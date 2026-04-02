@@ -9,180 +9,175 @@
   body { font-family: -apple-system, 'Noto Sans KR', sans-serif; background: #f5f6fa; color: #222; }
 
   header {
-    background: #03c75a;
-    color: white;
-    padding: 16px 24px;
-    display: flex;
-    align-items: center;
-    gap: 12px;
+    background: #03c75a; color: white;
+    padding: 14px 24px; display: flex; align-items: center; gap: 12px;
     box-shadow: 0 2px 8px rgba(0,0,0,0.15);
   }
-  header h1 { font-size: 18px; font-weight: 700; }
-  header .subtitle { font-size: 13px; opacity: 0.85; margin-left: auto; }
+  header h1 { font-size: 17px; font-weight: 700; }
+  .header-actions { margin-left: auto; display: flex; align-items: center; gap: 10px; }
+  .btn-classify {
+    background: rgba(255,255,255,0.2); color: white; border: 1px solid rgba(255,255,255,0.4);
+    padding: 6px 14px; border-radius: 6px; font-size: 13px; cursor: pointer;
+    transition: background 0.15s;
+  }
+  .btn-classify:hover { background: rgba(255,255,255,0.35); }
+  .last-updated { font-size: 12px; opacity: 0.8; }
 
   .stats-bar {
-    background: white;
-    border-bottom: 1px solid #e8e8e8;
-    padding: 14px 24px;
-    display: flex;
-    gap: 32px;
-    flex-wrap: wrap;
+    background: white; border-bottom: 1px solid #e8e8e8;
+    padding: 12px 24px; display: flex; gap: 24px; flex-wrap: wrap; align-items: center;
   }
   .stat { text-align: center; }
-  .stat .val { font-size: 22px; font-weight: 700; color: #03c75a; }
+  .stat .val { font-size: 20px; font-weight: 700; color: #03c75a; }
   .stat .lbl { font-size: 11px; color: #888; margin-top: 2px; }
+  .stat.warn .val { color: #e53935; }
+  .stat.info .val { color: #1976d2; }
 
-  .rating-dist { display: flex; align-items: center; gap: 6px; }
-  .bar-wrap { display: flex; flex-direction: column; gap: 2px; }
-  .bar-row { display: flex; align-items: center; gap: 6px; font-size: 11px; }
-  .bar-row .star-lbl { width: 20px; text-align: right; color: #666; }
-  .bar-bg { width: 80px; height: 6px; background: #eee; border-radius: 3px; overflow: hidden; }
-  .bar-fill { height: 100%; background: #ffc107; border-radius: 3px; transition: width 0.3s; }
-  .bar-count { color: #888; min-width: 20px; }
+  .sentiment-bar { display: flex; align-items: center; gap: 8px; }
+  .sbar { height: 8px; border-radius: 4px; min-width: 4px; transition: width 0.3s; }
+  .sbar.pos { background: #03c75a; }
+  .sbar.neg { background: #e53935; }
+  .sbar.mix { background: #ff9800; }
+  .sbar-label { font-size: 11px; color: #666; }
 
   .controls {
-    padding: 14px 24px;
-    display: flex;
-    gap: 10px;
-    flex-wrap: wrap;
-    align-items: center;
-    background: white;
-    border-bottom: 1px solid #e8e8e8;
-    position: sticky;
-    top: 0;
-    z-index: 10;
-    box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+    padding: 12px 24px; display: flex; gap: 8px; flex-wrap: wrap; align-items: center;
+    background: white; border-bottom: 1px solid #e8e8e8;
+    position: sticky; top: 0; z-index: 10; box-shadow: 0 1px 4px rgba(0,0,0,0.06);
   }
   .search-box {
-    flex: 1;
-    min-width: 200px;
-    padding: 8px 12px;
-    border: 1px solid #ddd;
-    border-radius: 6px;
-    font-size: 14px;
-    outline: none;
+    flex: 1; min-width: 180px; padding: 7px 12px;
+    border: 1px solid #ddd; border-radius: 6px; font-size: 14px; outline: none;
   }
   .search-box:focus { border-color: #03c75a; }
   select {
-    padding: 8px 10px;
-    border: 1px solid #ddd;
-    border-radius: 6px;
-    font-size: 13px;
-    background: white;
-    cursor: pointer;
-    outline: none;
+    padding: 7px 10px; border: 1px solid #ddd; border-radius: 6px;
+    font-size: 13px; background: white; cursor: pointer; outline: none;
   }
   .filter-count { font-size: 13px; color: #666; margin-left: auto; }
 
-  .reviews-container { padding: 16px 24px; }
+  .reviews-container { padding: 14px 24px; }
 
   .review-card {
-    background: white;
-    border-radius: 10px;
-    padding: 18px 20px;
-    margin-bottom: 12px;
-    border: 1px solid #ececec;
-    transition: box-shadow 0.15s;
+    background: white; border-radius: 10px; padding: 16px 18px;
+    margin-bottom: 10px; border: 1px solid #ececec; transition: box-shadow 0.15s;
   }
   .review-card:hover { box-shadow: 0 3px 12px rgba(0,0,0,0.08); }
+  .review-card.reportable { border-left: 3px solid #e53935; }
 
-  .review-header { display: flex; align-items: flex-start; gap: 12px; margin-bottom: 10px; }
+  .review-header { display: flex; align-items: flex-start; gap: 10px; margin-bottom: 8px; }
   .reviewer-avatar {
-    width: 36px; height: 36px;
-    background: linear-gradient(135deg, #03c75a, #00a846);
-    border-radius: 50%;
-    display: flex; align-items: center; justify-content: center;
-    color: white; font-size: 14px; font-weight: 700;
-    flex-shrink: 0;
+    width: 34px; height: 34px; background: linear-gradient(135deg, #03c75a, #00a846);
+    border-radius: 50%; display: flex; align-items: center; justify-content: center;
+    color: white; font-size: 13px; font-weight: 700; flex-shrink: 0;
   }
   .reviewer-info { flex: 1; }
-  .reviewer-name { font-weight: 600; font-size: 14px; }
+  .reviewer-name { font-weight: 600; font-size: 14px; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
   .review-meta { font-size: 12px; color: #888; margin-top: 2px; }
-  .stars { color: #ffc107; font-size: 16px; letter-spacing: 1px; }
-  .star-num { font-size: 13px; color: #666; margin-left: 4px; }
+  .stars { color: #ffc107; font-size: 15px; }
+  .star-num { font-size: 12px; color: #666; margin-left: 3px; }
+
+  /* 배지 */
+  .badge {
+    display: inline-block; border-radius: 4px; font-size: 11px;
+    padding: 2px 7px; font-weight: 600; white-space: nowrap;
+  }
+  .badge-replied { background: #e8f9f0; color: #03c75a; }
+  .badge-unreplied { background: #fff3f3; color: #e53935; }
+  .badge-positive { background: #e8f9f0; color: #03c75a; }
+  .badge-negative { background: #fff3f3; color: #e53935; }
+  .badge-mixed { background: #fff8e1; color: #f57c00; }
+  .badge-report { background: #fce4ec; color: #c62828; }
+  .badge-draft { background: #e3f2fd; color: #1565c0; }
+  .badge-approved { background: #e8f5e9; color: #2e7d32; }
 
   .product-tag {
-    display: inline-block;
-    background: #f0faf5;
-    color: #00a846;
-    border: 1px solid #c6ecd8;
-    border-radius: 4px;
-    font-size: 11px;
-    padding: 2px 8px;
-    margin-bottom: 8px;
-    max-width: 100%;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+    display: inline-block; background: #f0faf5; color: #00a846;
+    border: 1px solid #c6ecd8; border-radius: 4px; font-size: 11px;
+    padding: 2px 8px; margin-bottom: 7px; max-width: 100%;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+
+  .topic-chips { display: flex; gap: 4px; flex-wrap: wrap; margin-bottom: 7px; }
+  .topic-chip {
+    background: #f0f4ff; color: #3949ab; border: 1px solid #c5cae9;
+    border-radius: 12px; font-size: 11px; padding: 2px 9px;
+  }
+
+  .report-warning {
+    background: #fce4ec; border-radius: 4px; padding: 5px 10px;
+    font-size: 12px; color: #c62828; margin-bottom: 7px;
+    display: flex; align-items: center; gap: 5px;
   }
 
   .review-content { font-size: 14px; line-height: 1.7; color: #333; white-space: pre-wrap; }
 
   .reply-box {
-    margin-top: 12px;
-    background: #f8f8f8;
-    border-left: 3px solid #03c75a;
-    border-radius: 0 6px 6px 0;
-    padding: 10px 14px;
-    font-size: 13px;
-    color: #444;
+    margin-top: 10px; background: #f8f8f8; border-left: 3px solid #03c75a;
+    border-radius: 0 6px 6px 0; padding: 9px 13px; font-size: 13px; color: #444;
   }
   .reply-box .reply-label { font-size: 11px; color: #03c75a; font-weight: 600; margin-bottom: 4px; }
 
-  .badge-replied {
-    display: inline-block;
-    background: #e8f9f0;
-    color: #03c75a;
-    border-radius: 4px;
-    font-size: 11px;
-    padding: 2px 6px;
-    font-weight: 600;
+  .ai-reply-section { margin-top: 10px; }
+  .ai-reply-box {
+    background: #f0f4ff; border: 1px solid #c5cae9; border-radius: 6px;
+    padding: 10px 13px; font-size: 13px; color: #333;
   }
-  .badge-unreplied {
-    display: inline-block;
-    background: #fff3f3;
-    color: #e53935;
-    border-radius: 4px;
-    font-size: 11px;
-    padding: 2px 6px;
-    font-weight: 600;
+  .ai-reply-label { font-size: 11px; color: #3949ab; font-weight: 600; margin-bottom: 6px; }
+  .ai-reply-text {
+    width: 100%; border: none; background: transparent; font-size: 13px;
+    font-family: inherit; color: #333; resize: vertical; min-height: 60px;
+    outline: none; line-height: 1.6;
   }
+  .ai-reply-actions { display: flex; gap: 6px; margin-top: 8px; }
+  .btn-approve {
+    background: #03c75a; color: white; border: none; border-radius: 5px;
+    padding: 5px 14px; font-size: 12px; cursor: pointer; font-weight: 600;
+  }
+  .btn-approve:hover { background: #00a846; }
+  .btn-reject {
+    background: white; color: #666; border: 1px solid #ddd; border-radius: 5px;
+    padding: 5px 14px; font-size: 12px; cursor: pointer;
+  }
+  .btn-reject:hover { background: #f5f5f5; }
 
-  .empty-state {
-    text-align: center;
-    padding: 60px 20px;
-    color: #aaa;
+  .btn-generate {
+    margin-top: 8px; background: #e3f2fd; color: #1565c0;
+    border: 1px solid #90caf9; border-radius: 5px;
+    padding: 5px 14px; font-size: 12px; cursor: pointer;
   }
+  .btn-generate:hover { background: #bbdefb; }
+  .btn-generate:disabled { opacity: 0.5; cursor: not-allowed; }
+
+  .empty-state { text-align: center; padding: 60px 20px; color: #aaa; }
   .empty-state .icon { font-size: 48px; margin-bottom: 12px; }
-  .empty-state p { font-size: 15px; }
-  .empty-state small { font-size: 13px; margin-top: 6px; display: block; }
-
   .loading { text-align: center; padding: 40px; color: #aaa; font-size: 15px; }
 
   @media (max-width: 600px) {
-    .controls { padding: 10px 14px; }
-    .reviews-container { padding: 10px 14px; }
-    .stats-bar { padding: 10px 14px; gap: 16px; }
+    .controls, .stats-bar, .reviews-container { padding: 10px 14px; }
   }
 </style>
 </head>
 <body>
 
 <header>
-  <svg width="24" height="24" viewBox="0 0 24 24" fill="white">
-    <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 14.5v-9l6 4.5-6 4.5z"/>
-  </svg>
+  <svg width="22" height="22" viewBox="0 0 24 24" fill="white"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 14.5v-9l6 4.5-6 4.5z"/></svg>
   <h1>스마트스토어 리뷰 관리</h1>
-  <span class="subtitle" id="last-updated">-</span>
+  <div class="header-actions">
+    <button class="btn-classify" onclick="runClassify()">AI 분류 실행</button>
+    <span class="last-updated" id="last-updated">-</span>
+  </div>
 </header>
 
 <div class="stats-bar" id="stats-bar">
   <div class="stat"><div class="val" id="stat-total">-</div><div class="lbl">전체 리뷰</div></div>
   <div class="stat"><div class="val" id="stat-avg">-</div><div class="lbl">평균 별점</div></div>
   <div class="stat"><div class="val" id="stat-replied">-</div><div class="lbl">답글 완료</div></div>
-  <div class="stat"><div class="val" id="stat-unreplied">-</div><div class="lbl">미답글</div></div>
+  <div class="stat warn"><div class="val" id="stat-report">-</div><div class="lbl">신고 가능</div></div>
+  <div class="stat info"><div class="val" id="stat-draft">-</div><div class="lbl">AI 초안 대기</div></div>
   <div class="stat">
-    <div class="bar-wrap" id="rating-dist"></div>
+    <div class="sbar-label" style="margin-bottom:4px;font-size:11px;color:#888">감성 분포</div>
+    <div class="sentiment-bar" id="sentiment-bar"></div>
   </div>
 </div>
 
@@ -196,10 +191,30 @@
     <option value="2">★ 2점</option>
     <option value="1">★ 1점</option>
   </select>
+  <select id="filter-sentiment">
+    <option value="">감성 전체</option>
+    <option value="positive">긍정</option>
+    <option value="negative">부정</option>
+    <option value="mixed">혼합</option>
+  </select>
+  <select id="filter-topic">
+    <option value="">주제 전체</option>
+    <option value="효능">효능</option>
+    <option value="성분">성분</option>
+    <option value="포장">포장</option>
+    <option value="배송">배송</option>
+    <option value="가격">가격</option>
+    <option value="냄새/맛">냄새/맛</option>
+    <option value="복용편의">복용편의</option>
+  </select>
   <select id="filter-replied">
     <option value="">답글 전체</option>
     <option value="yes">답글 완료</option>
     <option value="no">미답글</option>
+  </select>
+  <select id="filter-reportable">
+    <option value="">신고 전체</option>
+    <option value="yes">신고 가능</option>
   </select>
   <select id="sort">
     <option value="newest">최신순</option>
@@ -220,46 +235,72 @@ let debounceTimer;
 function starsHTML(rating) {
   const n = parseFloat(rating) || 0;
   const full = Math.floor(n);
-  let s = '★'.repeat(full) + '☆'.repeat(5 - full);
-  return `<span class="stars">${s}</span><span class="star-num">${n}</span>`;
+  return `<span class="stars">${'★'.repeat(full)}${'☆'.repeat(5-full)}</span><span class="star-num">${n}</span>`;
 }
 
-function avatarChar(name) {
-  return name ? name[0].toUpperCase() : '?';
+function sentimentBadge(s) {
+  const map = { positive: ['긍정', 'positive'], negative: ['부정', 'negative'], mixed: ['혼합', 'mixed'] };
+  if (!s || !map[s]) return '';
+  const [label, cls] = map[s];
+  return `<span class="badge badge-${cls}">${label}</span>`;
+}
+
+function replyStatusBadge(status) {
+  if (status === 'draft') return '<span class="badge badge-draft">AI초안</span>';
+  if (status === 'approved') return '<span class="badge badge-approved">승인됨</span>';
+  return '';
 }
 
 function renderReviews(reviews) {
   const container = document.getElementById('reviews-container');
   if (!reviews.length) {
-    container.innerHTML = `<div class="empty-state">
-      <div class="icon">📭</div>
-      <p>조건에 맞는 리뷰가 없습니다</p>
-      <small>검색어나 필터를 변경해보세요</small>
-    </div>`;
+    container.innerHTML = `<div class="empty-state"><div class="icon">📭</div><p>조건에 맞는 리뷰가 없습니다</p></div>`;
     return;
   }
 
   container.innerHTML = reviews.map(r => {
+    const idx = r._idx;
     const product = r.product ? `<div class="product-tag" title="${r.product}">${r.product}${r.option ? ' · ' + r.option : ''}</div>` : '';
-    const replyBadge = r.replied
-      ? '<span class="badge-replied">답글완료</span>'
-      : '<span class="badge-unreplied">미답글</span>';
-    const replyBox = r.reply_content
-      ? `<div class="reply-box"><div class="reply-label">판매자 답글</div>${r.reply_content}</div>`
-      : '';
+    const repliedBadge = r.replied ? '<span class="badge badge-replied">답글완료</span>' : '<span class="badge badge-unreplied">미답글</span>';
+    const reportWarn = r.reportable ? `<div class="report-warning">🚨 신고 가능 · ${r.report_reason || ''}</div>` : '';
+    const topicChips = (r.topics || []).length
+      ? `<div class="topic-chips">${r.topics.map(t => `<span class="topic-chip">${t}</span>`).join('')}</div>` : '';
 
-    return `<div class="review-card">
+    // 기존 답글
+    const existingReply = r.replied && r.reply_content
+      ? `<div class="reply-box"><div class="reply-label">판매자 답글</div>${r.reply_content}</div>` : '';
+
+    // AI 답변 섹션
+    let aiSection = '';
+    if (!r.replied) {
+      if (r.reply_status === 'draft' || r.reply_status === 'approved') {
+        aiSection = `<div class="ai-reply-section">
+          <div class="ai-reply-box">
+            <div class="ai-reply-label">AI 생성 답변 ${replyStatusBadge(r.reply_status)}</div>
+            <textarea class="ai-reply-text" id="reply-text-${idx}">${r.ai_reply || ''}</textarea>
+            ${r.reply_status === 'draft' ? `<div class="ai-reply-actions">
+              <button class="btn-approve" onclick="approveReply(${idx})">승인</button>
+              <button class="btn-reject" onclick="rejectReply(${idx})">삭제</button>
+            </div>` : '<div style="font-size:11px;color:#2e7d32;margin-top:4px;">✓ 승인 완료</div>'}
+          </div>
+        </div>`;
+      } else {
+        aiSection = `<button class="btn-generate" onclick="generateReply(${idx}, this)">AI 답변 생성</button>`;
+      }
+    }
+
+    return `<div class="review-card${r.reportable ? ' reportable' : ''}" id="card-${idx}">
       <div class="review-header">
-        <div class="reviewer-avatar">${avatarChar(r.reviewer)}</div>
+        <div class="reviewer-avatar">${r.reviewer ? r.reviewer[0].toUpperCase() : '?'}</div>
         <div class="reviewer-info">
-          <div class="reviewer-name">${r.reviewer || '익명'} ${replyBadge}</div>
+          <div class="reviewer-name">${r.reviewer || '익명'} ${repliedBadge} ${sentimentBadge(r.sentiment)} ${replyStatusBadge(r.reply_status)}</div>
           <div class="review-meta">${r.date || ''}</div>
         </div>
         <div>${starsHTML(r.rating)}</div>
       </div>
-      ${product}
+      ${reportWarn}${product}${topicChips}
       <div class="review-content">${r.content || '(내용 없음)'}</div>
-      ${replyBox}
+      ${existingReply}${aiSection}
     </div>`;
   }).join('');
 }
@@ -268,36 +309,37 @@ function renderStats(stats) {
   document.getElementById('stat-total').textContent = stats.total.toLocaleString();
   document.getElementById('stat-avg').textContent = stats.avg_rating || '-';
   document.getElementById('stat-replied').textContent = stats.replied_count.toLocaleString();
-  document.getElementById('stat-unreplied').textContent = (stats.total - stats.replied_count).toLocaleString();
-  document.getElementById('filter-count').textContent = `${stats.filtered.toLocaleString()}건 표시 중`;
+  document.getElementById('stat-report').textContent = stats.reportable_count || 0;
+  document.getElementById('stat-draft').textContent = stats.draft_count || 0;
+  document.getElementById('filter-count').textContent = `${stats.filtered.toLocaleString()}건`;
 
-  const maxCount = Math.max(...Object.values(stats.rating_dist), 1);
-  const distEl = document.getElementById('rating-dist');
-  distEl.innerHTML = [5,4,3,2,1].map(i => {
-    const cnt = stats.rating_dist[i] || 0;
-    const pct = Math.round(cnt / maxCount * 100);
-    return `<div class="bar-row">
-      <span class="star-lbl">${i}★</span>
-      <div class="bar-bg"><div class="bar-fill" style="width:${pct}%"></div></div>
-      <span class="bar-count">${cnt}</span>
-    </div>`;
-  }).join('');
+  const sd = stats.sentiment_dist || {};
+  const total = (sd.positive||0) + (sd.negative||0) + (sd.mixed||0) || 1;
+  const pct = v => Math.max(Math.round(v/total*100), 2);
+  document.getElementById('sentiment-bar').innerHTML = `
+    <span class="sbar pos" style="width:${pct(sd.positive||0)}px" title="긍정 ${sd.positive||0}"></span>
+    <span class="sbar neg" style="width:${pct(sd.negative||0)}px" title="부정 ${sd.negative||0}"></span>
+    <span class="sbar mix" style="width:${pct(sd.mixed||0)}px" title="혼합 ${sd.mixed||0}"></span>
+    <span class="sbar-label">긍정 ${sd.positive||0} / 부정 ${sd.negative||0} / 혼합 ${sd.mixed||0}</span>
+  `;
 }
 
 function fetchReviews() {
-  const q = document.getElementById('search').value;
-  const rating = document.getElementById('filter-rating').value;
-  const replied = document.getElementById('filter-replied').value;
-  const sort = document.getElementById('sort').value;
-
-  const params = new URLSearchParams({ q, rating, replied, sort });
+  const params = new URLSearchParams({
+    q: document.getElementById('search').value,
+    rating: document.getElementById('filter-rating').value,
+    replied: document.getElementById('filter-replied').value,
+    sentiment: document.getElementById('filter-sentiment').value,
+    topic: document.getElementById('filter-topic').value,
+    reportable: document.getElementById('filter-reportable').value,
+    sort: document.getElementById('sort').value,
+  });
   fetch('/api/reviews?' + params)
     .then(r => r.json())
     .then(data => {
       renderStats(data.stats);
       renderReviews(data.reviews);
-      const now = new Date().toLocaleString('ko-KR');
-      document.getElementById('last-updated').textContent = `마지막 갱신: ${now}`;
+      document.getElementById('last-updated').textContent = new Date().toLocaleTimeString('ko-KR');
     })
     .catch(() => {
       document.getElementById('reviews-container').innerHTML =
@@ -305,15 +347,47 @@ function fetchReviews() {
     });
 }
 
-['search', 'filter-rating', 'filter-replied', 'sort'].forEach(id => {
-  document.getElementById(id).addEventListener('input', () => {
+function runClassify() {
+  if (!confirm('미분류 리뷰를 AI로 분류하겠습니까?')) return;
+  fetch('/api/classify', {method: 'POST'})
+    .then(() => {
+      alert('분류 실행 중... 잠시 후 새로고침하세요.');
+      setTimeout(fetchReviews, 5000);
+    });
+}
+
+function generateReply(idx, btn) {
+  btn.disabled = true;
+  btn.textContent = '생성 중...';
+  fetch(`/api/reply/generate/${idx}`, {method: 'POST'})
+    .then(r => r.json())
+    .then(data => {
+      if (data.error) { alert(data.error); btn.disabled = false; btn.textContent = 'AI 답변 생성'; }
+      else fetchReviews();
+    })
+    .catch(() => { btn.disabled = false; btn.textContent = 'AI 답변 생성'; });
+}
+
+function approveReply(idx) {
+  const text = document.getElementById(`reply-text-${idx}`)?.value || '';
+  fetch(`/api/reply/approve/${idx}`, {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({reply: text}),
+  }).then(() => fetchReviews());
+}
+
+function rejectReply(idx) {
+  fetch(`/api/reply/reject/${idx}`, {method: 'POST'}).then(() => fetchReviews());
+}
+
+['search','filter-rating','filter-sentiment','filter-topic','filter-replied','filter-reportable','sort']
+  .forEach(id => document.getElementById(id).addEventListener('input', () => {
     clearTimeout(debounceTimer);
     debounceTimer = setTimeout(fetchReviews, 250);
-  });
-});
+  }));
 
 fetchReviews();
-// 5분마다 자동 갱신
 setInterval(fetchReviews, 5 * 60 * 1000);
 </script>
 </body>
