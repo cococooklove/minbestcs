@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>스마트스토어 리뷰 관리</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, 'Noto Sans KR', sans-serif; background: #f5f6fa; color: #222; }
+
+  header {
+    background: #03c75a;
+    color: white;
+    padding: 16px 24px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+  }
+  header h1 { font-size: 18px; font-weight: 700; }
+  header .subtitle { font-size: 13px; opacity: 0.85; margin-left: auto; }
+
+  .stats-bar {
+    background: white;
+    border-bottom: 1px solid #e8e8e8;
+    padding: 14px 24px;
+    display: flex;
+    gap: 32px;
+    flex-wrap: wrap;
+  }
+  .stat { text-align: center; }
+  .stat .val { font-size: 22px; font-weight: 700; color: #03c75a; }
+  .stat .lbl { font-size: 11px; color: #888; margin-top: 2px; }
+
+  .rating-dist { display: flex; align-items: center; gap: 6px; }
+  .bar-wrap { display: flex; flex-direction: column; gap: 2px; }
+  .bar-row { display: flex; align-items: center; gap: 6px; font-size: 11px; }
+  .bar-row .star-lbl { width: 20px; text-align: right; color: #666; }
+  .bar-bg { width: 80px; height: 6px; background: #eee; border-radius: 3px; overflow: hidden; }
+  .bar-fill { height: 100%; background: #ffc107; border-radius: 3px; transition: width 0.3s; }
+  .bar-count { color: #888; min-width: 20px; }
+
+  .controls {
+    padding: 14px 24px;
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    align-items: center;
+    background: white;
+    border-bottom: 1px solid #e8e8e8;
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+  }
+  .search-box {
+    flex: 1;
+    min-width: 200px;
+    padding: 8px 12px;
+    border: 1px solid #ddd;
+    border-radius: 6px;
+    font-size: 14px;
+    outline: none;
+  }
+  .search-box:focus { border-color: #03c75a; }
+  select {
+    padding: 8px 10px;
+    border: 1px solid #ddd;
+    border-radius: 6px;
+    font-size: 13px;
+    background: white;
+    cursor: pointer;
+    outline: none;
+  }
+  .filter-count { font-size: 13px; color: #666; margin-left: auto; }
+
+  .reviews-container { padding: 16px 24px; }
+
+  .review-card {
+    background: white;
+    border-radius: 10px;
+    padding: 18px 20px;
+    margin-bottom: 12px;
+    border: 1px solid #ececec;
+    transition: box-shadow 0.15s;
+  }
+  .review-card:hover { box-shadow: 0 3px 12px rgba(0,0,0,0.08); }
+
+  .review-header { display: flex; align-items: flex-start; gap: 12px; margin-bottom: 10px; }
+  .reviewer-avatar {
+    width: 36px; height: 36px;
+    background: linear-gradient(135deg, #03c75a, #00a846);
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    color: white; font-size: 14px; font-weight: 700;
+    flex-shrink: 0;
+  }
+  .reviewer-info { flex: 1; }
+  .reviewer-name { font-weight: 600; font-size: 14px; }
+  .review-meta { font-size: 12px; color: #888; margin-top: 2px; }
+  .stars { color: #ffc107; font-size: 16px; letter-spacing: 1px; }
+  .star-num { font-size: 13px; color: #666; margin-left: 4px; }
+
+  .product-tag {
+    display: inline-block;
+    background: #f0faf5;
+    color: #00a846;
+    border: 1px solid #c6ecd8;
+    border-radius: 4px;
+    font-size: 11px;
+    padding: 2px 8px;
+    margin-bottom: 8px;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .review-content { font-size: 14px; line-height: 1.7; color: #333; white-space: pre-wrap; }
+
+  .reply-box {
+    margin-top: 12px;
+    background: #f8f8f8;
+    border-left: 3px solid #03c75a;
+    border-radius: 0 6px 6px 0;
+    padding: 10px 14px;
+    font-size: 13px;
+    color: #444;
+  }
+  .reply-box .reply-label { font-size: 11px; color: #03c75a; font-weight: 600; margin-bottom: 4px; }
+
+  .badge-replied {
+    display: inline-block;
+    background: #e8f9f0;
+    color: #03c75a;
+    border-radius: 4px;
+    font-size: 11px;
+    padding: 2px 6px;
+    font-weight: 600;
+  }
+  .badge-unreplied {
+    display: inline-block;
+    background: #fff3f3;
+    color: #e53935;
+    border-radius: 4px;
+    font-size: 11px;
+    padding: 2px 6px;
+    font-weight: 600;
+  }
+
+  .empty-state {
+    text-align: center;
+    padding: 60px 20px;
+    color: #aaa;
+  }
+  .empty-state .icon { font-size: 48px; margin-bottom: 12px; }
+  .empty-state p { font-size: 15px; }
+  .empty-state small { font-size: 13px; margin-top: 6px; display: block; }
+
+  .loading { text-align: center; padding: 40px; color: #aaa; font-size: 15px; }
+
+  @media (max-width: 600px) {
+    .controls { padding: 10px 14px; }
+    .reviews-container { padding: 10px 14px; }
+    .stats-bar { padding: 10px 14px; gap: 16px; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <svg width="24" height="24" viewBox="0 0 24 24" fill="white">
+    <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 14.5v-9l6 4.5-6 4.5z"/>
+  </svg>
+  <h1>스마트스토어 리뷰 관리</h1>
+  <span class="subtitle" id="last-updated">-</span>
+</header>
+
+<div class="stats-bar" id="stats-bar">
+  <div class="stat"><div class="val" id="stat-total">-</div><div class="lbl">전체 리뷰</div></div>
+  <div class="stat"><div class="val" id="stat-avg">-</div><div class="lbl">평균 별점</div></div>
+  <div class="stat"><div class="val" id="stat-replied">-</div><div class="lbl">답글 완료</div></div>
+  <div class="stat"><div class="val" id="stat-unreplied">-</div><div class="lbl">미답글</div></div>
+  <div class="stat">
+    <div class="bar-wrap" id="rating-dist"></div>
+  </div>
+</div>
+
+<div class="controls">
+  <input class="search-box" type="text" id="search" placeholder="리뷰 내용, 상품명, 작성자 검색...">
+  <select id="filter-rating">
+    <option value="">별점 전체</option>
+    <option value="5">★ 5점</option>
+    <option value="4">★ 4점</option>
+    <option value="3">★ 3점</option>
+    <option value="2">★ 2점</option>
+    <option value="1">★ 1점</option>
+  </select>
+  <select id="filter-replied">
+    <option value="">답글 전체</option>
+    <option value="yes">답글 완료</option>
+    <option value="no">미답글</option>
+  </select>
+  <select id="sort">
+    <option value="newest">최신순</option>
+    <option value="oldest">오래된순</option>
+    <option value="rating_high">별점 높은순</option>
+    <option value="rating_low">별점 낮은순</option>
+  </select>
+  <span class="filter-count" id="filter-count"></span>
+</div>
+
+<div class="reviews-container" id="reviews-container">
+  <div class="loading">불러오는 중...</div>
+</div>
+
+<script>
+let debounceTimer;
+
+function starsHTML(rating) {
+  const n = parseFloat(rating) || 0;
+  const full = Math.floor(n);
+  let s = '★'.repeat(full) + '☆'.repeat(5 - full);
+  return `<span class="stars">${s}</span><span class="star-num">${n}</span>`;
+}
+
+function avatarChar(name) {
+  return name ? name[0].toUpperCase() : '?';
+}
+
+function renderReviews(reviews) {
+  const container = document.getElementById('reviews-container');
+  if (!reviews.length) {
+    container.innerHTML = `<div class="empty-state">
+      <div class="icon">📭</div>
+      <p>조건에 맞는 리뷰가 없습니다</p>
+      <small>검색어나 필터를 변경해보세요</small>
+    </div>`;
+    return;
+  }
+
+  container.innerHTML = reviews.map(r => {
+    const product = r.product ? `<div class="product-tag" title="${r.product}">${r.product}${r.option ? ' · ' + r.option : ''}</div>` : '';
+    const replyBadge = r.replied
+      ? '<span class="badge-replied">답글완료</span>'
+      : '<span class="badge-unreplied">미답글</span>';
+    const replyBox = r.reply_content
+      ? `<div class="reply-box"><div class="reply-label">판매자 답글</div>${r.reply_content}</div>`
+      : '';
+
+    return `<div class="review-card">
+      <div class="review-header">
+        <div class="reviewer-avatar">${avatarChar(r.reviewer)}</div>
+        <div class="reviewer-info">
+          <div class="reviewer-name">${r.reviewer || '익명'} ${replyBadge}</div>
+          <div class="review-meta">${r.date || ''}</div>
+        </div>
+        <div>${starsHTML(r.rating)}</div>
+      </div>
+      ${product}
+      <div class="review-content">${r.content || '(내용 없음)'}</div>
+      ${replyBox}
+    </div>`;
+  }).join('');
+}
+
+function renderStats(stats) {
+  document.getElementById('stat-total').textContent = stats.total.toLocaleString();
+  document.getElementById('stat-avg').textContent = stats.avg_rating || '-';
+  document.getElementById('stat-replied').textContent = stats.replied_count.toLocaleString();
+  document.getElementById('stat-unreplied').textContent = (stats.total - stats.replied_count).toLocaleString();
+  document.getElementById('filter-count').textContent = `${stats.filtered.toLocaleString()}건 표시 중`;
+
+  const maxCount = Math.max(...Object.values(stats.rating_dist), 1);
+  const distEl = document.getElementById('rating-dist');
+  distEl.innerHTML = [5,4,3,2,1].map(i => {
+    const cnt = stats.rating_dist[i] || 0;
+    const pct = Math.round(cnt / maxCount * 100);
+    return `<div class="bar-row">
+      <span class="star-lbl">${i}★</span>
+      <div class="bar-bg"><div class="bar-fill" style="width:${pct}%"></div></div>
+      <span class="bar-count">${cnt}</span>
+    </div>`;
+  }).join('');
+}
+
+function fetchReviews() {
+  const q = document.getElementById('search').value;
+  const rating = document.getElementById('filter-rating').value;
+  const replied = document.getElementById('filter-replied').value;
+  const sort = document.getElementById('sort').value;
+
+  const params = new URLSearchParams({ q, rating, replied, sort });
+  fetch('/api/reviews?' + params)
+    .then(r => r.json())
+    .then(data => {
+      renderStats(data.stats);
+      renderReviews(data.reviews);
+      const now = new Date().toLocaleString('ko-KR');
+      document.getElementById('last-updated').textContent = `마지막 갱신: ${now}`;
+    })
+    .catch(() => {
+      document.getElementById('reviews-container').innerHTML =
+        '<div class="empty-state"><div class="icon">⚠️</div><p>데이터를 불러오지 못했습니다</p></div>';
+    });
+}
+
+['search', 'filter-rating', 'filter-replied', 'sort'].forEach(id => {
+  document.getElementById(id).addEventListener('input', () => {
+    clearTimeout(debounceTimer);
+    debounceTimer = setTimeout(fetchReviews, 250);
+  });
+});
+
+fetchReviews();
+// 5분마다 자동 갱신
+setInterval(fetchReviews, 5 * 60 * 1000);
+</script>
+</body>
+</html>

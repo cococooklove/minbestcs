@@ -1,0 +1,6 @@
+data/browser_profile/
+data/downloads/
+data/reviews.json
+__pycache__/
+*.pyc
+.DS_Store
