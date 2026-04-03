@@ -4,7 +4,9 @@
 접속: http://localhost:5000
 """
 from flask import Flask, render_template, jsonify, request
-import json, os
+import json, os, subprocess, sys
+from dotenv import load_dotenv
+load_dotenv()
 
 app = Flask(__name__)
 REVIEWS_FILE = "data/reviews.json"
@@ -81,6 +83,7 @@ def api_reviews():
         },
         "reportable_count": sum(1 for r in all_reviews if r.get("reportable")),
         "draft_count": sum(1 for r in all_reviews if r.get("reply_status") == "draft"),
+        "need_reply_count": sum(1 for r in all_reviews if not r.get("replied") and not r.get("ai_reply")),
     }
 
     # 인덱스 포함해서 반환 (답변 승인 등에 필요)
@@ -101,12 +104,51 @@ def api_reviews():
     return jsonify({"reviews": indexed_reviews, "stats": stats})
 
 
+PROFILE_DIR = "data/browser_profile"
+SETTINGS_FILE = "config/settings.json"
+BRAND_TONE_FILE = "config/brand_tone.txt"
+
+
+def load_settings():
+    if not os.path.exists(SETTINGS_FILE):
+        return {"auto_reply": False, "report_criteria": ["욕설", "경쟁사 언급", "광고성", "반복 내용"], "anthropic_api_key": ""}
+    with open(SETTINGS_FILE, encoding="utf-8") as f:
+        return json.load(f)
+
+
+def save_settings(data):
+    with open(SETTINGS_FILE, "w", encoding="utf-8") as f:
+        json.dump(data, f, ensure_ascii=False, indent=2)
+
+
+@app.route("/api/login/start", methods=["POST"])
+def api_login_start():
+    subprocess.Popen([sys.executable, "login.py"])
+    return jsonify({"status": "started"})
+
+
+@app.route("/api/login/status")
+def api_login_status():
+    cookies_path = os.path.join(PROFILE_DIR, "Default", "Cookies")
+    logged_in = os.path.exists(cookies_path)
+    return jsonify({"logged_in": logged_in})
+
+
+@app.route("/api/classify/progress")
+def api_classify_progress():
+    path = "data/classify_progress.json"
+    if not os.path.exists(path):
+        return jsonify({"running": False, "done": 0, "total": 0, "step": ""})
+    with open(path, encoding="utf-8") as f:
+        return jsonify(json.load(f))
+
+
 @app.route("/api/classify", methods=["POST"])
 def api_classify():
     """미분류 리뷰 일괄 분류"""
-    import subprocess, sys
     subprocess.Popen([sys.executable, "classifier.py"])
-    return jsonify({"status": "started"})
+    mtime = os.path.getmtime(REVIEWS_FILE) if os.path.exists(REVIEWS_FILE) else 0
+    return jsonify({"status": "started", "mtime": mtime})
 
 
 @app.route("/api/reply/generate/<int:idx>", methods=["POST"])
@@ -118,7 +160,7 @@ def api_generate_reply(idx):
 
     api_key = os.environ.get("ANTHROPIC_API_KEY")
     if not api_key:
-        return jsonify({"error": "ANTHROPIC_API_KEY 없음. 환경변수를 설정하세요."}), 400
+        return jsonify({"error": "ANTHROPIC_API_KEY 환경변수가 없습니다. export ANTHROPIC_API_KEY=sk-ant-... 후 재실행하세요."}), 400
 
     try:
         import anthropic
@@ -126,10 +168,11 @@ def api_generate_reply(idx):
         client = anthropic.Anthropic(api_key=api_key)
         brand_tone = load_brand_tone()
         reply = generate_reply(reviews[idx], brand_tone, client)
+        auto_reply = load_settings().get("auto_reply", False)
         reviews[idx]["ai_reply"] = reply
-        reviews[idx]["reply_status"] = "draft"
+        reviews[idx]["reply_status"] = "approved" if auto_reply else "draft"
         save_reviews(reviews)
-        return jsonify({"reply": reply, "status": "draft"})
+        return jsonify({"reply": reply, "status": reviews[idx]["reply_status"]})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
@@ -162,6 +205,33 @@ def api_reject_reply(idx):
     return jsonify({"status": "rejected"})
 
 
+@app.route("/api/stats/daily")
+def api_stats_daily():
+    from datetime import date, timedelta
+    reviews = load_reviews()
+    counts = {}
+    for r in reviews:
+        d = r.get("date", "")
+        if d and len(d) >= 10:
+            key = d[:10]
+            counts[key] = counts.get(key, 0) + 1
+    if counts:
+        all_dates = sorted(counts.keys())
+        start = all_dates[0]
+        end = date.today().isoformat()
+        cur = date.fromisoformat(start)
+        end_d = date.fromisoformat(end)
+        dates, vals = [], []
+        while cur <= end_d:
+            s = cur.isoformat()
+            dates.append(s)
+            vals.append(counts.get(s, 0))
+            cur += timedelta(days=1)
+    else:
+        dates, vals = [], []
+    return jsonify({"dates": dates, "counts": vals})
+
+
 @app.route("/api/stats/voc")
 def api_voc_stats():
     """VOC 통계 - 주제별/감성별 집계"""
@@ -189,5 +259,64 @@ def _sentiment_by_product(reviews):
     return result
 
 
+@app.route("/api/admin/config", methods=["GET"])
+def admin_config_get():
+    s = load_settings()
+    s["anthropic_api_key_set"] = bool(s.get("anthropic_api_key") or os.environ.get("ANTHROPIC_API_KEY"))
+    s["anthropic_api_key"] = ""  # 키 값 자체는 노출 안 함
+    return jsonify(s)
+
+
+@app.route("/api/admin/config", methods=["POST"])
+def admin_config_post():
+    data = request.get_json() or {}
+    s = load_settings()
+    if "auto_reply" in data:
+        s["auto_reply"] = bool(data["auto_reply"])
+    if "auto_generate_reply" in data:
+        s["auto_generate_reply"] = bool(data["auto_generate_reply"])
+    if "report_criteria" in data:
+        s["report_criteria"] = data["report_criteria"]
+    if data.get("anthropic_api_key"):
+        s["anthropic_api_key"] = data["anthropic_api_key"]
+        os.environ["ANTHROPIC_API_KEY"] = data["anthropic_api_key"]
+    if "coupon_rules" in data:
+        s["coupon_rules"] = data["coupon_rules"]
+    save_settings(s)
+    return jsonify({"status": "ok"})
+
+
+@app.route("/api/admin/brand-tone", methods=["GET"])
+def admin_brand_tone_get():
+    content = ""
+    if os.path.exists(BRAND_TONE_FILE):
+        with open(BRAND_TONE_FILE, encoding="utf-8") as f:
+            content = f.read()
+    return jsonify({"content": content})
+
+
+@app.route("/api/admin/brand-tone", methods=["POST"])
+def admin_brand_tone_post():
+    data = request.get_json() or {}
+    with open(BRAND_TONE_FILE, "w", encoding="utf-8") as f:
+        f.write(data.get("content", ""))
+    return jsonify({"status": "ok"})
+
+
+@app.route("/api/scrape", methods=["POST"])
+def api_scrape():
+    subprocess.Popen([sys.executable, "scraper.py"])
+    mtime = os.path.getmtime(REVIEWS_FILE) if os.path.exists(REVIEWS_FILE) else 0
+    return jsonify({"status": "started", "mtime": mtime})
+
+
+@app.route("/api/scrape/status")
+def api_scrape_status():
+    mtime = os.path.getmtime(REVIEWS_FILE) if os.path.exists(REVIEWS_FILE) else 0
+    return jsonify({"mtime": mtime})
+
+
 if __name__ == "__main__":
-    app.run(debug=True, port=5000)
+    import webbrowser, threading
+    threading.Timer(1.0, lambda: webbrowser.open("http://localhost:8080")).start()
+    app.run(debug=False, port=8080)

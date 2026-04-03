@@ -14,18 +14,11 @@ DOWNLOAD_DIR = Path("data/downloads").resolve()
 
 
 def wait_for_login(page):
-    """로그인될 때까지 대기"""
-    LOGIN_INDICATORS = ("login", "nidlogin", "naver.com/nid", "oauth", "signin")
-    print("로그인 대기 중... (로그인 완료되면 자동으로 진행됩니다)")
-    while True:
-        url = page.url
-        is_login = any(x in url.lower() for x in LOGIN_INDICATORS)
-        on_store = "sell.smartstore.naver.com" in url and not is_login
-        if on_store:
-            print(f"로그인 확인: {url}")
-            time.sleep(2)
-            return
-        time.sleep(1.5)
+    """자동 로그인 후 셀러센터 진입 대기"""
+    from login import auto_login, wait_for_seller_center
+    print("자동 로그인 시도 중...")
+    auto_login(page)
+    wait_for_seller_center(page)
 
 
 def excel_to_reviews(filepath):
@@ -41,15 +34,15 @@ def excel_to_reviews(filepath):
     print(f"  헤더: {headers}")
 
     col_map = {
-        "reviewer":      ["작성자", "구매자", "회원ID", "아이디"],
-        "date":          ["작성일", "리뷰작성일", "날짜"],
-        "rating":        ["별점", "평점", "리뷰점수", "점수"],
+        "reviewer":      ["등록자", "작성자", "구매자", "회원ID"],
+        "date":          ["리뷰등록일", "작성일", "리뷰작성일", "날짜"],
+        "rating":        ["구매자평점", "별점", "평점", "리뷰점수"],
         "product":       ["상품명", "상품"],
         "option":        ["옵션", "선택옵션"],
-        "content":       ["리뷰내용", "내용", "리뷰"],
-        "replied":       ["답글여부", "답변여부", "답글"],
+        "content":       ["리뷰상세내용", "리뷰내용", "내용", "리뷰"],
+        "replied":       ["답글여부", "답변여부"],
         "reply_content": ["답글내용", "답변내용"],
-        "order_no":      ["주문번호"],
+        "order_no":      ["상품주문번호", "주문번호"],
     }
 
     def find_col(field):
@@ -73,9 +66,13 @@ def excel_to_reviews(filepath):
         if not any(row):
             continue
         replied_val = cell(row, "replied")
+        raw_date = cell(row, "date")
+        import re as _re
+        m = _re.match(r'(\d{4})\.(\d{2})\.(\d{2})', raw_date)
+        norm_date = f"{m.group(1)}-{m.group(2)}-{m.group(3)}" if m else raw_date
         reviews.append({
             "reviewer":      cell(row, "reviewer"),
-            "date":          cell(row, "date"),
+            "date":          norm_date,
             "rating":        cell(row, "rating"),
             "product":       cell(row, "product"),
             "option":        cell(row, "option"),
@@ -111,35 +108,42 @@ def main():
         page = context.pages[0] if context.pages else context.new_page()
         page.on("dialog", lambda d: d.accept())
 
-        # 스마트스토어 리뷰 페이지로 이동
-        print("리뷰 관리 페이지로 이동 중...")
+        # 셀러센터로 이동 (로그인 안 됐으면 로그인 페이지로 리다이렉트됨)
+        print("셀러센터로 이동 중...")
         try:
             page.goto("https://sell.smartstore.naver.com/#/review/search", timeout=15000)
         except Exception:
             pass
-        time.sleep(2)
 
-        # 로그인 안 되어 있으면 대기
-        url = page.url
-        if "sell.smartstore.naver.com" not in url or any(
-            x in url.lower() for x in ("login", "nidlogin", "oauth", "signin")
-        ):
-            wait_for_login(page)
-            try:
-                page.goto("https://sell.smartstore.naver.com/#/review/search", timeout=15000)
-            except Exception:
-                pass
-            time.sleep(3)
+        # 로그인 대기 (최대 5분)
+        print("로그인 대기 중... (로그인이 필요하면 브라우저에서 완료해주세요)")
+        for _ in range(300):
+            url = page.url.lower()
+            if "sell.smartstore.naver.com" in url and not any(
+                x in url for x in ("login", "nidlogin", "oauth", "signin")
+            ):
+                break
+            time.sleep(1)
+        else:
+            print("로그인 시간 초과")
+            context.close()
+            pw.stop()
+            return
 
-        print("리뷰 페이지 로딩 대기 중...")
+        # 리뷰 검색 페이지로 이동
+        print("리뷰 페이지 로딩 중...")
+        try:
+            page.goto("https://sell.smartstore.naver.com/#/review/search", timeout=15000)
+            page.wait_for_load_state("networkidle", timeout=15000)
+        except Exception:
+            pass
         time.sleep(3)
 
-        # 엑셀다운 버튼 클릭
-        print("'엑셀다운' 버튼 탐색 중...")
+        # 엑셀다운 버튼 대기
+        print("'엑셀다운' 버튼 대기 중...")
         btn = page.get_by_text("엑셀다운").first
-        btn.wait_for(state="visible", timeout=15000)
+        btn.wait_for(state="visible", timeout=30000)
         print("버튼 클릭...")
-
         with page.expect_download(timeout=60000) as dl_info:
             btn.click()
             time.sleep(2)
@@ -170,7 +174,6 @@ def main():
     except Exception:
         import traceback
         traceback.print_exc()
-        input("\n오류 발생. Enter를 눌러 종료: ")
     finally:
         context.close()
         pw.stop()
@@ -193,7 +196,7 @@ def main():
         json.dump(all_reviews, f, ensure_ascii=False, indent=2)
 
     print(f"\n완료: 신규 {len(added)}건 추가 / 전체 {len(all_reviews)}건")
-    print(f"웹 뷰어: python3 app.py → http://localhost:5000")
+
 
 
 if __name__ == "__main__":

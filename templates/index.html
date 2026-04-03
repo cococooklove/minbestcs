@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>스마트스토어 리뷰 관리</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body { font-family: -apple-system, 'Noto Sans KR', sans-serif; background: #f5f6fa; color: #222; }
@@ -22,6 +23,100 @@
   }
   .btn-classify:hover { background: rgba(255,255,255,0.35); }
   .last-updated { font-size: 12px; opacity: 0.8; }
+  .btn-admin {
+    background: rgba(255,255,255,0.15); color: white;
+    border: 1px solid rgba(255,255,255,0.3);
+    padding: 6px 14px; border-radius: 6px; font-size: 13px; cursor: pointer;
+    transition: background 0.15s;
+  }
+  .btn-admin:hover { background: rgba(255,255,255,0.28); }
+  .btn-admin.active { background: rgba(255,255,255,0.35); }
+
+  /* 관리자 패널 */
+  .admin-panel { display: none; padding: 24px; max-width: 760px; margin: 0 auto; }
+  .admin-panel.open { display: block; }
+  .admin-section {
+    background: white; border-radius: 10px; border: 1px solid #ececec;
+    padding: 20px 22px; margin-bottom: 16px;
+  }
+  .admin-section-title {
+    font-size: 15px; font-weight: 700; margin-bottom: 14px;
+    padding-bottom: 10px; border-bottom: 1px solid #f0f0f0;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .admin-label { font-size: 13px; font-weight: 600; color: #444; margin-bottom: 6px; display: block; }
+  .admin-textarea {
+    width: 100%; height: 260px; padding: 10px 12px;
+    border: 1px solid #ddd; border-radius: 6px; font-size: 13px;
+    font-family: 'Menlo', monospace; resize: vertical; outline: none; line-height: 1.6;
+  }
+  .admin-textarea:focus { border-color: #03c75a; }
+  .admin-input {
+    width: 100%; padding: 8px 12px;
+    border: 1px solid #ddd; border-radius: 6px; font-size: 13px; outline: none;
+  }
+  .admin-input:focus { border-color: #03c75a; }
+  .admin-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+  .admin-row-label { font-size: 14px; color: #333; }
+  .admin-row-sub { font-size: 12px; color: #888; margin-top: 2px; }
+  .toggle-wrap { display: flex; align-items: center; gap: 8px; }
+  .toggle {
+    width: 42px; height: 24px; background: #ddd; border-radius: 12px;
+    cursor: pointer; position: relative; transition: background 0.2s; flex-shrink: 0;
+  }
+  .toggle.on { background: #03c75a; }
+  .toggle::after {
+    content: ''; position: absolute; width: 18px; height: 18px;
+    background: white; border-radius: 50%; top: 3px; left: 3px;
+    transition: left 0.2s; box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+  }
+  .toggle.on::after { left: 21px; }
+  .btn-save {
+    margin-top: 12px; background: #03c75a; color: white;
+    border: none; border-radius: 6px; padding: 7px 18px;
+    font-size: 13px; font-weight: 600; cursor: pointer; transition: background 0.15s;
+  }
+  .btn-save:hover:not(:disabled) { background: #02b350; }
+  .btn-save:disabled { background: #e0e0e0; color: #aaa; cursor: default; }
+  .api-status { font-size: 12px; margin-top: 6px; }
+  .api-status.set { color: #03c75a; }
+  .api-status.unset { color: #e53935; }
+
+  .coupon-rule {
+    display: flex; align-items: center; gap: 12px;
+    padding: 10px 0; border-bottom: 1px solid #f5f5f5;
+  }
+  .coupon-rule:last-child { border-bottom: none; }
+  .coupon-rule-label { font-size: 13px; color: #444; width: 160px; flex-shrink: 0; }
+  .coupon-rule-input {
+    flex: 1; padding: 6px 10px; border: 1px solid #ddd;
+    border-radius: 5px; font-size: 13px; outline: none;
+  }
+  .coupon-rule-input:focus { border-color: #03c75a; }
+  .coupon-rule-input:disabled { background: #f8f8f8; color: #aaa; }
+
+  .btn-naver-login {
+    display: flex; align-items: center; gap: 6px;
+    background: white; color: #03c75a;
+    border: none; border-radius: 6px;
+    padding: 6px 14px; font-size: 13px; font-weight: 700;
+    cursor: pointer; transition: opacity 0.15s;
+  }
+  .btn-naver-login:hover { opacity: 0.85; }
+  .btn-naver-login:disabled { opacity: 0.5; cursor: not-allowed; }
+  .naver-n {
+    background: #03c75a; color: white;
+    font-weight: 900; font-size: 12px;
+    width: 18px; height: 18px; border-radius: 3px;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+  }
+  .login-toast {
+    position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
+    background: #333; color: white; border-radius: 8px;
+    padding: 10px 18px; font-size: 13px; z-index: 999;
+    display: none; white-space: nowrap;
+  }
 
   .stats-bar {
     background: white; border-bottom: 1px solid #e8e8e8;
@@ -40,13 +135,24 @@
   .sbar.mix { background: #ff9800; }
   .sbar-label { font-size: 11px; color: #666; }
 
+  .btn-classify-main {
+    padding: 7px 16px;
+    background: #03c75a; color: white; border: none;
+    border-radius: 6px; cursor: pointer;
+    font-size: 13px; font-weight: 700; white-space: nowrap;
+    box-shadow: 0 2px 6px rgba(3,199,90,0.25);
+    transition: background 0.15s, box-shadow 0.15s;
+  }
+  .btn-classify-main:hover { background: #02b350; box-shadow: 0 3px 10px rgba(3,199,90,0.35); }
+  .btn-classify-main:disabled { background: #a8e6c5; box-shadow: none; cursor: not-allowed; }
+
   .controls {
     padding: 12px 24px; display: flex; gap: 8px; flex-wrap: wrap; align-items: center;
     background: white; border-bottom: 1px solid #e8e8e8;
     position: sticky; top: 0; z-index: 10; box-shadow: 0 1px 4px rgba(0,0,0,0.06);
   }
   .search-box {
-    flex: 1; min-width: 180px; padding: 7px 12px;
+    width: 220px; flex: none; padding: 7px 12px;
     border: 1px solid #ddd; border-radius: 6px; font-size: 14px; outline: none;
   }
   .search-box:focus { border-color: #03c75a; }
@@ -149,6 +255,47 @@
   .btn-generate:hover { background: #bbdefb; }
   .btn-generate:disabled { opacity: 0.5; cursor: not-allowed; }
 
+  /* 2컬럼 카드 */
+  .card-body { display: flex; gap: 0; }
+  .card-left { width: 50%; min-width: 0; padding-right: 14px; border-right: 1px solid #f0f0f0; overflow: hidden; }
+  .card-divider {
+    width: 6px; flex-shrink: 0; cursor: col-resize;
+    background: transparent; position: relative; margin: 0 -3px; z-index: 1;
+    transition: background 0.15s;
+  }
+  .card-divider:hover, .card-divider.dragging { background: #03c75a33; border-radius: 3px; }
+  .card-right {
+    flex: 1; min-width: 0; padding-left: 14px;
+    display: flex; flex-direction: column; gap: 10px;
+  }
+  .card-right-section { }
+  .card-right-label {
+    font-size: 10px; font-weight: 700; color: #aaa; text-transform: uppercase;
+    letter-spacing: .05em; margin-bottom: 5px;
+  }
+  .badge-coupon {
+    display: inline-flex; align-items: center; gap: 4px;
+    background: #fff8e1; color: #9e7a20; border: 1px solid #ffe082;
+    border-radius: 4px; font-size: 11px; padding: 3px 8px; font-weight: 600;
+  }
+  .badge-coupon-manual {
+    background: #fce4ec; color: #c62828; border-color: #ef9a9a;
+  }
+  .no-analysis { font-size: 12px; color: #ccc; }
+
+  /* 진행 오버레이 */
+  .progress-overlay {
+    display: none; position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
+    background: white; border-radius: 12px; box-shadow: 0 6px 24px rgba(0,0,0,0.15);
+    padding: 16px 22px; min-width: 300px; z-index: 999;
+    border: 1px solid #e8e8e8;
+  }
+  .progress-overlay.open { display: block; }
+  .progress-title { font-size: 13px; font-weight: 700; color: #333; margin-bottom: 8px; display: flex; justify-content: space-between; }
+  .progress-step { font-size: 12px; color: #888; margin-bottom: 8px; }
+  .progress-track { background: #f0f0f0; border-radius: 99px; height: 6px; overflow: hidden; }
+  .progress-bar { height: 100%; background: #03c75a; border-radius: 99px; transition: width 0.4s ease; }
+
   .empty-state { text-align: center; padding: 60px 20px; color: #aaa; }
   .empty-state .icon { font-size: 48px; margin-bottom: 12px; }
   .loading { text-align: center; padding: 40px; color: #aaa; font-size: 15px; }
@@ -161,10 +308,14 @@
 <body>
 
 <header>
-  <svg width="22" height="22" viewBox="0 0 24 24" fill="white"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 14.5v-9l6 4.5-6 4.5z"/></svg>
-  <h1>스마트스토어 리뷰 관리</h1>
+  <svg width="22" height="22" viewBox="0 0 24 24" fill="white" style="cursor:pointer" onclick="goHome()"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 14.5v-9l6 4.5-6 4.5z"/></svg>
+  <h1 style="cursor:pointer" onclick="goHome()">스마트스토어 리뷰 관리</h1>
   <div class="header-actions">
-    <button class="btn-classify" onclick="runClassify()">AI 분류 실행</button>
+    <button class="btn-naver-login" id="btn-login" onclick="startNaverLogin()">
+      <span class="naver-n">N</span> 네이버 로그인
+    </button>
+    <button class="btn-classify" onclick="runScrape()">리뷰 수집</button>
+    <button class="btn-admin" id="btn-admin" onclick="toggleAdmin()">관리자</button>
     <span class="last-updated" id="last-updated">-</span>
   </div>
 </header>
@@ -175,9 +326,25 @@
   <div class="stat"><div class="val" id="stat-replied">-</div><div class="lbl">답글 완료</div></div>
   <div class="stat warn"><div class="val" id="stat-report">-</div><div class="lbl">신고 가능</div></div>
   <div class="stat info"><div class="val" id="stat-draft">-</div><div class="lbl">AI 초안 대기</div></div>
+  <div class="stat warn"><div class="val" id="stat-need-reply">-</div><div class="lbl">답변 생성 필요</div></div>
   <div class="stat">
     <div class="sbar-label" style="margin-bottom:4px;font-size:11px;color:#888">감성 분포</div>
     <div class="sentiment-bar" id="sentiment-bar"></div>
+  </div>
+</div>
+
+<!-- 일별 리뷰 현황 차트 -->
+<div id="chart-section" style="background:white;border-bottom:1px solid #e8e8e8;">
+  <div onclick="toggleChart()" style="padding:10px 24px;cursor:pointer;display:flex;align-items:center;gap:8px;font-size:13px;color:#555;user-select:none;">
+    <span id="chart-toggle-icon">▶</span> 일별 리뷰 현황
+    <span style="margin-left:auto;display:flex;gap:8px;" onclick="event.stopPropagation()">
+      <button onclick="setChartRange(7)" id="chart-btn-7" style="font-size:12px;padding:3px 10px;border:1px solid #ddd;border-radius:4px;background:#03c75a;color:white;cursor:pointer;">7일</button>
+      <button onclick="setChartRange(30)" id="chart-btn-30" style="font-size:12px;padding:3px 10px;border:1px solid #ddd;border-radius:4px;background:white;color:#555;cursor:pointer;">30일</button>
+      <button onclick="setChartRange(0)" id="chart-btn-all" style="font-size:12px;padding:3px 10px;border:1px solid #ddd;border-radius:4px;background:white;color:#555;cursor:pointer;">전체</button>
+    </span>
+  </div>
+  <div id="chart-body" style="display:none;padding:0 24px 16px;">
+    <canvas id="daily-chart" height="80"></canvas>
   </div>
 </div>
 
@@ -223,6 +390,76 @@
     <option value="rating_low">별점 낮은순</option>
   </select>
   <span class="filter-count" id="filter-count"></span>
+  <button class="btn-classify-main" onclick="runClassify()">✦ AI 분석</button>
+</div>
+
+<div class="login-toast" id="login-toast"></div>
+
+<div class="progress-overlay" id="classify-progress">
+  <div class="progress-title">
+    <span>✦ AI 분석 실행 중</span>
+    <span id="progress-count" style="color:#03c75a;"></span>
+  </div>
+  <div class="progress-step" id="progress-step">준비 중...</div>
+  <div class="progress-track"><div class="progress-bar" id="progress-bar" style="width:0%"></div></div>
+</div>
+
+<!-- 관리자 패널 -->
+<div class="admin-panel" id="admin-panel">
+
+  <!-- 브랜드 톤 가이드 -->
+  <div class="admin-section">
+    <div class="admin-section-title">🎨 브랜드 톤 가이드</div>
+    <label class="admin-label">AI 답변 스타일 가이드 (brand_tone.txt)</label>
+    <textarea class="admin-textarea" id="brand-tone-text" oninput="enableSave('btn-save-brand')" placeholder="브랜드 톤 가이드를 입력하세요..."></textarea>
+    <button class="btn-save" id="btn-save-brand" onclick="saveBrandTone(this)" disabled>저장됨</button>
+  </div>
+
+  <!-- 답변 설정 -->
+  <div class="admin-section">
+    <div class="admin-section-title">💬 답변 설정</div>
+    <div class="admin-row">
+      <div>
+        <div class="admin-row-label">AI 분석 시 자동 답변 생성</div>
+        <div class="admin-row-sub">AI 분류 실행 시 답변 초안도 함께 자동 생성</div>
+      </div>
+      <div class="toggle-wrap">
+        <div class="toggle" id="toggle-auto-generate" onclick="toggleAutoGenerate(); enableSave('btn-save-settings')"></div>
+        <span id="auto-generate-label" style="font-size:13px;color:#666;">OFF</span>
+      </div>
+    </div>
+    <div class="admin-row" style="opacity:0.45;">
+      <div>
+        <div class="admin-row-label">자동 답변 게시 <span style="font-size:11px;color:#aaa;font-weight:400;">미구현</span></div>
+        <div class="admin-row-sub">OFF: 담당자 승인 후 게시 / ON: AI 생성 즉시 게시</div>
+      </div>
+      <div class="toggle-wrap">
+        <div class="toggle" style="pointer-events:none;"></div>
+        <span style="font-size:13px;color:#bbb;">준비 중</span>
+      </div>
+    </div>
+    <div class="admin-section-title" style="margin-top:16px;">🚨 신고 기준</div>
+    <label class="admin-label">신고 가능 리뷰 기준 (쉼표로 구분)</label>
+    <input class="admin-input" id="report-criteria" type="text" oninput="enableSave('btn-save-settings')" placeholder="욕설, 경쟁사 언급, 광고성, 반복 내용">
+    <button class="btn-save" id="btn-save-settings" onclick="saveSettings(this)" disabled>저장됨</button>
+  </div>
+
+  <!-- 쿠폰 발급 기준 -->
+  <div class="admin-section">
+    <div class="admin-section-title">🎟️ 쿠폰 발급 기준</div>
+    <div id="coupon-rules-list"></div>
+    <button class="btn-save" id="btn-save-coupon" onclick="saveCouponRules(this)" disabled>저장됨</button>
+  </div>
+
+  <!-- API 설정 -->
+  <div class="admin-section">
+    <div class="admin-section-title">🔑 API 설정</div>
+    <label class="admin-label">Anthropic API 키 (AI 분류·답변 생성에 필요)</label>
+    <input class="admin-input" id="api-key-input" type="password" oninput="enableSave('btn-save-api')" placeholder="sk-ant-...">
+    <div class="api-status" id="api-status"></div>
+    <button class="btn-save" id="btn-save-api" onclick="saveApiKey(this)" disabled>저장됨</button>
+  </div>
+
 </div>
 
 <div class="reviews-container" id="reviews-container">
@@ -251,6 +488,46 @@ function replyStatusBadge(status) {
   return '';
 }
 
+// 컬럼 드래그 리사이즈
+window._cardLeftPct = 50;
+function startResize(e) {
+  e.preventDefault();
+  const divider = e.target;
+  const cardBody = divider.closest('.card-body');
+  divider.classList.add('dragging');
+  document.body.style.cursor = 'col-resize';
+  document.body.style.userSelect = 'none';
+
+  function onMove(e) {
+    const rect = cardBody.getBoundingClientRect();
+    let pct = Math.round((e.clientX - rect.left) / rect.width * 100);
+    pct = Math.max(25, Math.min(75, pct));
+    window._cardLeftPct = pct;
+    document.querySelectorAll('.card-left').forEach(el => el.style.width = pct + '%');
+  }
+  function onUp() {
+    divider.classList.remove('dragging');
+    document.body.style.cursor = '';
+    document.body.style.userSelect = '';
+    document.removeEventListener('mousemove', onMove);
+    document.removeEventListener('mouseup', onUp);
+  }
+  document.addEventListener('mousemove', onMove);
+  document.addEventListener('mouseup', onUp);
+}
+
+function checkCoupon(r) {
+  const rules = (window.adminSettings && window.adminSettings.coupon_rules) || [];
+  const matched = [];
+  for (const rule of rules) {
+    if (!rule.enabled) continue;
+    if (rule.condition === 'rating_5_photo' && parseFloat(r.rating) >= 5) matched.push({...rule});
+    if (rule.condition === 'content_100' && (r.content || '').length >= 100) matched.push({...rule});
+    if (rule.condition === 'negative_manual' && r.sentiment === 'negative') matched.push({...rule, manual: true});
+  }
+  return matched;
+}
+
 function renderReviews(reviews) {
   const container = document.getElementById('reviews-container');
   if (!reviews.length) {
@@ -262,45 +539,89 @@ function renderReviews(reviews) {
     const idx = r._idx;
     const product = r.product ? `<div class="product-tag" title="${r.product}">${r.product}${r.option ? ' · ' + r.option : ''}</div>` : '';
     const repliedBadge = r.replied ? '<span class="badge badge-replied">답글완료</span>' : '<span class="badge badge-unreplied">미답글</span>';
-    const reportWarn = r.reportable ? `<div class="report-warning">🚨 신고 가능 · ${r.report_reason || ''}</div>` : '';
-    const topicChips = (r.topics || []).length
-      ? `<div class="topic-chips">${r.topics.map(t => `<span class="topic-chip">${t}</span>`).join('')}</div>` : '';
 
-    // 기존 답글
+    // 기존 판매자 답글
     const existingReply = r.replied && r.reply_content
       ? `<div class="reply-box"><div class="reply-label">판매자 답글</div>${r.reply_content}</div>` : '';
 
-    // AI 답변 섹션
+    // ── 우측: AI 분류 결과 ──
+    const hasAnalysis = r.sentiment || (r.topics && r.topics.length) || r.reportable;
+    const analysisSection = hasAnalysis ? `
+      <div class="card-right-section">
+        <div class="card-right-label">AI 분류</div>
+        <div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:4px;">
+          ${r.sentiment ? sentimentBadge(r.sentiment) : ''}
+          ${r.reportable ? `<span class="badge badge-report">🚨 ${r.report_reason || '신고가능'}</span>` : ''}
+        </div>
+        ${(r.topics || []).length ? `<div class="topic-chips">${r.topics.map(t => `<span class="topic-chip">${t}</span>`).join('')}</div>` : ''}
+      </div>` : `<div class="card-right-section"><div class="card-right-label">AI 분류</div><span class="no-analysis">미분류</span></div>`;
+
+    // ── 우측: 쿠폰 발급 ──
+    const coupons = checkCoupon(r);
+    const couponSection = `
+      <div class="card-right-section">
+        <div class="card-right-label">쿠폰 발급</div>
+        ${coupons.length ? coupons.map(c =>
+          `<span class="badge-coupon${c.manual ? ' badge-coupon-manual' : ''}">${c.manual ? '✋ 수동 ' : '🎟 '}${c.coupon}</span>`
+        ).join('<br style="margin-bottom:3px">') : '<span class="no-analysis">해당 없음</span>'}
+      </div>`;
+
+    // ── 우측: AI 답변 or 답변완료 ──
     let aiSection = '';
-    if (!r.replied) {
-      if (r.reply_status === 'draft' || r.reply_status === 'approved') {
-        aiSection = `<div class="ai-reply-section">
+    if (r.replied) {
+      aiSection = `
+        <div class="card-right-section">
+          <div class="card-right-label">답변 상태</div>
+          <span class="badge badge-replied" style="font-size:12px;padding:4px 10px;">✓ 답변완료</span>
+        </div>`;
+    } else if (r.reply_status === 'draft' || r.reply_status === 'approved') {
+      aiSection = `
+        <div class="card-right-section">
+          <div class="card-right-label">AI 답변 작성 ${replyStatusBadge(r.reply_status)}</div>
           <div class="ai-reply-box">
-            <div class="ai-reply-label">AI 생성 답변 ${replyStatusBadge(r.reply_status)}</div>
-            <textarea class="ai-reply-text" id="reply-text-${idx}">${r.ai_reply || ''}</textarea>
-            ${r.reply_status === 'draft' ? `<div class="ai-reply-actions">
-              <button class="btn-approve" onclick="approveReply(${idx})">승인</button>
-              <button class="btn-reject" onclick="rejectReply(${idx})">삭제</button>
-            </div>` : '<div style="font-size:11px;color:#2e7d32;margin-top:4px;">✓ 승인 완료</div>'}
+            <textarea class="ai-reply-text" id="reply-text-${idx}" ${r.reply_status === 'approved' ? 'readonly style="background:#f9f9f9;color:#555;"' : ''}>${r.ai_reply || ''}</textarea>
+            <div class="ai-reply-actions">
+              ${r.reply_status === 'draft'
+                ? `<button class="btn-approve" onclick="approveReply(${idx})">승인</button>
+                   <button class="btn-reject" onclick="rejectReply(${idx})">삭제</button>`
+                : `<span style="font-size:11px;color:#2e7d32;flex:1;">✓ 승인 완료</span>
+                   <button class="btn-approve" id="edit-btn-${idx}" onclick="startEditReply(${idx})" style="background:#1565c0;display:none;">수정 저장</button>
+                   <button class="btn-reject" onclick="rejectReply(${idx})" style="display:none;" id="del-btn-${idx}">삭제</button>
+                   <button class="btn-classify" onclick="enableEditReply(${idx})" id="enable-edit-btn-${idx}" style="background:#555;border:none;color:white;">수정</button>`
+              }
+            </div>
           </div>
         </div>`;
-      } else {
-        aiSection = `<button class="btn-generate" onclick="generateReply(${idx}, this)">AI 답변 생성</button>`;
-      }
+    } else {
+      aiSection = `
+        <div class="card-right-section">
+          <div class="card-right-label">AI 답변 작성</div>
+          <button class="btn-generate" onclick="generateReply(${idx}, this)">답변 작성</button>
+        </div>`;
     }
 
     return `<div class="review-card${r.reportable ? ' reportable' : ''}" id="card-${idx}">
       <div class="review-header">
         <div class="reviewer-avatar">${r.reviewer ? r.reviewer[0].toUpperCase() : '?'}</div>
         <div class="reviewer-info">
-          <div class="reviewer-name">${r.reviewer || '익명'} ${repliedBadge} ${sentimentBadge(r.sentiment)} ${replyStatusBadge(r.reply_status)}</div>
+          <div class="reviewer-name">${r.reviewer || '익명'} ${repliedBadge} ${replyStatusBadge(r.reply_status)}</div>
           <div class="review-meta">${r.date || ''}</div>
         </div>
         <div>${starsHTML(r.rating)}</div>
       </div>
-      ${reportWarn}${product}${topicChips}
-      <div class="review-content">${r.content || '(내용 없음)'}</div>
-      ${existingReply}${aiSection}
+      <div class="card-body" data-idx="${idx}">
+        <div class="card-left" style="width:${window._cardLeftPct||50}%">
+          ${product}
+          <div class="review-content">${r.content || '(내용 없음)'}</div>
+          ${existingReply}
+        </div>
+        <div class="card-divider" onmousedown="startResize(event)"></div>
+        <div class="card-right">
+          ${analysisSection}
+          ${couponSection}
+          ${aiSection}
+        </div>
+      </div>
     </div>`;
   }).join('');
 }
@@ -311,6 +632,7 @@ function renderStats(stats) {
   document.getElementById('stat-replied').textContent = stats.replied_count.toLocaleString();
   document.getElementById('stat-report').textContent = stats.reportable_count || 0;
   document.getElementById('stat-draft').textContent = stats.draft_count || 0;
+  document.getElementById('stat-need-reply').textContent = stats.need_reply_count || 0;
   document.getElementById('filter-count').textContent = `${stats.filtered.toLocaleString()}건`;
 
   const sd = stats.sentiment_dist || {};
@@ -347,12 +669,63 @@ function fetchReviews() {
     });
 }
 
+let scrapePoll = null;
+function runScrape() {
+  if (!confirm('스마트스토어 리뷰를 수집하겠습니까?\n브라우저 창이 열립니다.')) return;
+  fetch('/api/scrape', {method: 'POST'})
+    .then(r => r.json())
+    .then(data => {
+      const baseMtime = data.mtime;
+      showToast('리뷰 수집 중... 완료되면 자동으로 반영됩니다.', 60000);
+      if (scrapePoll) clearInterval(scrapePoll);
+      scrapePoll = setInterval(() => {
+        fetch('/api/scrape/status').then(r => r.json()).then(d => {
+          if (d.mtime > baseMtime) {
+            clearInterval(scrapePoll);
+            showToast('리뷰 수집 완료!', 3000);
+            fetchReviews();
+          }
+        });
+      }, 3000);
+    });
+}
+
+let classifyPoll = null;
 function runClassify() {
   if (!confirm('미분류 리뷰를 AI로 분류하겠습니까?')) return;
+  const btn = document.querySelector('.btn-classify-main');
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ 분류 중...'; }
+
+  const overlay = document.getElementById('classify-progress');
+  overlay.classList.add('open');
+  document.getElementById('progress-bar').style.width = '0%';
+  document.getElementById('progress-step').textContent = '준비 중...';
+  document.getElementById('progress-count').textContent = '';
+
   fetch('/api/classify', {method: 'POST'})
-    .then(() => {
-      alert('분류 실행 중... 잠시 후 새로고침하세요.');
-      setTimeout(fetchReviews, 5000);
+    .then(r => r.json())
+    .then(data => {
+      const baseMtime = data.mtime;
+      if (classifyPoll) clearInterval(classifyPoll);
+      classifyPoll = setInterval(() => {
+        fetch('/api/classify/progress').then(r => r.json()).then(p => {
+          const pct = p.total > 0 ? Math.round(p.done / p.total * 100) : 0;
+          document.getElementById('progress-bar').style.width = pct + '%';
+          document.getElementById('progress-step').textContent = p.step || '처리 중...';
+          document.getElementById('progress-count').textContent = p.total > 0 ? `${p.done}/${p.total}` : '';
+
+          if (!p.running && p.step === '완료') {
+            clearInterval(classifyPoll);
+            overlay.classList.remove('open');
+            if (btn) { btn.disabled = false; btn.textContent = '✦ AI 분석'; }
+            fetch('/api/admin/config').then(r => r.json()).then(cfg => {
+              window.adminSettings = cfg;
+              fetchReviews();
+              showToast('AI 분석 완료!', 3000);
+            });
+          }
+        });
+      }, 1500);
     });
 }
 
@@ -377,8 +750,200 @@ function approveReply(idx) {
   }).then(() => fetchReviews());
 }
 
+function enableEditReply(idx) {
+  const ta = document.getElementById(`reply-text-${idx}`);
+  if (!ta) return;
+  ta.removeAttribute('readonly');
+  ta.style.background = '';
+  ta.style.color = '';
+  ta.focus();
+  document.getElementById(`enable-edit-btn-${idx}`).style.display = 'none';
+  document.getElementById(`edit-btn-${idx}`).style.display = '';
+  document.getElementById(`del-btn-${idx}`).style.display = '';
+}
+
+function startEditReply(idx) {
+  approveReply(idx);
+}
+
 function rejectReply(idx) {
   fetch(`/api/reply/reject/${idx}`, {method: 'POST'}).then(() => fetchReviews());
+}
+
+function showToast(msg, duration = 4000) {
+  const t = document.getElementById('login-toast');
+  t.textContent = msg;
+  t.style.display = 'block';
+  setTimeout(() => { t.style.display = 'none'; }, duration);
+}
+
+// 관리자 탭
+let adminOpen = false;
+let adminConfig = {};
+
+function goHome() {
+  if (!adminOpen) return;
+  adminOpen = false;
+  document.getElementById('admin-panel').classList.remove('open');
+  document.getElementById('reviews-container').style.display = '';
+  document.querySelector('.stats-bar').style.display = '';
+  document.getElementById('chart-section').style.display = '';
+  document.querySelector('.controls').style.display = '';
+  document.getElementById('btn-admin').classList.remove('active');
+}
+
+function toggleAdmin() {
+  adminOpen = !adminOpen;
+  document.getElementById('admin-panel').classList.toggle('open', adminOpen);
+  document.getElementById('reviews-container').style.display = adminOpen ? 'none' : '';
+  document.querySelector('.stats-bar').style.display = adminOpen ? 'none' : '';
+  document.getElementById('chart-section').style.display = adminOpen ? 'none' : '';
+  document.querySelector('.controls').style.display = adminOpen ? 'none' : '';
+  document.getElementById('btn-admin').classList.toggle('active', adminOpen);
+  if (adminOpen) loadAdminData();
+}
+
+function loadAdminData() {
+  Promise.all([
+    fetch('/api/admin/config').then(r => r.json()),
+    fetch('/api/admin/brand-tone').then(r => r.json()),
+  ]).then(([cfg, bt]) => {
+    adminConfig = cfg;
+    document.getElementById('brand-tone-text').value = bt.content;
+    document.getElementById('report-criteria').value = (cfg.report_criteria || []).join(', ');
+    const toggle = document.getElementById('toggle-auto-generate');
+    toggle.classList.toggle('on', cfg.auto_generate_reply);
+    document.getElementById('auto-generate-label').textContent = cfg.auto_generate_reply ? 'ON' : 'OFF';
+    if (cfg.coupon_rules) renderCouponRules(cfg.coupon_rules);
+    const status = document.getElementById('api-status');
+    if (cfg.anthropic_api_key_set) {
+      status.textContent = '● API 키 설정됨';
+      status.className = 'api-status set';
+    } else {
+      status.textContent = '● API 키 미설정 (AI 기능 사용 불가)';
+      status.className = 'api-status unset';
+    }
+  });
+}
+
+function toggleAutoGenerate() {
+  adminConfig.auto_generate_reply = !adminConfig.auto_generate_reply;
+  const toggle = document.getElementById('toggle-auto-generate');
+  toggle.classList.toggle('on', adminConfig.auto_generate_reply);
+  document.getElementById('auto-generate-label').textContent = adminConfig.auto_generate_reply ? 'ON' : 'OFF';
+}
+
+function renderCouponRules(rules) {
+  const list = document.getElementById('coupon-rules-list');
+  list.innerHTML = rules.map((r, i) => `
+    <div class="coupon-rule">
+      <div class="toggle ${r.enabled ? 'on' : ''}" onclick="toggleCoupon(${i})" title="활성화/비활성화"></div>
+      <div class="coupon-rule-label">${r.label}</div>
+      <input class="coupon-rule-input" id="coupon-name-${i}" type="text"
+        value="${r.coupon}" placeholder="쿠폰명 또는 혜택" oninput="onCouponChange()" ${r.enabled ? '' : 'disabled'}>
+    </div>
+  `).join('');
+}
+
+function toggleCoupon(i) {
+  adminConfig.coupon_rules[i].enabled = !adminConfig.coupon_rules[i].enabled;
+  renderCouponRules(adminConfig.coupon_rules);
+  enableSave('btn-save-coupon');
+}
+
+function enableSave(id) {
+  const btn = document.getElementById(id);
+  if (!btn) return;
+  btn.disabled = false;
+  btn.textContent = '저장';
+  btn.style.background = '';
+}
+
+function flashSaved(btn) {
+  btn.textContent = '저장됨';
+  btn.style.background = '';
+  btn.disabled = true;
+}
+
+// 쿠폰 토글/입력 변경 시 버튼 활성화
+function onCouponChange() { enableSave('btn-save-coupon'); }
+
+function saveCouponRules(btn) {
+  adminConfig.coupon_rules.forEach((r, i) => {
+    r.coupon = document.getElementById(`coupon-name-${i}`)?.value || r.coupon;
+  });
+  fetch('/api/admin/config', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({coupon_rules: adminConfig.coupon_rules}),
+  }).then(() => flashSaved(btn));
+}
+
+function saveBrandTone(btn) {
+  const content = document.getElementById('brand-tone-text').value;
+  fetch('/api/admin/brand-tone', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({content}),
+  }).then(() => flashSaved(btn));
+}
+
+function saveSettings(btn) {
+  const criteriaRaw = document.getElementById('report-criteria').value;
+  const criteria = criteriaRaw.split(',').map(s => s.trim()).filter(Boolean);
+  fetch('/api/admin/config', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({auto_generate_reply: adminConfig.auto_generate_reply, report_criteria: criteria}),
+  }).then(() => flashSaved(btn));
+}
+
+function saveApiKey(btn) {
+  const key = document.getElementById('api-key-input').value.trim();
+  if (!key) { showToast('API 키를 입력해주세요'); return; }
+  fetch('/api/admin/config', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({anthropic_api_key: key}),
+  }).then(() => {
+    document.getElementById('api-key-input').value = '';
+    flashSaved(btn);
+    loadAdminData();
+  });
+}
+
+let loginPoll = null;
+function startNaverLogin() {
+  const btn = document.getElementById('btn-login');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="naver-n">N</span> 로그인 중...';
+  fetch('/api/login/start', {method: 'POST'})
+    .then(r => r.json())
+    .then(data => {
+      if (data.error) {
+        showToast('오류: ' + data.error);
+        btn.disabled = false;
+        btn.innerHTML = '<span class="naver-n">N</span> 네이버 로그인';
+        return;
+      }
+      showToast('브라우저 창에서 네이버 로그인을 완료해주세요.', 8000);
+      loginPoll = setInterval(() => {
+        fetch('/api/login/status').then(r => r.json()).then(d => {
+          if (d.logged_in) {
+            clearInterval(loginPoll);
+            showToast('로그인 완료!');
+            btn.innerHTML = '<span class="naver-n">N</span> 로그인됨';
+            btn.disabled = true;
+            btn.onclick = null;
+          }
+        });
+      }, 2000);
+    })
+    .catch(() => {
+      showToast('서버 연결 실패');
+      btn.disabled = false;
+      btn.innerHTML = '<span class="naver-n">N</span> 네이버 로그인';
+    });
 }
 
 ['search','filter-rating','filter-sentiment','filter-topic','filter-replied','filter-reportable','sort']
@@ -387,8 +952,80 @@ function rejectReply(idx) {
     debounceTimer = setTimeout(fetchReviews, 250);
   }));
 
-fetchReviews();
-setInterval(fetchReviews, 5 * 60 * 1000);
+// ── 일별 리뷰 차트 ──
+let dailyChartInst = null;
+let chartOpen = false;
+let chartRange = 7;
+let allDates = [], allCounts = [];
+
+function toggleChart() {
+  chartOpen = !chartOpen;
+  document.getElementById('chart-body').style.display = chartOpen ? '' : 'none';
+  document.getElementById('chart-toggle-icon').textContent = chartOpen ? '▼' : '▶';
+  if (chartOpen && allDates.length === 0) loadDailyChart();
+}
+
+function setChartRange(days) {
+  chartRange = days;
+  ['7','30','all'].forEach(k => {
+    const el = document.getElementById(`chart-btn-${k}`);
+    const active = (days === 7 && k==='7') || (days === 30 && k==='30') || (days === 0 && k==='all');
+    el.style.background = active ? '#03c75a' : 'white';
+    el.style.color = active ? 'white' : '#555';
+  });
+  renderDailyChart();
+}
+
+function loadDailyChart() {
+  fetch('/api/stats/daily').then(r => r.json()).then(data => {
+    allDates = data.dates || [];
+    allCounts = data.counts || [];
+    renderDailyChart();
+  });
+}
+
+function renderDailyChart() {
+  let dates = allDates, counts = allCounts;
+  if (chartRange > 0 && dates.length > chartRange) {
+    dates = dates.slice(-chartRange);
+    counts = counts.slice(-chartRange);
+  }
+  const labels = dates.map(d => d.slice(5)); // MM-DD
+  if (dailyChartInst) dailyChartInst.destroy();
+  const ctx = document.getElementById('daily-chart').getContext('2d');
+  dailyChartInst = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [{
+        label: '리뷰 수',
+        data: counts,
+        backgroundColor: '#03c75a88',
+        borderColor: '#03c75a',
+        borderWidth: 1,
+        borderRadius: 3,
+      }]
+    },
+    options: {
+      responsive: true,
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { ticks: { font: { size: 11 } } },
+        y: { beginAtZero: true, ticks: { stepSize: 1, font: { size: 11 } } }
+      }
+    }
+  });
+}
+
+window.adminSettings = {};
+fetch('/api/admin/config').then(r => r.json()).then(cfg => {
+  window.adminSettings = cfg;
+  fetchReviews();
+  setInterval(fetchReviews, 5 * 60 * 1000);
+}).catch(() => {
+  fetchReviews();
+  setInterval(fetchReviews, 5 * 60 * 1000);
+});
 </script>
 </body>
 </html>
