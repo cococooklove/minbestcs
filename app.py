@@ -396,9 +396,25 @@ def api_post_progress():
 
 @app.route("/api/scrape", methods=["POST"])
 def api_scrape():
+    if os.environ.get("RAILWAY_ENVIRONMENT"):
+        return jsonify({"error": "리뷰 수집은 로컬 환경에서만 가능합니다. 로컬에서 수집 후 업로드해주세요."}), 400
     subprocess.Popen([sys.executable, "scraper.py"])
     mtime = os.path.getmtime(REVIEWS_FILE) if os.path.exists(REVIEWS_FILE) else 0
     return jsonify({"status": "started", "mtime": mtime})
+
+
+@app.route("/api/upload/reviews", methods=["POST"])
+def api_upload_reviews():
+    """로컬에서 수집한 reviews.json을 Railway로 업로드"""
+    token = request.headers.get("X-Upload-Token", "")
+    if token != os.environ.get("UPLOAD_TOKEN", ""):
+        return jsonify({"error": "인증 실패"}), 401
+    data = request.get_json()
+    if not isinstance(data, list):
+        return jsonify({"error": "reviews 배열이 필요합니다"}), 400
+    os.makedirs("data", exist_ok=True)
+    save_reviews(data)
+    return jsonify({"status": "ok", "count": len(data)})
 
 
 @app.route("/api/scrape/status")
@@ -408,6 +424,8 @@ def api_scrape_status():
 
 
 if __name__ == "__main__":
-    import webbrowser, threading
-    threading.Timer(1.0, lambda: webbrowser.open("http://localhost:8080")).start()
-    app.run(debug=False, port=8080)
+    port = int(os.environ.get("PORT", 8080))
+    if not os.environ.get("RAILWAY_ENVIRONMENT"):
+        import webbrowser, threading
+        threading.Timer(1.0, lambda: webbrowser.open(f"http://localhost:{port}")).start()
+    app.run(debug=False, host="0.0.0.0", port=port)

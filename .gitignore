@@ -1,10 +1,10 @@
 data/browser_profile/
 data/downloads/
 data/reviews.json
+data/classify_progress.json
+data/post_progress.json
+data/manual_tags.json
 __pycache__/
 *.pyc
 .DS_Store
 .env
-data/classify_progress.json
-data/post_progress.json
-data/manual_tags.json
