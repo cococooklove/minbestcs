@@ -4,12 +4,15 @@
 접속: http://localhost:5000
 """
 from flask import Flask, render_template, jsonify, request
+from flask_socketio import SocketIO, emit, disconnect
 import json, os, subprocess, sys
 from dotenv import load_dotenv
 load_dotenv()
 
 app = Flask(__name__)
+socketio = SocketIO(app, cors_allowed_origins="*", async_mode="eventlet")
 REVIEWS_FILE = "data/reviews.json"
+_agent_sid = None  # 연결된 로컬 에이전트 session id
 
 
 def load_reviews():
@@ -164,8 +167,51 @@ def save_settings(data):
         json.dump(data, f, ensure_ascii=False, indent=2)
 
 
+@socketio.on("agent_auth")
+def on_agent_auth(data):
+    global _agent_sid
+    if data.get("token") == os.environ.get("AGENT_TOKEN", ""):
+        _agent_sid = request.sid
+        emit("agent_ready", {"status": "ok"})
+    else:
+        disconnect()
+
+
+@socketio.on("disconnect")
+def on_disconnect():
+    global _agent_sid
+    if request.sid == _agent_sid:
+        _agent_sid = None
+
+
+@socketio.on("login_done")
+def on_login_done(data):
+    logged_in = data.get("success", False)
+    socketio.emit("login_status", {"logged_in": logged_in, **data})
+
+
+@socketio.on("scrape_done")
+def on_scrape_done(data):
+    socketio.emit("scrape_status", {"done": True, **data})
+
+
+@socketio.on("agent_progress")
+def on_agent_progress(data):
+    socketio.emit("agent_progress", data)
+
+
+@app.route("/api/agent/status")
+def api_agent_status():
+    return jsonify({"connected": _agent_sid is not None})
+
+
 @app.route("/api/login/start", methods=["POST"])
 def api_login_start():
+    if _agent_sid:
+        socketio.emit("do_login", {}, to=_agent_sid)
+        return jsonify({"status": "sent_to_agent"})
+    if os.environ.get("RAILWAY_ENVIRONMENT"):
+        return jsonify({"error": "로컬 에이전트가 연결되어 있지 않습니다."}), 400
     subprocess.Popen([sys.executable, "login.py"])
     return jsonify({"status": "started"})
 
@@ -396,8 +442,11 @@ def api_post_progress():
 
 @app.route("/api/scrape", methods=["POST"])
 def api_scrape():
+    if _agent_sid:
+        socketio.emit("do_scrape", {}, to=_agent_sid)
+        return jsonify({"status": "sent_to_agent"})
     if os.environ.get("RAILWAY_ENVIRONMENT"):
-        return jsonify({"error": "리뷰 수집은 로컬 환경에서만 가능합니다. 로컬에서 수집 후 업로드해주세요."}), 400
+        return jsonify({"error": "로컬 에이전트가 연결되어 있지 않습니다."}), 400
     subprocess.Popen([sys.executable, "scraper.py"])
     mtime = os.path.getmtime(REVIEWS_FILE) if os.path.exists(REVIEWS_FILE) else 0
     return jsonify({"status": "started", "mtime": mtime})
@@ -428,4 +477,4 @@ if __name__ == "__main__":
     if not os.environ.get("RAILWAY_ENVIRONMENT"):
         import webbrowser, threading
         threading.Timer(1.0, lambda: webbrowser.open(f"http://localhost:{port}")).start()
-    app.run(debug=False, host="0.0.0.0", port=port)
+    socketio.run(app, host="0.0.0.0", port=port, debug=False)
