@@ -1,0 +1,47 @@
+name: Build MinBestAgent
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build-mac:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install dependencies
+        run: pip install pyinstaller "python-socketio[client]" python-dotenv
+      - name: Build Mac executable
+        run: |
+          pyinstaller --onefile --name "MinBestAgent" \
+            --hidden-import=engineio.async_drivers.threading \
+            --hidden-import=socketio --hidden-import=dotenv \
+            local_agent.py
+      - name: Upload Mac artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: MinBestAgent-Mac
+          path: dist/MinBestAgent
+
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install dependencies
+        run: pip install pyinstaller "python-socketio[client]" python-dotenv
+      - name: Build Windows executable
+        run: |
+          pyinstaller --onefile --name "MinBestAgent" `
+            --hidden-import=engineio.async_drivers.threading `
+            --hidden-import=socketio --hidden-import=dotenv `
+            local_agent.py
+      - name: Upload Windows artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: MinBestAgent-Windows
+          path: dist/MinBestAgent.exe
