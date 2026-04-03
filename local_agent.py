@@ -10,18 +10,27 @@ import os, sys, json, subprocess, time, webbrowser, threading
 from pathlib import Path
 from dotenv import load_dotenv
 
-load_dotenv()
+# PyInstaller 번들 실행 시 실행파일 위치 기준으로 .env 로드
+if getattr(sys, 'frozen', False):
+    _base_dir = os.path.dirname(sys.executable)
+else:
+    _base_dir = os.path.dirname(os.path.abspath(__file__))
+
+_env_path = os.path.join(_base_dir, ".env")
+load_dotenv(_env_path, override=True)
 
 RAILWAY_URL  = os.environ.get("RAILWAY_URL", "").rstrip("/")
 AGENT_TOKEN  = os.environ.get("AGENT_TOKEN", "")
-REVIEWS_FILE = "data/reviews.json"
-PROFILE_DIR  = "data/browser_profile"
+REVIEWS_FILE = os.path.join(_base_dir, "data", "reviews.json")
+PROFILE_DIR  = os.path.join(_base_dir, "data", "browser_profile")
 
 if not RAILWAY_URL:
-    print("오류: .env에 RAILWAY_URL이 없습니다.")
+    print(f"오류: .env에 RAILWAY_URL이 없습니다. ({_env_path})", flush=True)
+    input("엔터를 누르면 종료합니다...")
     sys.exit(1)
 if not AGENT_TOKEN:
-    print("오류: .env에 AGENT_TOKEN이 없습니다.")
+    print(f"오류: .env에 AGENT_TOKEN이 없습니다. ({_env_path})", flush=True)
+    input("엔터를 누르면 종료합니다...")
     sys.exit(1)
 
 import socketio as sio_client
@@ -113,18 +122,23 @@ def on_do_scrape(data):
 
 
 def main():
-    print(f"민베스트 로컬 에이전트 시작")
-    print(f"서버: {RAILWAY_URL}")
+    print("민베스트 로컬 에이전트 시작", flush=True)
+    print(f"서버: {RAILWAY_URL}", flush=True)
 
     # 브라우저에서 Railway URL 열기
     threading.Timer(2.0, lambda: webbrowser.open(RAILWAY_URL)).start()
 
     try:
-        sio.connect(RAILWAY_URL, transports=["websocket", "polling"])
+        print("연결 시도 중...", flush=True)
+        sio.connect(RAILWAY_URL, transports=["websocket", "polling"], wait_timeout=15)
+        print("연결 완료. 대기 중...", flush=True)
         sio.wait()
     except KeyboardInterrupt:
-        print("종료합니다.")
+        print("종료합니다.", flush=True)
         sio.disconnect()
+    except Exception as e:
+        print(f"연결 오류: {e}", flush=True)
+        input("엔터를 누르면 종료합니다...")
 
 
 if __name__ == "__main__":
