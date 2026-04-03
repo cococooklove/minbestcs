@@ -104,6 +104,18 @@
   }
   .btn-naver-login:hover { opacity: 0.85; }
   .btn-naver-login:disabled { opacity: 0.5; cursor: not-allowed; }
+  .btn-naver-login.logged-in { background: #e8f9f0; color: #03c75a; }
+  .step-guide {
+    display: flex; align-items: center; gap: 6px;
+    font-size: 12px; color: rgba(255,255,255,0.75); margin-right: 4px;
+  }
+  .step-guide .step {
+    display: flex; align-items: center; gap: 4px;
+    background: rgba(255,255,255,0.15); border-radius: 4px;
+    padding: 3px 8px; white-space: nowrap;
+  }
+  .step-guide .step.done { background: rgba(3,199,90,0.3); color: #b2ffd6; }
+  .step-guide .arrow { opacity: 0.5; font-size: 10px; }
   .naver-n {
     background: #03c75a; color: white;
     font-weight: 900; font-size: 12px;
@@ -351,10 +363,17 @@
   <svg width="22" height="22" viewBox="0 0 24 24" fill="white" style="cursor:pointer" onclick="goHome()"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 14.5v-9l6 4.5-6 4.5z"/></svg>
   <h1 style="cursor:pointer" onclick="goHome()">스마트스토어 리뷰 관리</h1>
   <div class="header-actions">
-    <button class="btn-naver-login" id="btn-login" onclick="startNaverLogin()">
+    <div class="step-guide" id="step-guide">
+      <span class="step" id="step1">① 로그인</span>
+      <span class="arrow">▶</span>
+      <span class="step" id="step2">② 리뷰 수집</span>
+    </div>
+    <button class="btn-naver-login" id="btn-login" onclick="startNaverLogin()"
+      title="셀러센터에 로그인합니다. 브라우저 창이 열리면 네이버 계정으로 로그인하세요.">
       <span class="naver-n">N</span> 네이버 로그인
     </button>
-    <button class="btn-classify" onclick="runScrape()">리뷰 수집</button>
+    <button class="btn-classify" onclick="runScrape()"
+      title="로그인 후 스마트스토어 셀러센터에서 리뷰를 자동으로 가져옵니다.">리뷰 수집</button>
     <button class="btn-admin" id="btn-admin" onclick="toggleAdmin()">관리자</button>
     <span class="last-updated" id="last-updated">-</span>
   </div>
@@ -696,7 +715,7 @@ function renderReviews(reviews) {
               <button class="btn-sm btn-gray" id="enable-edit-btn-${idx}" onclick="enableEditReply(${idx})">수정</button>
               <button class="btn-sm btn-blue" id="edit-btn-${idx}" onclick="startEditReply(${idx})" style="display:none">저장</button>
               <button class="btn-sm btn-ghost" id="del-btn-${idx}" onclick="rejectReply(${idx})" style="display:none">삭제</button>
-              <button class="btn-sm btn-orange" onclick="postReply(${idx}, this)">스토어에 댓글 등록</button>
+              <button class="btn-sm btn-orange" disabled style="opacity:.4;cursor:not-allowed">스토어에 댓글 등록 (개발중)</button>
             </div>
           </div>
         </div>`;
@@ -1083,10 +1102,14 @@ function startNaverLogin() {
         fetch('/api/login/status').then(r => r.json()).then(d => {
           if (d.logged_in) {
             clearInterval(loginPoll);
-            showToast('로그인 완료!');
-            btn.innerHTML = '<span class="naver-n">N</span> 로그인됨';
+            showToast('✓ 로그인 완료! 이제 리뷰 수집 버튼을 눌러주세요.');
+            btn.innerHTML = '<span class="naver-n">N</span> 로그인됨 ✓';
+            btn.classList.add('logged-in');
             btn.disabled = true;
             btn.onclick = null;
+            document.getElementById('step1').classList.add('done');
+            document.getElementById('step2').style.fontWeight = '700';
+            document.getElementById('step2').style.color = 'white';
           }
         });
       }, 2000);
@@ -1177,6 +1200,20 @@ fetch('/api/admin/config').then(r => r.json()).then(cfg => {
 }).catch(() => {
   fetchReviews();
   setInterval(fetchReviews, 5 * 60 * 1000);
+});
+
+// 초기 로그인 상태 확인
+fetch('/api/login/status').then(r => r.json()).then(d => {
+  if (d.logged_in) {
+    const btn = document.getElementById('btn-login');
+    btn.innerHTML = '<span class="naver-n">N</span> 로그인됨 ✓';
+    btn.classList.add('logged-in');
+    btn.disabled = true;
+    btn.onclick = null;
+    document.getElementById('step1').classList.add('done');
+    document.getElementById('step2').style.fontWeight = '700';
+    document.getElementById('step2').style.color = 'white';
+  }
 });
 
 function tagGift(idx, btn) {
