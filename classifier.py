@@ -91,9 +91,29 @@ def generate_reply(review: dict, brand_tone: str, client) -> str:
 
 답변만 출력하세요. 따옴표나 설명 없이 답변 텍스트만."""
 
+    customer_type    = review.get("customer_type", "")
+    reviewer_history = review.get("reviewer_history", [])
+    hints = load_settings().get("customer_type_hints", {})
+    type_label = {"first": "첫 구매", "repeat": "재구매", "loyal": "단골", "gift": "선물 구매자"}.get(customer_type, "")
+    type_hint  = hints.get(customer_type, "")
+    history_lines = ""
+    if reviewer_history:
+        recent = sorted(reviewer_history, key=lambda x: x.get("date", ""), reverse=True)[:3]
+        history_lines = "\n".join(
+            f"  - {h.get('date','')} | 별점 {h.get('rating','')}점 | {(h.get('product','') or '')[:30]} | {(h.get('content','') or '')[:40]}"
+            for h in recent
+        )
+    customer_context = ""
+    if type_label:
+        customer_context  = f"\n\n[고객 유형: {type_label}]"
+        if type_hint:
+            customer_context += f"\n{type_hint}"
+        if history_lines:
+            customer_context += f"\n\n[최근 구매 이력]\n{history_lines}"
+
     user = f"""리뷰 내용: {review.get('content', '')}
 별점: {review.get('rating', '')}점
-상품: {review.get('product', '')}
+상품: {review.get('product', '')}{customer_context}
 
 위 리뷰에 적절한 답변을 작성해주세요."""
 

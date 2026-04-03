@@ -180,16 +180,23 @@
   .reviewer-info { flex: 1; }
   .reviewer-name { font-weight: 600; font-size: 14px; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
   .review-meta { font-size: 12px; color: #888; margin-top: 2px; }
-  .stars { color: #ffc107; font-size: 15px; }
-  .star-num { font-size: 12px; color: #666; margin-left: 3px; }
+  .stars { display: inline-flex; gap: 1px; vertical-align: middle; }
+  .stars svg { width: 14px; height: 14px; }
+  .star-num { font-size: 12px; color: #ff6e00; margin-left: 4px; font-weight: 700; vertical-align: middle; }
 
   /* 배지 */
   .badge {
     display: inline-block; border-radius: 4px; font-size: 11px;
     padding: 2px 7px; font-weight: 600; white-space: nowrap;
   }
-  .badge-replied { background: #e8f9f0; color: #03c75a; }
+  .badge-replied { background: #e8f9f0; color: #03c75a; font-size:12px; padding:3px 9px; }
   .badge-unreplied { background: #fff3f3; color: #e53935; }
+  .badge-first  { background: #e8f4fd; color: #1565c0; }
+  .badge-repeat { background: #e8f9f0; color: #2e7d32; }
+  .badge-loyal  { background: #fff8e1; color: #9e7a20; border: 1px solid #ffe082; }
+  .badge-gift   { background: #fce4ec; color: #c62828; }
+  .btn-gift-tag { background: none; border: none; font-size: 14px; cursor: pointer; opacity: .35; padding: 0 2px; line-height: 1; vertical-align: middle; }
+  .btn-gift-tag.active { opacity: 1; }
   .badge-positive { background: #e8f9f0; color: #03c75a; }
   .badge-negative { background: #fff3f3; color: #e53935; }
   .badge-mixed { background: #fff8e1; color: #f57c00; }
@@ -224,40 +231,38 @@
   }
   .reply-box .reply-label { font-size: 11px; color: #03c75a; font-weight: 600; margin-bottom: 4px; }
 
-  .ai-reply-section { margin-top: 10px; }
   .ai-reply-box {
-    background: #f0f4ff; border: 1px solid #c5cae9; border-radius: 6px;
-    padding: 10px 13px; font-size: 13px; color: #333;
+    background: #fafafa; border: 1px solid #e8e8e8; border-radius: 6px;
+    padding: 10px 12px;
   }
-  .ai-reply-label { font-size: 11px; color: #3949ab; font-weight: 600; margin-bottom: 6px; }
   .ai-reply-text {
     width: 100%; border: none; background: transparent; font-size: 13px;
-    font-family: inherit; color: #333; resize: vertical; min-height: 60px;
-    outline: none; line-height: 1.6;
+    font-family: inherit; color: #333; resize: vertical; min-height: 64px;
+    outline: none; line-height: 1.65;
   }
-  .ai-reply-actions { display: flex; gap: 6px; margin-top: 8px; }
-  .btn-approve {
-    background: #03c75a; color: white; border: none; border-radius: 5px;
-    padding: 5px 14px; font-size: 12px; cursor: pointer; font-weight: 600;
-  }
-  .btn-approve:hover { background: #00a846; }
-  .btn-reject {
-    background: white; color: #666; border: 1px solid #ddd; border-radius: 5px;
-    padding: 5px 14px; font-size: 12px; cursor: pointer;
-  }
-  .btn-reject:hover { background: #f5f5f5; }
+  .ai-reply-text[readonly] { background: #f5f5f5; color: #666; border-radius: 4px; padding: 4px; }
+  .ai-reply-actions { display: flex; gap: 6px; margin-top: 8px; flex-wrap: wrap; align-items: center; }
 
-  .btn-generate {
-    margin-top: 8px; background: #e3f2fd; color: #1565c0;
-    border: 1px solid #90caf9; border-radius: 5px;
-    padding: 5px 14px; font-size: 12px; cursor: pointer;
+  /* 버튼 통일 */
+  .btn-sm {
+    border: none; border-radius: 5px; padding: 5px 13px;
+    font-size: 12px; cursor: pointer; font-weight: 600; white-space: nowrap;
+    transition: opacity .15s;
   }
-  .btn-generate:hover { background: #bbdefb; }
-  .btn-generate:disabled { opacity: 0.5; cursor: not-allowed; }
+  .btn-sm:hover { opacity: .85; }
+  .btn-sm:disabled { opacity: .4; cursor: not-allowed; }
+  .btn-green  { background: #03c75a; color: white; }
+  .btn-blue   { background: #1565c0; color: white; }
+  .btn-gray   { background: #757575; color: white; }
+  .btn-orange { background: #e65100; color: white; }
+  .btn-ghost  { background: white; color: #666; border: 1px solid #ddd; font-weight: 400; }
+  .btn-ghost:hover { background: #f5f5f5; }
+  .btn-light-blue { background: #e3f2fd; color: #1565c0; border: 1px solid #90caf9; font-weight: 400; }
+  .btn-light-blue:hover { background: #bbdefb; }
 
   /* 2컬럼 카드 */
   .card-body { display: flex; gap: 0; }
-  .card-left { width: 50%; min-width: 0; padding-right: 14px; border-right: 1px solid #f0f0f0; overflow: hidden; }
+  .card-left { width: 30%; min-width: 0; padding-right: 14px; border-right: 1px solid #f0f0f0; overflow: hidden; }
   .card-divider {
     width: 6px; flex-shrink: 0; cursor: col-resize;
     background: transparent; position: relative; margin: 0 -3px; z-index: 1;
@@ -266,22 +271,57 @@
   .card-divider:hover, .card-divider.dragging { background: #03c75a33; border-radius: 3px; }
   .card-right {
     flex: 1; min-width: 0; padding-left: 14px;
-    display: flex; flex-direction: column; gap: 10px;
+    display: flex; flex-direction: column;
   }
-  .card-right-section { }
+  .card-right-section {
+    padding: 10px 0;
+    border-bottom: 1px solid #f3f3f3;
+  }
+  .card-right-section:last-child { border-bottom: none; }
   .card-right-label {
-    font-size: 10px; font-weight: 700; color: #aaa; text-transform: uppercase;
-    letter-spacing: .05em; margin-bottom: 5px;
+    font-size: 10px; font-weight: 700; color: #bbb; text-transform: uppercase;
+    letter-spacing: .06em; margin-bottom: 6px;
   }
   .badge-coupon {
     display: inline-flex; align-items: center; gap: 4px;
     background: #fff8e1; color: #9e7a20; border: 1px solid #ffe082;
     border-radius: 4px; font-size: 11px; padding: 3px 8px; font-weight: 600;
   }
-  .badge-coupon-manual {
-    background: #fce4ec; color: #c62828; border-color: #ef9a9a;
-  }
+  .badge-coupon-manual { background: #fce4ec; color: #c62828; border-color: #ef9a9a; }
+  .coupon-list { display: flex; flex-wrap: wrap; gap: 4px; }
   .no-analysis { font-size: 12px; color: #ccc; }
+  .approved-status { font-size: 11px; color: #2e7d32; flex: 1; }
+
+  /* 이전 리뷰 이력 */
+  .reviewer-history { margin-top: 10px; border-top: 1px dashed #eee; padding-top: 8px; }
+  .reviewer-history-toggle {
+    font-size: 11px; color: #999; cursor: pointer; user-select: none;
+    display: flex; align-items: center; gap: 4px;
+  }
+  .reviewer-history-toggle:hover { color: #444; }
+  .reviewer-history-list { margin-top: 8px; display: flex; flex-direction: column; gap: 7px; }
+  .history-item {
+    background: #f9f9f9; border-radius: 5px; padding: 8px 10px;
+    font-size: 12px; border-left: 3px solid #e0e0e0;
+  }
+  .history-item-meta { font-size: 11px; color: #bbb; margin-bottom: 3px; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+  .history-item-content { color: #555; line-height: 1.5; }
+  .history-item-product { font-size: 11px; color: #ccc; margin-top: 3px; }
+
+  /* 리뷰 포토 */
+  .review-photo { margin-top: 8px; }
+  .review-photo img {
+    width: 72px; height: 72px; object-fit: cover; border-radius: 6px;
+    border: 1px solid #e8e8e8; cursor: pointer; transition: opacity .15s;
+  }
+  .review-photo img:hover { opacity: .85; }
+  /* 포토 라이트박스 */
+  #photo-lightbox {
+    display: none; position: fixed; inset: 0; background: rgba(0,0,0,.75);
+    z-index: 9999; align-items: center; justify-content: center; cursor: pointer;
+  }
+  #photo-lightbox.open { display: flex; }
+  #photo-lightbox img { max-width: 90vw; max-height: 90vh; border-radius: 8px; }
 
   /* 진행 오버레이 */
   .progress-overlay {
@@ -407,6 +447,35 @@
 <!-- 관리자 패널 -->
 <div class="admin-panel" id="admin-panel">
 
+  <!-- 초개인화 CS 설정 -->
+  <div class="admin-section">
+    <div class="admin-section-title">👤 초개인화 CS 설정</div>
+    <div class="admin-row">
+      <div>
+        <div class="admin-row-label">단골 기준</div>
+        <div class="admin-row-sub">N회 이상 리뷰 시 "단골"로 분류</div>
+      </div>
+      <div style="display:flex;align-items:center;gap:6px">
+        <input type="number" id="loyal-threshold" min="2" max="20"
+          style="width:60px;padding:5px 8px;border:1px solid #ddd;border-radius:5px;font-size:13px;text-align:center"
+          oninput="enableSave('btn-save-cs')">
+        <span style="font-size:13px;color:#666">회 이상</span>
+      </div>
+    </div>
+    <label class="admin-label" style="margin-top:14px">고객 유형별 AI 힌트</label>
+    <div style="display:flex;flex-direction:column;gap:10px">
+      <div><div style="font-size:12px;color:#1565c0;margin-bottom:4px">🔵 첫구매</div>
+        <textarea class="admin-textarea" id="hint-first" rows="3" oninput="enableSave('btn-save-cs')"></textarea></div>
+      <div><div style="font-size:12px;color:#2e7d32;margin-bottom:4px">🟢 재구매</div>
+        <textarea class="admin-textarea" id="hint-repeat" rows="3" oninput="enableSave('btn-save-cs')"></textarea></div>
+      <div><div style="font-size:12px;color:#9e7a20;margin-bottom:4px">⭐ 단골</div>
+        <textarea class="admin-textarea" id="hint-loyal" rows="3" oninput="enableSave('btn-save-cs')"></textarea></div>
+      <div><div style="font-size:12px;color:#c62828;margin-bottom:4px">🎁 선물 구매자</div>
+        <textarea class="admin-textarea" id="hint-gift" rows="3" oninput="enableSave('btn-save-cs')"></textarea></div>
+    </div>
+    <button class="btn-save" id="btn-save-cs" onclick="saveCsSettings(this)" disabled>저장됨</button>
+  </div>
+
   <!-- 브랜드 톤 가이드 -->
   <div class="admin-section">
     <div class="admin-section-title">🎨 브랜드 톤 가이드</div>
@@ -471,14 +540,23 @@ let debounceTimer;
 
 function starsHTML(rating) {
   const n = parseFloat(rating) || 0;
-  const full = Math.floor(n);
-  return `<span class="stars">${'★'.repeat(full)}${'☆'.repeat(5-full)}</span><span class="star-num">${n}</span>`;
+  const full = Math.round(n);
+  const starFilled = `<svg viewBox="0 0 24 24" fill="#FFB100"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>`;
+  const starEmpty  = `<svg viewBox="0 0 24 24" fill="#D9D9D9"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>`;
+  return `<span class="stars">${starFilled.repeat(full)}${starEmpty.repeat(5-full)}</span><span class="star-num">${n}.0점</span>`;
 }
 
 function sentimentBadge(s) {
   const map = { positive: ['긍정', 'positive'], negative: ['부정', 'negative'], mixed: ['혼합', 'mixed'] };
   if (!s || !map[s]) return '';
   const [label, cls] = map[s];
+  return `<span class="badge badge-${cls}">${label}</span>`;
+}
+
+function customerTypeBadge(type) {
+  const map = { first: ['첫구매', 'first'], repeat: ['재구매', 'repeat'], loyal: ['단골⭐', 'loyal'], gift: ['선물🎁', 'gift'] };
+  if (!type || !map[type]) return '';
+  const [label, cls] = map[type];
   return `<span class="badge badge-${cls}">${label}</span>`;
 }
 
@@ -489,7 +567,7 @@ function replyStatusBadge(status) {
 }
 
 // 컬럼 드래그 리사이즈
-window._cardLeftPct = 50;
+window._cardLeftPct = 30;
 function startResize(e) {
   e.preventDefault();
   const divider = e.target;
@@ -544,59 +622,89 @@ function renderReviews(reviews) {
     const existingReply = r.replied && r.reply_content
       ? `<div class="reply-box"><div class="reply-label">판매자 답글</div>${r.reply_content}</div>` : '';
 
+    // 동일 고객 이전 리뷰
+    const historyHTML = (r.reviewer_history && r.reviewer_history.length > 0) ? `
+      <div class="reviewer-history">
+        <div class="reviewer-history-toggle" onclick="toggleHistory(this)">
+          ▶ 이 고객의 다른 리뷰 ${r.reviewer_history.length}건
+        </div>
+        <div class="reviewer-history-list" style="display:none">
+          ${[...r.reviewer_history].sort((a,b)=>(b.date||'')>(a.date||'')?1:-1).map(h=>`
+            <div class="history-item">
+              <div class="history-item-meta">
+                ${starsHTML(h.rating)} ${h.date||''} · ${h.replied?'✓ 답글완료':'미답글'}
+              </div>
+              <div class="history-item-content">${h.content||''}</div>
+              <div class="history-item-product">${h.product||''}</div>
+            </div>
+          `).join('')}
+        </div>
+      </div>` : '';
+
     // ── 우측: AI 분류 결과 ──
     const hasAnalysis = r.sentiment || (r.topics && r.topics.length) || r.reportable;
-    const analysisSection = hasAnalysis ? `
+    const analysisSection = `
       <div class="card-right-section">
         <div class="card-right-label">AI 분류</div>
-        <div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:4px;">
-          ${r.sentiment ? sentimentBadge(r.sentiment) : ''}
-          ${r.reportable ? `<span class="badge badge-report">🚨 ${r.report_reason || '신고가능'}</span>` : ''}
-        </div>
-        ${(r.topics || []).length ? `<div class="topic-chips">${r.topics.map(t => `<span class="topic-chip">${t}</span>`).join('')}</div>` : ''}
-      </div>` : `<div class="card-right-section"><div class="card-right-label">AI 분류</div><span class="no-analysis">미분류</span></div>`;
+        ${hasAnalysis ? `
+          <div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:${(r.topics||[]).length?'6px':'0'}">
+            ${r.sentiment ? sentimentBadge(r.sentiment) : ''}
+            ${r.reportable ? `<span class="badge badge-report">🚨 ${r.report_reason || '신고가능'}</span>` : ''}
+          </div>
+          ${(r.topics||[]).length ? `<div class="topic-chips">${r.topics.map(t=>`<span class="topic-chip">${t}</span>`).join('')}</div>` : ''}
+        ` : `<span class="no-analysis">미분류</span>`}
+      </div>`;
 
     // ── 우측: 쿠폰 발급 ──
     const coupons = checkCoupon(r);
     const couponSection = `
       <div class="card-right-section">
         <div class="card-right-label">쿠폰 발급</div>
-        ${coupons.length ? coupons.map(c =>
-          `<span class="badge-coupon${c.manual ? ' badge-coupon-manual' : ''}">${c.manual ? '✋ 수동 ' : '🎟 '}${c.coupon}</span>`
-        ).join('<br style="margin-bottom:3px">') : '<span class="no-analysis">해당 없음</span>'}
+        ${coupons.length
+          ? `<div class="coupon-list">${coupons.map(c=>`<span class="badge-coupon${c.manual?' badge-coupon-manual':''}">${c.manual?'✋ ':' '}${c.coupon}</span>`).join('')}</div>`
+          : '<span class="no-analysis">해당 없음</span>'}
       </div>`;
 
-    // ── 우측: AI 답변 or 답변완료 ──
+    // ── 우측: 답변 ──
     let aiSection = '';
     if (r.replied) {
       aiSection = `
         <div class="card-right-section">
           <div class="card-right-label">답변 상태</div>
-          <span class="badge badge-replied" style="font-size:12px;padding:4px 10px;">✓ 답변완료</span>
+          <span class="badge badge-replied">✓ 답변완료</span>
         </div>`;
-    } else if (r.reply_status === 'draft' || r.reply_status === 'approved') {
+    } else if (r.reply_status === 'draft') {
       aiSection = `
         <div class="card-right-section">
-          <div class="card-right-label">AI 답변 작성 ${replyStatusBadge(r.reply_status)}</div>
+          <div class="card-right-label">AI 답변 <span class="badge badge-draft">초안</span></div>
           <div class="ai-reply-box">
-            <textarea class="ai-reply-text" id="reply-text-${idx}" ${r.reply_status === 'approved' ? 'readonly style="background:#f9f9f9;color:#555;"' : ''}>${r.ai_reply || ''}</textarea>
+            <textarea class="ai-reply-text" id="reply-text-${idx}">${r.ai_reply || ''}</textarea>
             <div class="ai-reply-actions">
-              ${r.reply_status === 'draft'
-                ? `<button class="btn-approve" onclick="approveReply(${idx})">승인</button>
-                   <button class="btn-reject" onclick="rejectReply(${idx})">삭제</button>`
-                : `<span style="font-size:11px;color:#2e7d32;flex:1;">✓ 승인 완료</span>
-                   <button class="btn-approve" id="edit-btn-${idx}" onclick="startEditReply(${idx})" style="background:#1565c0;display:none;">수정 저장</button>
-                   <button class="btn-reject" onclick="rejectReply(${idx})" style="display:none;" id="del-btn-${idx}">삭제</button>
-                   <button class="btn-classify" onclick="enableEditReply(${idx})" id="enable-edit-btn-${idx}" style="background:#555;border:none;color:white;">수정</button>`
-              }
+              <button class="btn-sm btn-green" onclick="approveReply(${idx})">승인</button>
+              <button class="btn-sm btn-ghost" onclick="rejectReply(${idx})">삭제</button>
+            </div>
+          </div>
+        </div>`;
+    } else if (r.reply_status === 'approved') {
+      aiSection = `
+        <div class="card-right-section">
+          <div class="card-right-label">AI 답변 <span class="badge badge-approved">승인됨</span></div>
+          <div class="ai-reply-box">
+            <textarea class="ai-reply-text" id="reply-text-${idx}" readonly>${r.ai_reply || ''}</textarea>
+            <div class="ai-reply-actions">
+              <span class="approved-status">✓ 승인 완료</span>
+              <button class="btn-sm btn-gray" id="enable-edit-btn-${idx}" onclick="enableEditReply(${idx})">수정</button>
+              <button class="btn-sm btn-blue" id="edit-btn-${idx}" onclick="startEditReply(${idx})" style="display:none">저장</button>
+              <button class="btn-sm btn-ghost" id="del-btn-${idx}" onclick="rejectReply(${idx})" style="display:none">삭제</button>
+              <button class="btn-sm btn-orange" onclick="postReply(${idx}, this)">스토어에 댓글 등록</button>
             </div>
           </div>
         </div>`;
     } else {
       aiSection = `
         <div class="card-right-section">
-          <div class="card-right-label">AI 답변 작성</div>
-          <button class="btn-generate" onclick="generateReply(${idx}, this)">답변 작성</button>
+          <div class="card-right-label">AI 답변</div>
+          <button class="btn-sm btn-light-blue" onclick="generateReply(${idx}, this)">답변 작성</button>
         </div>`;
     }
 
@@ -604,7 +712,7 @@ function renderReviews(reviews) {
       <div class="review-header">
         <div class="reviewer-avatar">${r.reviewer ? r.reviewer[0].toUpperCase() : '?'}</div>
         <div class="reviewer-info">
-          <div class="reviewer-name">${r.reviewer || '익명'} ${repliedBadge} ${replyStatusBadge(r.reply_status)}</div>
+          <div class="reviewer-name">${r.reviewer || '익명'} ${customerTypeBadge(r.customer_type)} ${repliedBadge} ${replyStatusBadge(r.reply_status)} <button class="btn-gift-tag ${r.customer_type==='gift'?'active':''}" onclick="tagGift(${idx},this)" title="선물 구매자 태그">🎁</button></div>
           <div class="review-meta">${r.date || ''}</div>
         </div>
         <div>${starsHTML(r.rating)}</div>
@@ -613,7 +721,9 @@ function renderReviews(reviews) {
         <div class="card-left" style="width:${window._cardLeftPct||50}%">
           ${product}
           <div class="review-content">${r.content || '(내용 없음)'}</div>
+          ${r.photo_url ? `<div class="review-photo"><img src="${r.photo_url}" loading="lazy" onclick="openPhoto('${r.photo_url}')"></div>` : ''}
           ${existingReply}
+          ${historyHTML}
         </div>
         <div class="card-divider" onmousedown="startResize(event)"></div>
         <div class="card-right">
@@ -754,8 +864,6 @@ function enableEditReply(idx) {
   const ta = document.getElementById(`reply-text-${idx}`);
   if (!ta) return;
   ta.removeAttribute('readonly');
-  ta.style.background = '';
-  ta.style.color = '';
   ta.focus();
   document.getElementById(`enable-edit-btn-${idx}`).style.display = 'none';
   document.getElementById(`edit-btn-${idx}`).style.display = '';
@@ -764,6 +872,29 @@ function enableEditReply(idx) {
 
 function startEditReply(idx) {
   approveReply(idx);
+}
+
+function postReply(idx, btn) {
+  if (!confirm('스마트스토어에 실제로 댓글을 게시할까요?')) return;
+  btn.disabled = true;
+  btn.textContent = '게시 중...';
+  fetch(`/api/reply/post/${idx}`, {method: 'POST'})
+    .then(r => r.json())
+    .then(data => {
+      if (data.error) { alert(data.error); btn.disabled = false; btn.textContent = '스토어에 댓글 등록'; return; }
+      // 진행상황 폴링
+      const poll = setInterval(() => {
+        fetch('/api/reply/post-progress').then(r => r.json()).then(p => {
+          btn.textContent = p.step || '게시 중...';
+          if (!p.running) {
+            clearInterval(poll);
+            if (p.success) fetchReviews();
+            else { alert('게시 실패: ' + (p.error || '알 수 없는 오류')); btn.disabled = false; btn.textContent = '스토어에 댓글 등록'; }
+          }
+        });
+      }, 1500);
+    })
+    .catch(() => { btn.disabled = false; btn.textContent = '스토어에 댓글 등록'; });
 }
 
 function rejectReply(idx) {
@@ -815,6 +946,13 @@ function loadAdminData() {
     toggle.classList.toggle('on', cfg.auto_generate_reply);
     document.getElementById('auto-generate-label').textContent = cfg.auto_generate_reply ? 'ON' : 'OFF';
     if (cfg.coupon_rules) renderCouponRules(cfg.coupon_rules);
+    // 초개인화 CS 설정
+    document.getElementById('loyal-threshold').value = cfg.loyal_threshold || 3;
+    const hints = cfg.customer_type_hints || {};
+    ['first', 'repeat', 'loyal', 'gift'].forEach(t => {
+      const el = document.getElementById(`hint-${t}`);
+      if (el) el.value = hints[t] || '';
+    });
     const status = document.getElementById('api-status');
     if (cfg.anthropic_api_key_set) {
       status.textContent = '● API 키 설정됨';
@@ -876,6 +1014,20 @@ function saveCouponRules(btn) {
     method: 'POST',
     headers: {'Content-Type': 'application/json'},
     body: JSON.stringify({coupon_rules: adminConfig.coupon_rules}),
+  }).then(() => flashSaved(btn));
+}
+
+function saveCsSettings(btn) {
+  const hints = {};
+  ['first', 'repeat', 'loyal', 'gift'].forEach(t => {
+    hints[t] = document.getElementById(`hint-${t}`)?.value || '';
+  });
+  fetch('/api/admin/config', {
+    method: 'POST', headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({
+      loyal_threshold: parseInt(document.getElementById('loyal-threshold').value) || 3,
+      customer_type_hints: hints,
+    }),
   }).then(() => flashSaved(btn));
 }
 
@@ -1026,6 +1178,31 @@ fetch('/api/admin/config').then(r => r.json()).then(cfg => {
   fetchReviews();
   setInterval(fetchReviews, 5 * 60 * 1000);
 });
+
+function tagGift(idx, btn) {
+  const isActive = btn.classList.contains('active');
+  fetch(`/api/review/tag/${idx}`, {
+    method: 'POST', headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({tag: isActive ? '' : 'gift'}),
+  }).then(() => fetchReviews());
+}
+
+function toggleHistory(el) {
+  const list = el.nextElementSibling;
+  const open = list.style.display !== 'none';
+  list.style.display = open ? 'none' : 'flex';
+  el.textContent = el.textContent.replace(open ? '▼' : '▶', open ? '▶' : '▼');
+}
+
+function openPhoto(url) {
+  const lb = document.getElementById('photo-lightbox');
+  lb.querySelector('img').src = url;
+  lb.classList.add('open');
+}
 </script>
+
+<div id="photo-lightbox" onclick="this.classList.remove('open')">
+  <img src="" alt="리뷰 포토">
+</div>
 </body>
 </html>

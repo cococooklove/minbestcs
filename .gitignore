@@ -5,3 +5,6 @@ __pycache__/
 *.pyc
 .DS_Store
 .env
+data/classify_progress.json
+data/post_progress.json
+data/manual_tags.json

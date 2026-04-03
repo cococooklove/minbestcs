@@ -86,19 +86,37 @@ def api_reviews():
         "need_reply_count": sum(1 for r in all_reviews if not r.get("replied") and not r.get("ai_reply")),
     }
 
-    # 인덱스 포함해서 반환 (답변 승인 등에 필요)
-    indexed = [{"_idx": i, **r} for i, r in enumerate(load_reviews())
-               if any(r2.get("content") == r.get("content") and r2.get("date") == r.get("date")
-                      for r2 in reviews)]
-    # 필터된 리뷰에 _idx 붙이기
+    # 전체 기준 reviewer → 인덱스 목록 맵
     all_r = load_reviews()
+    reviewer_map = {}
+    for i, r in enumerate(all_r):
+        rv = r.get("reviewer", "")
+        if rv:
+            reviewer_map.setdefault(rv, []).append(i)
+
+    settings_data = load_settings()
+    manual_tags   = load_manual_tags()
+
+    # 필터된 리뷰에 _idx + reviewer_history + customer_type 붙이기
     indexed_reviews = []
     for r in reviews:
         for i, ar in enumerate(all_r):
             if (ar.get("content") == r.get("content") and
                     ar.get("date") == r.get("date") and
                     ar.get("reviewer") == r.get("reviewer")):
-                indexed_reviews.append({"_idx": i, **ar})
+                history = [
+                    {
+                        "date": all_r[j].get("date"),
+                        "rating": all_r[j].get("rating"),
+                        "product": all_r[j].get("product"),
+                        "content": all_r[j].get("content"),
+                        "replied": all_r[j].get("replied"),
+                    }
+                    for j in reviewer_map.get(ar.get("reviewer", ""), [])
+                    if j != i
+                ]
+                customer_type = calculate_customer_type(history, manual_tags, ar.get("reviewer", ""), settings_data)
+                indexed_reviews.append({"_idx": i, **ar, "reviewer_history": history, "customer_type": customer_type})
                 break
 
     return jsonify({"reviews": indexed_reviews, "stats": stats})
@@ -114,6 +132,31 @@ def load_settings():
         return {"auto_reply": False, "report_criteria": ["욕설", "경쟁사 언급", "광고성", "반복 내용"], "anthropic_api_key": ""}
     with open(SETTINGS_FILE, encoding="utf-8") as f:
         return json.load(f)
+
+
+MANUAL_TAGS_FILE = "data/manual_tags.json"
+
+def load_manual_tags():
+    if not os.path.exists(MANUAL_TAGS_FILE):
+        return {}
+    with open(MANUAL_TAGS_FILE, encoding="utf-8") as f:
+        return json.load(f)
+
+def save_manual_tags(tags):
+    with open(MANUAL_TAGS_FILE, "w", encoding="utf-8") as f:
+        json.dump(tags, f, ensure_ascii=False, indent=2)
+
+def calculate_customer_type(reviewer_history: list, manual_tags: dict, reviewer: str, settings: dict) -> str:
+    manual_tag = manual_tags.get(reviewer, "")
+    if manual_tag:
+        return manual_tag
+    threshold = settings.get("loyal_threshold", 3)
+    count = len(reviewer_history)
+    if count == 0:
+        return "first"
+    if count >= threshold - 1:
+        return "loyal"
+    return "repeat"
 
 
 def save_settings(data):
@@ -205,6 +248,26 @@ def api_reject_reply(idx):
     return jsonify({"status": "rejected"})
 
 
+@app.route("/api/review/tag/<int:idx>", methods=["POST"])
+def api_tag_review(idx):
+    """고객 수동 태그 (gift 등)"""
+    reviews = load_reviews()
+    if idx >= len(reviews):
+        return jsonify({"error": "not found"}), 404
+    data = request.get_json() or {}
+    tag = data.get("tag", "")
+    reviewer = reviews[idx].get("reviewer", "")
+    if not reviewer:
+        return jsonify({"error": "reviewer 없음"}), 400
+    manual_tags = load_manual_tags()
+    if tag:
+        manual_tags[reviewer] = tag
+    else:
+        manual_tags.pop(reviewer, None)
+    save_manual_tags(manual_tags)
+    return jsonify({"status": "ok", "tag": tag})
+
+
 @app.route("/api/stats/daily")
 def api_stats_daily():
     from datetime import date, timedelta
@@ -282,6 +345,10 @@ def admin_config_post():
         os.environ["ANTHROPIC_API_KEY"] = data["anthropic_api_key"]
     if "coupon_rules" in data:
         s["coupon_rules"] = data["coupon_rules"]
+    if "loyal_threshold" in data:
+        s["loyal_threshold"] = int(data["loyal_threshold"])
+    if "customer_type_hints" in data:
+        s["customer_type_hints"] = data["customer_type_hints"]
     save_settings(s)
     return jsonify({"status": "ok"})
 
@@ -301,6 +368,30 @@ def admin_brand_tone_post():
     with open(BRAND_TONE_FILE, "w", encoding="utf-8") as f:
         f.write(data.get("content", ""))
     return jsonify({"status": "ok"})
+
+
+@app.route("/api/reply/post/<int:idx>", methods=["POST"])
+def api_post_reply(idx):
+    """셀러센터에 답글 게시 (Playwright 비동기 실행)"""
+    reviews = load_reviews()
+    if idx >= len(reviews):
+        return jsonify({"error": "not found"}), 404
+    r = reviews[idx]
+    if not r.get("ai_reply"):
+        return jsonify({"error": "게시할 답글이 없습니다."}), 400
+    if r.get("replied"):
+        return jsonify({"error": "이미 답글이 달린 리뷰입니다."}), 400
+    subprocess.Popen([sys.executable, "reply_poster.py", str(idx)])
+    return jsonify({"status": "started"})
+
+
+@app.route("/api/reply/post-progress")
+def api_post_progress():
+    path = "data/post_progress.json"
+    if not os.path.exists(path):
+        return jsonify({"running": False, "step": "", "success": None, "error": None})
+    with open(path, encoding="utf-8") as f:
+        return jsonify(json.load(f))
 
 
 @app.route("/api/scrape", methods=["POST"])
