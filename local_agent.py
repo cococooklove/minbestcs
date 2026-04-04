@@ -117,7 +117,8 @@ def on_do_scrape(data):
 
     def run_scrape():
         try:
-            subprocess.run([sys.executable, "scraper.py"], check=False)
+            import scraper
+            scraper.main()
             sio.emit("agent_progress", {"step": "수집 완료. 업로드 중..."})
             success = upload_reviews()
             sio.emit("scrape_done", {"success": success})

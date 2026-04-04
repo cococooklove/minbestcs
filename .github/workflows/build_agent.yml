@@ -12,7 +12,9 @@ jobs:
         with:
           python-version: '3.11'
       - name: Install dependencies
-        run: pip install pyinstaller "python-socketio[client]" python-dotenv websocket-client requests certifi
+        run: pip install pyinstaller "python-socketio[client]" python-dotenv websocket-client requests certifi playwright openpyxl
+      - name: Install Playwright browsers
+        run: playwright install chromium
       - name: Build Mac executable
         run: pyinstaller MinBestAgent.spec
       - name: Upload Mac artifact
@@ -29,7 +31,9 @@ jobs:
         with:
           python-version: '3.11'
       - name: Install dependencies
-        run: pip install pyinstaller "python-socketio[client]" python-dotenv websocket-client requests certifi
+        run: pip install pyinstaller "python-socketio[client]" python-dotenv websocket-client requests certifi playwright openpyxl
+      - name: Install Playwright browsers
+        run: playwright install chromium
       - name: Build Windows executable
         run: pyinstaller MinBestAgent.spec
       - name: Upload Windows artifact

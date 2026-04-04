@@ -7,6 +7,11 @@ a = Analysis(
     binaries=[],
     datas=[(certifi.where(), 'certifi')],
     hiddenimports=[
+        'scraper',
+        'login',
+        'playwright',
+        'playwright.sync_api',
+        'openpyxl',
         'engineio.async_drivers.threading',
         'socketio',
         'dotenv',
