@@ -8,7 +8,7 @@ from datetime import datetime
 from pathlib import Path
 import openpyxl
 
-PROFILE_DIR = os.path.abspath("data/browser_profile")
+PROFILE_DIR = os.environ.get("SCRAPER_PROFILE_DIR") or os.path.abspath("data/browser_profile")
 OUTPUT_FILE = "data/reviews.json"
 DOWNLOAD_DIR = Path("data/downloads").resolve()
 

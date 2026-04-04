@@ -1196,8 +1196,12 @@ const socket = io();
 socket.on('scrape_status', data => {
   clearInterval(scrapePoll);
   if (data.done) {
-    showToast('리뷰 수집 완료!', 3000);
-    fetchReviews();
+    if (data.success === false) {
+      showToast('수집 실패. 로그인 상태를 확인해주세요.', 5000);
+    } else {
+      showToast('리뷰 수집 완료!', 3000);
+      fetchReviews();
+    }
   }
 });
 

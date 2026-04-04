@@ -120,22 +120,21 @@ def on_do_scrape(data):
     def run_scrape():
         try:
             # Playwright Chromium 미설치 시 자동 설치
-            try:
-                from playwright._impl._driver import compute_driver_executable
-                driver_executable, driver_cli = compute_driver_executable()
-                result = subprocess.run(
-                    [str(driver_executable), str(driver_cli), "install", "--dry-run", "chromium"],
-                    capture_output=True
-                )
-                if result.returncode != 0:
-                    raise Exception("not installed")
-            except Exception:
+            from playwright._impl._driver import compute_driver_executable
+            driver_executable, driver_cli = compute_driver_executable()
+            result = subprocess.run(
+                [str(driver_executable), str(driver_cli), "show-browsers"],
+                capture_output=True
+            )
+            if b"chromium" not in result.stdout.lower():
                 print("Playwright Chromium 설치 중... (최초 1회)")
                 sio.emit("agent_progress", {"step": "Chromium 설치 중 (최초 1회)..."})
-                from playwright._impl._driver import compute_driver_executable
-                driver_executable, driver_cli = compute_driver_executable()
                 subprocess.run([str(driver_executable), str(driver_cli), "install", "chromium"], check=True)
+            # 브라우저 프로필 경로 전달 (로그인 세션 유지)
+            os.environ["SCRAPER_PROFILE_DIR"] = PROFILE_DIR
             import scraper
+            import importlib
+            importlib.reload(scraper)  # 환경변수 반영을 위해 reload
             scraper.main()
             sio.emit("agent_progress", {"step": "수집 완료. 업로드 중..."})
             success = upload_reviews()
