@@ -146,6 +146,9 @@ def on_do_scrape(data):
 
     def run_scrape():
         try:
+            if _login_page is None:
+                sio.emit("scrape_done", {"success": False, "error": "로그인 먼저 해주세요. 로그인 버튼을 눌러 네이버 셀러센터에 로그인 후 다시 시도하세요."})
+                return
             ensure_chromium()
             import scraper
             scraper.PROFILE_DIR = PROFILE_DIR

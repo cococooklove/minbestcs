@@ -152,6 +152,11 @@ def main(progress_cb=None, existing_page=None):
             pass
         time.sleep(3)
 
+        # 로그인 세션 만료 확인
+        cur_url = page.url.lower()
+        if any(x in cur_url for x in ("login", "nidlogin", "oauth", "signin")):
+            raise Exception("세션이 만료됐습니다. 에이전트를 재시작하고 다시 로그인해주세요.")
+
         # 엑셀다운 버튼 대기
         progress("엑셀다운 버튼 찾는 중...")
         btn = page.get_by_text("엑셀다운").first
