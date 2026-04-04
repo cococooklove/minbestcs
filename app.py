@@ -456,7 +456,7 @@ def api_scrape():
 def api_upload_reviews():
     """로컬에서 수집한 reviews.json을 Railway로 업로드"""
     token = request.headers.get("X-Upload-Token", "")
-    if token != os.environ.get("UPLOAD_TOKEN", ""):
+    if token != os.environ.get("AGENT_TOKEN", ""):
         return jsonify({"error": "인증 실패"}), 401
     data = request.get_json()
     if not isinstance(data, list):
