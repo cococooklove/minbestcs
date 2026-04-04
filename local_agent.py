@@ -74,6 +74,7 @@ def upload_reviews():
 def connect():
     print(f"서버 연결됨: {RAILWAY_URL}")
     sio.emit("agent_auth", {"token": AGENT_TOKEN})
+    webbrowser.open(RAILWAY_URL)
 
 
 @sio.event
@@ -149,20 +150,24 @@ def main():
     print("민베스트 로컬 에이전트 시작", flush=True)
     print(f"서버: {RAILWAY_URL}", flush=True)
 
-    # 브라우저에서 Railway URL 열기
-    threading.Timer(2.0, lambda: webbrowser.open(RAILWAY_URL)).start()
-
-    try:
-        print("연결 시도 중...", flush=True)
-        sio.connect(RAILWAY_URL, transports=["websocket", "polling"], wait_timeout=15)
-        print("연결 완료. 대기 중...", flush=True)
-        sio.wait()
-    except KeyboardInterrupt:
-        print("종료합니다.", flush=True)
-        sio.disconnect()
-    except Exception as e:
-        print(f"연결 오류: {e}", flush=True)
-        input("엔터를 누르면 종료합니다...")
+    while True:
+        try:
+            print("연결 시도 중...", flush=True)
+            sio.connect(RAILWAY_URL, transports=["websocket", "polling"], wait_timeout=10)
+            print("연결 완료. 대기 중...", flush=True)
+            sio.wait()
+            break
+        except KeyboardInterrupt:
+            print("종료합니다.", flush=True)
+            sio.disconnect()
+            break
+        except Exception as e:
+            print(f"연결 오류: {e} — 5초 후 재시도...", flush=True)
+            time.sleep(5)
+            try:
+                sio.disconnect()
+            except Exception:
+                pass
 
 
 if __name__ == "__main__":
