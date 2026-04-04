@@ -92,6 +92,17 @@ def on_agent_ready(data):
     print("에이전트 인증 완료. 대기 중...")
 
 
+def ensure_chromium():
+    import glob
+    _pw_path = os.environ.get("PLAYWRIGHT_BROWSERS_PATH", "")
+    if not (_pw_path and glob.glob(os.path.join(_pw_path, "chromium*"))):
+        print("Playwright Chromium 설치 중... (최초 1회)")
+        sio.emit("agent_progress", {"step": "Chromium 설치 중 (최초 1회)..."})
+        from playwright._impl._driver import compute_driver_executable
+        driver_executable, driver_cli = compute_driver_executable()
+        subprocess.run([str(driver_executable), str(driver_cli), "install", "chromium"], check=True)
+
+
 @sio.on("do_login")
 def on_do_login(data):
     print("로그인 요청 받음. 브라우저를 엽니다...")
@@ -99,6 +110,7 @@ def on_do_login(data):
 
     def run_login():
         try:
+            ensure_chromium()
             os.environ["SCRAPER_PROFILE_DIR"] = PROFILE_DIR
             import login as login_mod
             import importlib
@@ -119,16 +131,7 @@ def on_do_scrape(data):
 
     def run_scrape():
         try:
-            # Playwright Chromium 미설치 시 자동 설치 (폴더 존재 여부로 판단)
-            import glob
-            _pw_path = os.environ.get("PLAYWRIGHT_BROWSERS_PATH", "")
-            _chromium_found = bool(_pw_path and glob.glob(os.path.join(_pw_path, "chromium*")))
-            if not _chromium_found:
-                print("Playwright Chromium 설치 중... (최초 1회)")
-                sio.emit("agent_progress", {"step": "Chromium 설치 중 (최초 1회)..."})
-                from playwright._impl._driver import compute_driver_executable
-                driver_executable, driver_cli = compute_driver_executable()
-                subprocess.run([str(driver_executable), str(driver_cli), "install", "chromium"], check=True)
+            ensure_chromium()
             # 브라우저 프로필 경로 전달 (로그인 세션 유지)
             os.environ["SCRAPER_PROFILE_DIR"] = PROFILE_DIR
             import scraper
