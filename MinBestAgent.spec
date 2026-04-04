@@ -1,30 +1,38 @@
 # -*- mode: python ; coding: utf-8 -*-
-import certifi
+import certifi, os
+
+# templates 폴더 포함
+template_dir = os.path.join(os.path.dirname(os.path.abspath(SPEC)), 'templates')
 
 a = Analysis(
-    ['local_agent.py'],
+    ['app.py'],
     pathex=[],
     binaries=[],
-    datas=[(certifi.where(), 'certifi')],
+    datas=[
+        (certifi.where(), 'certifi'),
+        (template_dir, 'templates'),
+    ],
     hiddenimports=[
         'scraper',
         'login',
+        'classifier',
         'playwright',
         'playwright.sync_api',
+        'playwright._impl._driver',
         'openpyxl',
+        'flask',
+        'flask_socketio',
+        'engineio',
         'engineio.async_drivers.threading',
         'socketio',
         'dotenv',
-        'websocket',
-        'websocket._http',
-        'websocket._socket',
-        'websocket._ssl_compat',
-        'websocket._utils',
-        'websocket._logging',
         'certifi',
         'ssl',
         '_ssl',
         'requests',
+        'anthropic',
+        'jinja2',
+        'werkzeug',
     ],
     hookspath=[],
     hooksconfig={},

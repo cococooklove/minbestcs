@@ -362,8 +362,7 @@
   <svg width="22" height="22" viewBox="0 0 24 24" fill="white" style="cursor:pointer" onclick="goHome()"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 14.5v-9l6 4.5-6 4.5z"/></svg>
   <h1 style="cursor:pointer" onclick="goHome()">스마트스토어 리뷰 관리</h1>
   <div class="header-actions">
-    <span class="agent-badge off" id="agent-badge">● 에이전트 미연결</span>
-    <button class="btn-classify" id="btn-login-agent" onclick="runLogin()" disabled style="background:rgba(255,255,255,.18)">로그인</button>
+    <button class="btn-classify" id="btn-login-agent" onclick="runLogin()" style="background:rgba(255,255,255,.18)">로그인</button>
     <button class="btn-classify" id="btn-scrape" onclick="runScrape()" disabled style="opacity:.45">리뷰 수집</button>
     <button class="btn-admin" id="btn-admin" onclick="toggleAdmin()">관리자</button>
     <span class="last-updated" id="last-updated">-</span>
@@ -1233,28 +1232,6 @@ socket.on('login_status', data => {
   }
 });
 
-function checkAgentStatus() {
-  fetch('/api/agent/status').then(r => r.json()).then(d => {
-    const badge = document.getElementById('agent-badge');
-    const btnLogin = document.getElementById('btn-login-agent');
-    const btnScrape = document.getElementById('btn-scrape');
-    if (d.connected) {
-      badge.textContent = '● 에이전트 연결됨';
-      badge.className = 'agent-badge on';
-      if (btnLogin.textContent !== '✓ 로그인됨') btnLogin.disabled = false;
-    } else {
-      badge.textContent = '● 에이전트 미연결';
-      badge.className = 'agent-badge off';
-      btnLogin.disabled = true;
-      btnLogin.textContent = '로그인';
-      btnScrape.disabled = true;
-      btnScrape.style.opacity = '0.45';
-    }
-  }).catch(() => {});
-}
-
-checkAgentStatus();
-setInterval(checkAgentStatus, 5000);
 </script>
 
 <div id="photo-lightbox" onclick="this.classList.remove('open')">

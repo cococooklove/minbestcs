@@ -4,15 +4,33 @@
 접속: http://localhost:5000
 """
 from flask import Flask, render_template, jsonify, request
-from flask_socketio import SocketIO, emit, disconnect
-import json, os, subprocess, sys
+from flask_socketio import SocketIO
+import json, os, threading, webbrowser, sys
 from dotenv import load_dotenv
 load_dotenv()
 
 app = Flask(__name__)
 socketio = SocketIO(app, cors_allowed_origins="*", async_mode="threading", ping_timeout=60, ping_interval=25)
 REVIEWS_FILE = "data/reviews.json"
-_agent_sid = None  # 연결된 로컬 에이전트 session id
+
+_login_pw = None
+_login_context = None
+_login_page = None
+_scraping = False
+
+
+def ensure_chromium():
+    import glob, platform, subprocess
+    if platform.system() == "Windows":
+        _pw_path = os.path.join(os.environ.get("LOCALAPPDATA", ""), "ms-playwright")
+    else:
+        _pw_path = os.path.join(os.path.expanduser("~"), "Library", "Caches", "ms-playwright")
+    os.environ["PLAYWRIGHT_BROWSERS_PATH"] = _pw_path
+    if not glob.glob(os.path.join(_pw_path, "chromium*")):
+        socketio.emit("agent_progress", {"step": "Chromium 설치 중 (최초 1회)..."})
+        from playwright._impl._driver import compute_driver_executable
+        driver_executable, driver_cli = compute_driver_executable()
+        subprocess.run([str(driver_executable), str(driver_cli), "install", "chromium"], check=True)
 
 
 def load_reviews():
@@ -167,52 +185,21 @@ def save_settings(data):
         json.dump(data, f, ensure_ascii=False, indent=2)
 
 
-@socketio.on("agent_auth")
-def on_agent_auth(data):
-    global _agent_sid
-    if data.get("token") == os.environ.get("AGENT_TOKEN", ""):
-        _agent_sid = request.sid
-        emit("agent_ready", {"status": "ok"})
-    else:
-        disconnect()
-
-
-@socketio.on("disconnect")
-def on_disconnect():
-    global _agent_sid
-    if request.sid == _agent_sid:
-        _agent_sid = None
-
-
-@socketio.on("login_done")
-def on_login_done(data):
-    logged_in = data.get("success", False)
-    socketio.emit("login_status", {"logged_in": logged_in, **data})
-
-
-@socketio.on("scrape_done")
-def on_scrape_done(data):
-    socketio.emit("scrape_status", {"done": True, **data})
-
-
-@socketio.on("agent_progress")
-def on_agent_progress(data):
-    socketio.emit("agent_progress", data)
-
-
-@app.route("/api/agent/status")
-def api_agent_status():
-    return jsonify({"connected": _agent_sid is not None})
-
-
 @app.route("/api/login/start", methods=["POST"])
 def api_login_start():
-    if _agent_sid:
-        socketio.emit("do_login", {}, to=_agent_sid)
-        return jsonify({"status": "sent_to_agent"})
-    if os.environ.get("RAILWAY_ENVIRONMENT"):
-        return jsonify({"error": "로컬 에이전트가 연결되어 있지 않습니다."}), 400
-    subprocess.Popen([sys.executable, "login.py"])
+    def run_login():
+        global _login_pw, _login_context, _login_page
+        try:
+            ensure_chromium()
+            import login as login_mod
+            login_mod.PROFILE_DIR = PROFILE_DIR
+            success, pw, context, page = login_mod.main(keep_open=True)
+            if success:
+                _login_pw, _login_context, _login_page = pw, context, page
+            socketio.emit("login_status", {"logged_in": bool(success)})
+        except Exception as e:
+            socketio.emit("login_status", {"logged_in": False, "error": str(e)})
+    threading.Thread(target=run_login, daemon=True).start()
     return jsonify({"status": "started"})
 
 
@@ -442,28 +429,30 @@ def api_post_progress():
 
 @app.route("/api/scrape", methods=["POST"])
 def api_scrape():
-    if _agent_sid:
-        socketio.emit("do_scrape", {}, to=_agent_sid)
-        return jsonify({"status": "sent_to_agent"})
-    if os.environ.get("RAILWAY_ENVIRONMENT"):
-        return jsonify({"error": "로컬 에이전트가 연결되어 있지 않습니다."}), 400
-    subprocess.Popen([sys.executable, "scraper.py"])
+    global _scraping
+    if _scraping:
+        return jsonify({"error": "수집 중입니다. 잠시 기다려주세요."}), 400
+    if _login_page is None:
+        return jsonify({"error": "로그인 먼저 해주세요."}), 400
+    def run_scrape():
+        global _scraping
+        _scraping = True
+        try:
+            ensure_chromium()
+            import scraper
+            scraper.PROFILE_DIR = PROFILE_DIR
+            scraper.main(
+                progress_cb=lambda msg: socketio.emit("agent_progress", {"step": msg}),
+                existing_page=_login_page,
+            )
+            socketio.emit("scrape_done", {"success": True})
+        except Exception as e:
+            socketio.emit("scrape_done", {"success": False, "error": str(e)})
+        finally:
+            _scraping = False
+    threading.Thread(target=run_scrape, daemon=True).start()
     mtime = os.path.getmtime(REVIEWS_FILE) if os.path.exists(REVIEWS_FILE) else 0
     return jsonify({"status": "started", "mtime": mtime})
-
-
-@app.route("/api/upload/reviews", methods=["POST"])
-def api_upload_reviews():
-    """로컬에서 수집한 reviews.json을 Railway로 업로드"""
-    token = request.headers.get("X-Upload-Token", "")
-    if token != os.environ.get("AGENT_TOKEN", ""):
-        return jsonify({"error": "인증 실패"}), 401
-    data = request.get_json()
-    if not isinstance(data, list):
-        return jsonify({"error": "reviews 배열이 필요합니다"}), 400
-    os.makedirs("data", exist_ok=True)
-    save_reviews(data)
-    return jsonify({"status": "ok", "count": len(data)})
 
 
 @app.route("/api/scrape/status")
@@ -474,7 +463,5 @@ def api_scrape_status():
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 8080))
-    if not os.environ.get("RAILWAY_ENVIRONMENT"):
-        import webbrowser, threading
-        threading.Timer(1.0, lambda: webbrowser.open(f"http://localhost:{port}")).start()
-    socketio.run(app, host="0.0.0.0", port=port, debug=False, allow_unsafe_werkzeug=True)
+    threading.Timer(1.5, lambda: webbrowser.open(f"http://localhost:{port}")).start()
+    socketio.run(app, host="127.0.0.1", port=port, debug=False, allow_unsafe_werkzeug=True)
