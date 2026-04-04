@@ -94,12 +94,13 @@ def on_agent_ready(data):
 
 def ensure_chromium():
     import glob, platform
-    # 시스템 기본 playwright 브라우저 경로
+    # 영구 브라우저 경로 설정 (번들 임시경로 아닌 사용자 홈에 저장)
     if platform.system() == "Windows":
-        _default = os.path.join(os.environ.get("LOCALAPPDATA", ""), "ms-playwright")
+        _pw_path = os.path.join(os.environ.get("LOCALAPPDATA", ""), "ms-playwright")
     else:
-        _default = os.path.join(os.path.expanduser("~"), "Library", "Caches", "ms-playwright")
-    _pw_path = os.environ.get("PLAYWRIGHT_BROWSERS_PATH", _default)
+        _pw_path = os.path.join(os.path.expanduser("~"), "Library", "Caches", "ms-playwright")
+    # playwright가 이 경로를 사용하도록 환경변수 설정
+    os.environ["PLAYWRIGHT_BROWSERS_PATH"] = _pw_path
     if not glob.glob(os.path.join(_pw_path, "chromium*")):
         print("Playwright Chromium 설치 중... (최초 1회)")
         sio.emit("agent_progress", {"step": "Chromium 설치 중 (최초 1회)..."})
