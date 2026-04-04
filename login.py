@@ -8,7 +8,7 @@ import os, time
 
 load_dotenv()
 
-PROFILE_DIR = os.path.abspath("data/browser_profile")
+PROFILE_DIR = os.environ.get("SCRAPER_PROFILE_DIR") or os.path.abspath("data/browser_profile")
 NAVER_ID = os.environ.get("NAVER_ID", "")
 NAVER_PW = os.environ.get("NAVER_PW", "")
 
@@ -50,10 +50,11 @@ def main():
         except Exception:
             pass
 
-        wait_for_seller_center(page)
+        success = wait_for_seller_center(page)
 
         print("세션 저장 완료")
         context.close()
+        return success
 
 
 if __name__ == "__main__":

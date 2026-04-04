@@ -363,8 +363,8 @@
   <h1 style="cursor:pointer" onclick="goHome()">스마트스토어 리뷰 관리</h1>
   <div class="header-actions">
     <span class="agent-badge off" id="agent-badge">● 에이전트 미연결</span>
-    <button class="btn-classify" onclick="runScrape()"
-      title="브라우저가 열립니다. 처음이라면 네이버 로그인 후 자동으로 리뷰를 가져옵니다.">리뷰 수집</button>
+    <button class="btn-classify" id="btn-login-agent" onclick="runLogin()" disabled style="background:rgba(255,255,255,.18)">로그인</button>
+    <button class="btn-classify" id="btn-scrape" onclick="runScrape()" disabled style="opacity:.45">리뷰 수집</button>
     <button class="btn-admin" id="btn-admin" onclick="toggleAdmin()">관리자</button>
     <span class="last-updated" id="last-updated">-</span>
   </div>
@@ -800,9 +800,17 @@ function fetchReviews() {
     });
 }
 
+function runLogin() {
+  const btn = document.getElementById('btn-login-agent');
+  btn.disabled = true;
+  btn.textContent = '로그인 중...';
+  showToast('브라우저에서 네이버 로그인을 완료해주세요.', 60000);
+  fetch('/api/login/start', {method: 'POST'});
+}
+
 let scrapePoll = null;
 function runScrape() {
-  if (!confirm('리뷰를 수집하겠습니까?\n처음이라면 브라우저에서 네이버 로그인이 필요합니다.')) return;
+  if (!confirm('리뷰를 수집하겠습니까?')) return;
   fetch('/api/scrape', {method: 'POST'})
     .then(r => r.json())
     .then(data => {
@@ -1209,15 +1217,38 @@ socket.on('agent_progress', data => {
   showToast(data.step || '', 4000);
 });
 
+socket.on('login_status', data => {
+  const btnLogin = document.getElementById('btn-login-agent');
+  const btnScrape = document.getElementById('btn-scrape');
+  if (data.logged_in) {
+    btnLogin.textContent = '✓ 로그인됨';
+    btnLogin.disabled = true;
+    btnScrape.disabled = false;
+    btnScrape.style.opacity = '1';
+    showToast('로그인 완료! 리뷰 수집 버튼을 눌러주세요.', 3000);
+  } else {
+    btnLogin.textContent = '로그인';
+    btnLogin.disabled = false;
+    showToast('로그인 실패. 다시 시도해주세요.', 3000);
+  }
+});
+
 function checkAgentStatus() {
   fetch('/api/agent/status').then(r => r.json()).then(d => {
     const badge = document.getElementById('agent-badge');
+    const btnLogin = document.getElementById('btn-login-agent');
+    const btnScrape = document.getElementById('btn-scrape');
     if (d.connected) {
       badge.textContent = '● 에이전트 연결됨';
       badge.className = 'agent-badge on';
+      if (btnLogin.textContent !== '✓ 로그인됨') btnLogin.disabled = false;
     } else {
       badge.textContent = '● 에이전트 미연결';
       badge.className = 'agent-badge off';
+      btnLogin.disabled = true;
+      btnLogin.textContent = '로그인';
+      btnScrape.disabled = true;
+      btnScrape.style.opacity = '0.45';
     }
   }).catch(() => {});
 }

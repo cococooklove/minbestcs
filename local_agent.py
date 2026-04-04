@@ -99,14 +99,13 @@ def on_do_login(data):
 
     def run_login():
         try:
-            subprocess.run([sys.executable, "login.py"], check=False)
-            # Cookies 파일 존재 확인
-            cookies_path = Path(PROFILE_DIR) / "Default" / "Cookies"
-            if cookies_path.exists():
-                sio.emit("login_done", {"success": True})
-                print("로그인 완료")
-            else:
-                sio.emit("login_done", {"success": False, "error": "쿠키 파일을 찾을 수 없습니다."})
+            os.environ["SCRAPER_PROFILE_DIR"] = PROFILE_DIR
+            import login as login_mod
+            import importlib
+            importlib.reload(login_mod)
+            success = login_mod.main()
+            sio.emit("login_done", {"success": bool(success)})
+            print("로그인 완료" if success else "로그인 실패")
         except Exception as e:
             sio.emit("login_done", {"success": False, "error": str(e)})
 
