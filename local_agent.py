@@ -25,8 +25,8 @@ if getattr(sys, 'frozen', False):
     if os.path.exists(_certifi_path):
         os.environ['SSL_CERT_FILE'] = _certifi_path
         os.environ['REQUESTS_CA_BUNDLE'] = _certifi_path
-    # Playwright 브라우저 경로 (실행파일 옆 playwright-browsers 폴더)
-    os.environ['PLAYWRIGHT_BROWSERS_PATH'] = os.path.join(_base_dir, 'playwright-browsers')
+    # Playwright 브라우저 설치 경로 (실행파일 옆 .playwright 폴더)
+    os.environ['PLAYWRIGHT_BROWSERS_PATH'] = os.path.join(_base_dir, '.playwright-browsers')
 
 RAILWAY_URL  = os.environ.get("RAILWAY_URL", "").rstrip("/")
 AGENT_TOKEN  = os.environ.get("AGENT_TOKEN", "")
@@ -119,6 +119,22 @@ def on_do_scrape(data):
 
     def run_scrape():
         try:
+            # Playwright Chromium 미설치 시 자동 설치
+            try:
+                from playwright._impl._driver import compute_driver_executable
+                driver_executable, driver_cli = compute_driver_executable()
+                result = subprocess.run(
+                    [str(driver_executable), str(driver_cli), "install", "--dry-run", "chromium"],
+                    capture_output=True
+                )
+                if result.returncode != 0:
+                    raise Exception("not installed")
+            except Exception:
+                print("Playwright Chromium 설치 중... (최초 1회)")
+                sio.emit("agent_progress", {"step": "Chromium 설치 중 (최초 1회)..."})
+                from playwright._impl._driver import compute_driver_executable
+                driver_executable, driver_cli = compute_driver_executable()
+                subprocess.run([str(driver_executable), str(driver_cli), "install", "chromium"], check=True)
             import scraper
             scraper.main()
             sio.emit("agent_progress", {"step": "수집 완료. 업로드 중..."})
