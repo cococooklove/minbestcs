@@ -119,16 +119,15 @@ def on_do_scrape(data):
 
     def run_scrape():
         try:
-            # Playwright Chromium 미설치 시 자동 설치
-            from playwright._impl._driver import compute_driver_executable
-            driver_executable, driver_cli = compute_driver_executable()
-            result = subprocess.run(
-                [str(driver_executable), str(driver_cli), "show-browsers"],
-                capture_output=True
-            )
-            if b"chromium" not in result.stdout.lower():
+            # Playwright Chromium 미설치 시 자동 설치 (폴더 존재 여부로 판단)
+            import glob
+            _pw_path = os.environ.get("PLAYWRIGHT_BROWSERS_PATH", "")
+            _chromium_found = bool(_pw_path and glob.glob(os.path.join(_pw_path, "chromium*")))
+            if not _chromium_found:
                 print("Playwright Chromium 설치 중... (최초 1회)")
                 sio.emit("agent_progress", {"step": "Chromium 설치 중 (최초 1회)..."})
+                from playwright._impl._driver import compute_driver_executable
+                driver_executable, driver_cli = compute_driver_executable()
                 subprocess.run([str(driver_executable), str(driver_cli), "install", "chromium"], check=True)
             # 브라우저 프로필 경로 전달 (로그인 세션 유지)
             os.environ["SCRAPER_PROFILE_DIR"] = PROFILE_DIR
