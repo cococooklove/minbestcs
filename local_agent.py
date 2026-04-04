@@ -19,12 +19,14 @@ else:
 _env_path = os.path.join(_base_dir, ".env")
 load_dotenv(_env_path, override=True)
 
-# PyInstaller 번들에서 certifi CA 인증서 경로 설정
+# PyInstaller 번들에서 경로 설정
 if getattr(sys, 'frozen', False):
     _certifi_path = os.path.join(sys._MEIPASS, 'certifi', 'cacert.pem')
     if os.path.exists(_certifi_path):
         os.environ['SSL_CERT_FILE'] = _certifi_path
         os.environ['REQUESTS_CA_BUNDLE'] = _certifi_path
+    # Playwright 브라우저 경로 (번들 내 포함)
+    os.environ['PLAYWRIGHT_BROWSERS_PATH'] = os.path.join(sys._MEIPASS, 'playwright-browsers')
 
 RAILWAY_URL  = os.environ.get("RAILWAY_URL", "").rstrip("/")
 AGENT_TOKEN  = os.environ.get("AGENT_TOKEN", "")

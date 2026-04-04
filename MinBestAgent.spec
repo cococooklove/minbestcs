@@ -1,11 +1,16 @@
 # -*- mode: python ; coding: utf-8 -*-
-import certifi
+import certifi, os
+
+_browsers_src = os.environ.get('PLAYWRIGHT_BROWSERS_PATH', './playwright-browsers')
 
 a = Analysis(
     ['local_agent.py'],
     pathex=[],
     binaries=[],
-    datas=[(certifi.where(), 'certifi')],
+    datas=[
+        (certifi.where(), 'certifi'),
+        (_browsers_src, 'playwright-browsers'),
+    ],
     hiddenimports=[
         'scraper',
         'login',

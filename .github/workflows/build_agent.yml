@@ -5,7 +5,7 @@ on:
 
 jobs:
   build-mac:
-    runs-on: macos-latest
+    runs-on: macos-13
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -15,8 +15,12 @@ jobs:
         run: pip install pyinstaller "python-socketio[client]" python-dotenv websocket-client requests certifi playwright openpyxl
       - name: Install Playwright browsers
         run: playwright install chromium
+        env:
+          PLAYWRIGHT_BROWSERS_PATH: ./playwright-browsers
       - name: Build Mac executable
         run: pyinstaller MinBestAgent.spec
+        env:
+          PLAYWRIGHT_BROWSERS_PATH: ./playwright-browsers
       - name: Upload Mac artifact
         uses: actions/upload-artifact@v4
         with:
@@ -34,8 +38,12 @@ jobs:
         run: pip install pyinstaller "python-socketio[client]" python-dotenv websocket-client requests certifi playwright openpyxl
       - name: Install Playwright browsers
         run: playwright install chromium
+        env:
+          PLAYWRIGHT_BROWSERS_PATH: ./playwright-browsers
       - name: Build Windows executable
         run: pyinstaller MinBestAgent.spec
+        env:
+          PLAYWRIGHT_BROWSERS_PATH: ./playwright-browsers
       - name: Upload Windows artifact
         uses: actions/upload-artifact@v4
         with:
