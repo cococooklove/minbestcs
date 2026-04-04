@@ -25,8 +25,8 @@ if getattr(sys, 'frozen', False):
     if os.path.exists(_certifi_path):
         os.environ['SSL_CERT_FILE'] = _certifi_path
         os.environ['REQUESTS_CA_BUNDLE'] = _certifi_path
-    # Playwright 브라우저 설치 경로 (실행파일 옆 .playwright 폴더)
-    os.environ['PLAYWRIGHT_BROWSERS_PATH'] = os.path.join(_base_dir, '.playwright-browsers')
+    # Playwright 브라우저: 시스템 기본 경로 사용 (~/Library/Caches/ms-playwright)
+    # 커스텀 경로 사용 시 lock 파일 오류 발생
 
 RAILWAY_URL  = os.environ.get("RAILWAY_URL", "").rstrip("/")
 AGENT_TOKEN  = os.environ.get("AGENT_TOKEN", "")
@@ -93,9 +93,14 @@ def on_agent_ready(data):
 
 
 def ensure_chromium():
-    import glob
-    _pw_path = os.environ.get("PLAYWRIGHT_BROWSERS_PATH", "")
-    if not (_pw_path and glob.glob(os.path.join(_pw_path, "chromium*"))):
+    import glob, platform
+    # 시스템 기본 playwright 브라우저 경로
+    if platform.system() == "Windows":
+        _default = os.path.join(os.environ.get("LOCALAPPDATA", ""), "ms-playwright")
+    else:
+        _default = os.path.join(os.path.expanduser("~"), "Library", "Caches", "ms-playwright")
+    _pw_path = os.environ.get("PLAYWRIGHT_BROWSERS_PATH", _default)
+    if not glob.glob(os.path.join(_pw_path, "chromium*")):
         print("Playwright Chromium 설치 중... (최초 1회)")
         sio.emit("agent_progress", {"step": "Chromium 설치 중 (최초 1회)..."})
         from playwright._impl._driver import compute_driver_executable
