@@ -90,6 +90,7 @@ def disconnect():
 _login_pw = None
 _login_context = None
 _login_page = None
+_scraping = False
 
 
 @sio.on("agent_ready")
@@ -141,10 +142,16 @@ def on_do_login(data):
 
 @sio.on("do_scrape")
 def on_do_scrape(data):
+    global _scraping
+    if _scraping:
+        print("수집 이미 진행 중. 무시합니다.")
+        return
     print("수집 요청 받음. 스크래핑을 시작합니다...")
     sio.emit("agent_progress", {"step": "리뷰 수집 중..."})
 
     def run_scrape():
+        global _scraping
+        _scraping = True
         try:
             if _login_page is None:
                 sio.emit("scrape_done", {"success": False, "error": "로그인 먼저 해주세요. 로그인 버튼을 눌러 네이버 셀러센터에 로그인 후 다시 시도하세요."})
@@ -162,6 +169,8 @@ def on_do_scrape(data):
             print("수집 및 업로드 완료")
         except Exception as e:
             sio.emit("scrape_done", {"success": False, "error": str(e)})
+        finally:
+            _scraping = False
 
     threading.Thread(target=run_scrape, daemon=True).start()
 

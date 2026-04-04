@@ -152,12 +152,20 @@ def main(progress_cb=None, existing_page=None):
             pass
         time.sleep(3)
 
-        # 세션 확인 페이지 감지 → 사용자가 처리할 때까지 대기
-        if _is_on_login_page(page):
+        # 세션 확인 페이지 감지 (URL 또는 페이지 내 텍스트)
+        def _needs_auth_check():
+            if _is_on_login_page(page):
+                return True
+            try:
+                return page.locator("text=로그인 상태를 확인").count() > 0
+            except Exception:
+                return False
+
+        if _needs_auth_check():
             progress("브라우저에서 로그인 확인을 완료해주세요...")
             for _ in range(300):
                 time.sleep(1)
-                if not _is_on_login_page(page):
+                if not _needs_auth_check():
                     break
             else:
                 raise Exception("로그인 확인 시간 초과. 에이전트를 재시작하고 다시 로그인해주세요.")
