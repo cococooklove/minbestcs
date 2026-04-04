@@ -10,7 +10,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 app = Flask(__name__)
-socketio = SocketIO(app, cors_allowed_origins="*", async_mode="eventlet")
+socketio = SocketIO(app, cors_allowed_origins="*", async_mode="threading")
 REVIEWS_FILE = "data/reviews.json"
 _agent_sid = None  # 연결된 로컬 에이전트 session id
 
@@ -477,4 +477,4 @@ if __name__ == "__main__":
     if not os.environ.get("RAILWAY_ENVIRONMENT"):
         import webbrowser, threading
         threading.Timer(1.0, lambda: webbrowser.open(f"http://localhost:{port}")).start()
-    socketio.run(app, host="0.0.0.0", port=port, debug=False)
+    socketio.run(app, host="0.0.0.0", port=port, debug=False, allow_unsafe_werkzeug=True)

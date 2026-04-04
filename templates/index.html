@@ -34,67 +34,73 @@
   .btn-admin.active { background: rgba(255,255,255,0.35); }
 
   /* 관리자 패널 */
-  .admin-panel { display: none; padding: 24px; max-width: 760px; margin: 0 auto; }
+  .admin-panel { display: none; padding: 24px; max-width: 800px; margin: 0 auto; }
   .admin-panel.open { display: block; }
   .admin-section {
-    background: white; border-radius: 10px; border: 1px solid #ececec;
-    padding: 20px 22px; margin-bottom: 16px;
+    background: white; border-radius: 10px; border: 1px solid #e8e8e8;
+    padding: 22px 24px; margin-bottom: 14px;
   }
   .admin-section-title {
-    font-size: 15px; font-weight: 700; margin-bottom: 14px;
-    padding-bottom: 10px; border-bottom: 1px solid #f0f0f0;
-    display: flex; align-items: center; gap: 8px;
+    font-size: 14px; font-weight: 700; margin-bottom: 16px;
+    padding-bottom: 12px; border-bottom: 1px solid #f0f0f0;
+    display: flex; align-items: center; gap: 8px; color: #222;
   }
-  .admin-label { font-size: 13px; font-weight: 600; color: #444; margin-bottom: 6px; display: block; }
+  .admin-label { font-size: 12px; font-weight: 600; color: #888; margin-bottom: 6px; display: block; text-transform: uppercase; letter-spacing: .04em; }
   .admin-textarea {
-    width: 100%; height: 260px; padding: 10px 12px;
-    border: 1px solid #ddd; border-radius: 6px; font-size: 13px;
-    font-family: 'Menlo', monospace; resize: vertical; outline: none; line-height: 1.6;
+    width: 100%; padding: 10px 12px;
+    border: 1px solid #e0e0e0; border-radius: 6px; font-size: 13px;
+    font-family: inherit; resize: vertical; outline: none; line-height: 1.65;
+    color: #333;
   }
-  .admin-textarea:focus { border-color: #03c75a; }
+  .admin-textarea:focus { border-color: #03c75a; box-shadow: 0 0 0 3px rgba(3,199,90,.08); }
   .admin-input {
     width: 100%; padding: 8px 12px;
-    border: 1px solid #ddd; border-radius: 6px; font-size: 13px; outline: none;
+    border: 1px solid #e0e0e0; border-radius: 6px; font-size: 13px; outline: none; color: #333;
   }
-  .admin-input:focus { border-color: #03c75a; }
-  .admin-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
-  .admin-row-label { font-size: 14px; color: #333; }
-  .admin-row-sub { font-size: 12px; color: #888; margin-top: 2px; }
+  .admin-input:focus { border-color: #03c75a; box-shadow: 0 0 0 3px rgba(3,199,90,.08); }
+  .admin-row { display: flex; align-items: center; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid #f5f5f5; }
+  .admin-row:last-of-type { border-bottom: none; }
+  .admin-row-label { font-size: 14px; color: #333; font-weight: 500; }
+  .admin-row-sub { font-size: 12px; color: #aaa; margin-top: 3px; }
   .toggle-wrap { display: flex; align-items: center; gap: 8px; }
   .toggle {
-    width: 42px; height: 24px; background: #ddd; border-radius: 12px;
+    width: 40px; height: 22px; background: #ddd; border-radius: 11px;
     cursor: pointer; position: relative; transition: background 0.2s; flex-shrink: 0;
   }
   .toggle.on { background: #03c75a; }
   .toggle::after {
-    content: ''; position: absolute; width: 18px; height: 18px;
+    content: ''; position: absolute; width: 16px; height: 16px;
     background: white; border-radius: 50%; top: 3px; left: 3px;
     transition: left 0.2s; box-shadow: 0 1px 3px rgba(0,0,0,0.2);
   }
   .toggle.on::after { left: 21px; }
+  .admin-footer { margin-top: 16px; display: flex; align-items: center; gap: 10px; }
   .btn-save {
-    margin-top: 12px; background: #03c75a; color: white;
-    border: none; border-radius: 6px; padding: 7px 18px;
+    background: #03c75a; color: white;
+    border: none; border-radius: 6px; padding: 7px 20px;
     font-size: 13px; font-weight: 600; cursor: pointer; transition: background 0.15s;
   }
   .btn-save:hover:not(:disabled) { background: #02b350; }
-  .btn-save:disabled { background: #e0e0e0; color: #aaa; cursor: default; }
-  .api-status { font-size: 12px; margin-top: 6px; }
+  .btn-save:disabled { background: #f0f0f0; color: #bbb; cursor: default; }
+  .api-status { font-size: 12px; }
   .api-status.set { color: #03c75a; }
   .api-status.unset { color: #e53935; }
+  /* 힌트 그리드 */
+  .hint-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 16px; }
+  .hint-item label { font-size: 12px; font-weight: 600; margin-bottom: 5px; display: block; }
 
   .coupon-rule {
     display: flex; align-items: center; gap: 12px;
-    padding: 10px 0; border-bottom: 1px solid #f5f5f5;
+    padding: 9px 0; border-bottom: 1px solid #f5f5f5;
   }
   .coupon-rule:last-child { border-bottom: none; }
-  .coupon-rule-label { font-size: 13px; color: #444; width: 160px; flex-shrink: 0; }
+  .coupon-rule-label { font-size: 13px; color: #555; width: 160px; flex-shrink: 0; }
   .coupon-rule-input {
-    flex: 1; padding: 6px 10px; border: 1px solid #ddd;
+    flex: 1; padding: 6px 10px; border: 1px solid #e0e0e0;
     border-radius: 5px; font-size: 13px; outline: none;
   }
-  .coupon-rule-input:focus { border-color: #03c75a; }
-  .coupon-rule-input:disabled { background: #f8f8f8; color: #aaa; }
+  .coupon-rule-input:focus { border-color: #03c75a; box-shadow: 0 0 0 3px rgba(3,199,90,.08); }
+  .coupon-rule-input:disabled { background: #fafafa; color: #ccc; }
 
   .btn-naver-login {
     display: flex; align-items: center; gap: 6px;
@@ -187,7 +193,7 @@
   .review-meta { font-size: 12px; color: #888; margin-top: 2px; }
   .stars { display: inline-flex; gap: 1px; vertical-align: middle; }
   .stars svg { width: 14px; height: 14px; }
-  .star-num { font-size: 12px; color: #ff6e00; margin-left: 4px; font-weight: 700; vertical-align: middle; }
+  .star-num { font-size: 13px; color: #ff6e00; margin-left: 4px; font-weight: 700; vertical-align: middle; }
 
   /* 배지 */
   .badge {
@@ -451,6 +457,49 @@
 <!-- 관리자 패널 -->
 <div class="admin-panel" id="admin-panel">
 
+  <!-- API 설정 -->
+  <div class="admin-section">
+    <div class="admin-section-title">🔑 API 설정</div>
+    <label class="admin-label">Anthropic API 키</label>
+    <input class="admin-input" id="api-key-input" type="password" oninput="enableSave('btn-save-api')" placeholder="sk-ant-...">
+    <div class="admin-footer">
+      <button class="btn-save" id="btn-save-api" onclick="saveApiKey(this)" disabled>저장됨</button>
+      <span class="api-status" id="api-status"></span>
+    </div>
+  </div>
+
+  <!-- 답변 설정 -->
+  <div class="admin-section">
+    <div class="admin-section-title">💬 답변 · 신고 설정</div>
+    <div class="admin-row">
+      <div>
+        <div class="admin-row-label">AI 분석 시 자동 답변 초안 생성</div>
+        <div class="admin-row-sub">AI 분류 실행 시 답변 초안도 함께 생성</div>
+      </div>
+      <div class="toggle-wrap">
+        <div class="toggle" id="toggle-auto-generate" onclick="toggleAutoGenerate(); enableSave('btn-save-settings')"></div>
+        <span id="auto-generate-label" style="font-size:13px;color:#888;">OFF</span>
+      </div>
+    </div>
+    <div style="margin-top:16px">
+      <label class="admin-label">신고 가능 리뷰 기준 (쉼표 구분)</label>
+      <input class="admin-input" id="report-criteria" type="text" oninput="enableSave('btn-save-settings')" placeholder="욕설, 경쟁사 언급, 광고성, 반복 내용">
+    </div>
+    <div class="admin-footer">
+      <button class="btn-save" id="btn-save-settings" onclick="saveSettings(this)" disabled>저장됨</button>
+    </div>
+  </div>
+
+  <!-- 브랜드 톤 가이드 -->
+  <div class="admin-section">
+    <div class="admin-section-title">🎨 브랜드 톤 가이드</div>
+    <label class="admin-label">AI 답변 스타일 가이드</label>
+    <textarea class="admin-textarea" id="brand-tone-text" rows="8" oninput="enableSave('btn-save-brand')" placeholder="브랜드 톤 가이드를 입력하세요..."></textarea>
+    <div class="admin-footer">
+      <button class="btn-save" id="btn-save-brand" onclick="saveBrandTone(this)" disabled>저장됨</button>
+    </div>
+  </div>
+
   <!-- 초개인화 CS 설정 -->
   <div class="admin-section">
     <div class="admin-section-title">👤 초개인화 CS 설정</div>
@@ -461,76 +510,44 @@
       </div>
       <div style="display:flex;align-items:center;gap:6px">
         <input type="number" id="loyal-threshold" min="2" max="20"
-          style="width:60px;padding:5px 8px;border:1px solid #ddd;border-radius:5px;font-size:13px;text-align:center"
+          style="width:56px;padding:5px 8px;border:1px solid #e0e0e0;border-radius:5px;font-size:13px;text-align:center;outline:none"
           oninput="enableSave('btn-save-cs')">
-        <span style="font-size:13px;color:#666">회 이상</span>
+        <span style="font-size:13px;color:#888">회 이상</span>
       </div>
     </div>
-    <label class="admin-label" style="margin-top:14px">고객 유형별 AI 힌트</label>
-    <div style="display:flex;flex-direction:column;gap:10px">
-      <div><div style="font-size:12px;color:#1565c0;margin-bottom:4px">🔵 첫구매</div>
-        <textarea class="admin-textarea" id="hint-first" rows="3" oninput="enableSave('btn-save-cs')"></textarea></div>
-      <div><div style="font-size:12px;color:#2e7d32;margin-bottom:4px">🟢 재구매</div>
-        <textarea class="admin-textarea" id="hint-repeat" rows="3" oninput="enableSave('btn-save-cs')"></textarea></div>
-      <div><div style="font-size:12px;color:#9e7a20;margin-bottom:4px">⭐ 단골</div>
-        <textarea class="admin-textarea" id="hint-loyal" rows="3" oninput="enableSave('btn-save-cs')"></textarea></div>
-      <div><div style="font-size:12px;color:#c62828;margin-bottom:4px">🎁 선물 구매자</div>
-        <textarea class="admin-textarea" id="hint-gift" rows="3" oninput="enableSave('btn-save-cs')"></textarea></div>
-    </div>
-    <button class="btn-save" id="btn-save-cs" onclick="saveCsSettings(this)" disabled>저장됨</button>
-  </div>
-
-  <!-- 브랜드 톤 가이드 -->
-  <div class="admin-section">
-    <div class="admin-section-title">🎨 브랜드 톤 가이드</div>
-    <label class="admin-label">AI 답변 스타일 가이드 (brand_tone.txt)</label>
-    <textarea class="admin-textarea" id="brand-tone-text" oninput="enableSave('btn-save-brand')" placeholder="브랜드 톤 가이드를 입력하세요..."></textarea>
-    <button class="btn-save" id="btn-save-brand" onclick="saveBrandTone(this)" disabled>저장됨</button>
-  </div>
-
-  <!-- 답변 설정 -->
-  <div class="admin-section">
-    <div class="admin-section-title">💬 답변 설정</div>
-    <div class="admin-row">
-      <div>
-        <div class="admin-row-label">AI 분석 시 자동 답변 생성</div>
-        <div class="admin-row-sub">AI 분류 실행 시 답변 초안도 함께 자동 생성</div>
-      </div>
-      <div class="toggle-wrap">
-        <div class="toggle" id="toggle-auto-generate" onclick="toggleAutoGenerate(); enableSave('btn-save-settings')"></div>
-        <span id="auto-generate-label" style="font-size:13px;color:#666;">OFF</span>
+    <div style="margin-top:16px">
+      <label class="admin-label">고객 유형별 AI 힌트</label>
+      <div class="hint-grid">
+        <div class="hint-item">
+          <label style="color:#1565c0">🔵 첫구매</label>
+          <textarea class="admin-textarea" id="hint-first" rows="3" oninput="enableSave('btn-save-cs')"></textarea>
+        </div>
+        <div class="hint-item">
+          <label style="color:#2e7d32">🟢 재구매</label>
+          <textarea class="admin-textarea" id="hint-repeat" rows="3" oninput="enableSave('btn-save-cs')"></textarea>
+        </div>
+        <div class="hint-item">
+          <label style="color:#9e7a20">⭐ 단골</label>
+          <textarea class="admin-textarea" id="hint-loyal" rows="3" oninput="enableSave('btn-save-cs')"></textarea>
+        </div>
+        <div class="hint-item">
+          <label style="color:#c62828">🎁 선물 구매자</label>
+          <textarea class="admin-textarea" id="hint-gift" rows="3" oninput="enableSave('btn-save-cs')"></textarea>
+        </div>
       </div>
     </div>
-    <div class="admin-row" style="opacity:0.45;">
-      <div>
-        <div class="admin-row-label">자동 답변 게시 <span style="font-size:11px;color:#aaa;font-weight:400;">미구현</span></div>
-        <div class="admin-row-sub">OFF: 담당자 승인 후 게시 / ON: AI 생성 즉시 게시</div>
-      </div>
-      <div class="toggle-wrap">
-        <div class="toggle" style="pointer-events:none;"></div>
-        <span style="font-size:13px;color:#bbb;">준비 중</span>
-      </div>
+    <div class="admin-footer">
+      <button class="btn-save" id="btn-save-cs" onclick="saveCsSettings(this)" disabled>저장됨</button>
     </div>
-    <div class="admin-section-title" style="margin-top:16px;">🚨 신고 기준</div>
-    <label class="admin-label">신고 가능 리뷰 기준 (쉼표로 구분)</label>
-    <input class="admin-input" id="report-criteria" type="text" oninput="enableSave('btn-save-settings')" placeholder="욕설, 경쟁사 언급, 광고성, 반복 내용">
-    <button class="btn-save" id="btn-save-settings" onclick="saveSettings(this)" disabled>저장됨</button>
   </div>
 
   <!-- 쿠폰 발급 기준 -->
   <div class="admin-section">
     <div class="admin-section-title">🎟️ 쿠폰 발급 기준</div>
     <div id="coupon-rules-list"></div>
-    <button class="btn-save" id="btn-save-coupon" onclick="saveCouponRules(this)" disabled>저장됨</button>
-  </div>
-
-  <!-- API 설정 -->
-  <div class="admin-section">
-    <div class="admin-section-title">🔑 API 설정</div>
-    <label class="admin-label">Anthropic API 키 (AI 분류·답변 생성에 필요)</label>
-    <input class="admin-input" id="api-key-input" type="password" oninput="enableSave('btn-save-api')" placeholder="sk-ant-...">
-    <div class="api-status" id="api-status"></div>
-    <button class="btn-save" id="btn-save-api" onclick="saveApiKey(this)" disabled>저장됨</button>
+    <div class="admin-footer">
+      <button class="btn-save" id="btn-save-coupon" onclick="saveCouponRules(this)" disabled>저장됨</button>
+    </div>
   </div>
 
 </div>
@@ -717,9 +734,9 @@ function renderReviews(reviews) {
         <div class="reviewer-avatar">${r.reviewer ? r.reviewer[0].toUpperCase() : '?'}</div>
         <div class="reviewer-info">
           <div class="reviewer-name">${r.reviewer || '익명'} ${customerTypeBadge(r.customer_type)} ${repliedBadge} ${replyStatusBadge(r.reply_status)} <button class="btn-gift-tag ${r.customer_type==='gift'?'active':''}" onclick="tagGift(${idx},this)" title="선물 구매자 태그">🎁</button></div>
+          <div style="margin-top:3px">${starsHTML(r.rating)}</div>
           <div class="review-meta">${r.date || ''}</div>
         </div>
-        <div>${starsHTML(r.rating)}</div>
       </div>
       <div class="card-body" data-idx="${idx}">
         <div class="card-left" style="width:${window._cardLeftPct||50}%">

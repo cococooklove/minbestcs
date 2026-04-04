@@ -19,6 +19,13 @@ else:
 _env_path = os.path.join(_base_dir, ".env")
 load_dotenv(_env_path, override=True)
 
+# PyInstaller 번들에서 certifi CA 인증서 경로 설정
+if getattr(sys, 'frozen', False):
+    _certifi_path = os.path.join(sys._MEIPASS, 'certifi', 'cacert.pem')
+    if os.path.exists(_certifi_path):
+        os.environ['SSL_CERT_FILE'] = _certifi_path
+        os.environ['REQUESTS_CA_BUNDLE'] = _certifi_path
+
 RAILWAY_URL  = os.environ.get("RAILWAY_URL", "").rstrip("/")
 AGENT_TOKEN  = os.environ.get("AGENT_TOKEN", "")
 REVIEWS_FILE = os.path.join(_base_dir, "data", "reviews.json")
