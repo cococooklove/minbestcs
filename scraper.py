@@ -87,7 +87,12 @@ def excel_to_reviews(filepath):
     return reviews
 
 
-def main():
+def main(progress_cb=None):
+    def progress(msg):
+        print(msg)
+        if progress_cb:
+            progress_cb(msg)
+
     DOWNLOAD_DIR.mkdir(parents=True, exist_ok=True)
     os.makedirs(PROFILE_DIR, exist_ok=True)
 
@@ -111,14 +116,14 @@ def main():
         page.on("dialog", lambda d: d.accept())
 
         # 셀러센터로 이동 (로그인 안 됐으면 로그인 페이지로 리다이렉트됨)
-        print("셀러센터로 이동 중...")
+        progress("셀러센터로 이동 중...")
         try:
             page.goto("https://sell.smartstore.naver.com/#/review/search", timeout=15000)
         except Exception:
             pass
 
         # 로그인 대기 (최대 5분)
-        print("로그인 대기 중... (로그인이 필요하면 브라우저에서 완료해주세요)")
+        progress("로그인 대기 중...")
         for _ in range(300):
             url = page.url.lower()
             if "sell.smartstore.naver.com" in url and not any(
@@ -127,13 +132,13 @@ def main():
                 break
             time.sleep(1)
         else:
-            print("로그인 시간 초과")
+            progress("로그인 시간 초과")
             context.close()
             pw.stop()
             return
 
         # 리뷰 검색 페이지로 이동
-        print("리뷰 페이지 로딩 중...")
+        progress("리뷰 페이지 로딩 중...")
         try:
             page.goto("https://sell.smartstore.naver.com/#/review/search", timeout=15000)
             page.wait_for_load_state("networkidle", timeout=15000)
@@ -142,10 +147,10 @@ def main():
         time.sleep(3)
 
         # 엑셀다운 버튼 대기
-        print("'엑셀다운' 버튼 대기 중...")
+        progress("엑셀다운 버튼 찾는 중...")
         btn = page.get_by_text("엑셀다운").first
         btn.wait_for(state="visible", timeout=30000)
-        print("버튼 클릭...")
+        progress("엑셀다운 버튼 클릭 중...")
         with page.expect_download(timeout=60000) as dl_info:
             btn.click()
             time.sleep(2)
@@ -160,14 +165,14 @@ def main():
                 try:
                     confirm = page.wait_for_selector(sel, timeout=2000, state="visible")
                     if confirm:
-                        print("팝업 확인 클릭")
+                        progress("팝업 확인 클릭 중...")
                         confirm.click()
                         break
                 except Exception:
                     continue
 
         download = dl_info.value
-        print(f"다운로드 완료: {download.suggested_filename}")
+        progress(f"다운로드 완료: {download.suggested_filename}")
 
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         excel_path = DOWNLOAD_DIR / f"reviews_{timestamp}.xlsx"

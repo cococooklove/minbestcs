@@ -135,7 +135,7 @@ def on_do_scrape(data):
             import scraper
             import importlib
             importlib.reload(scraper)  # 환경변수 반영을 위해 reload
-            scraper.main()
+            scraper.main(progress_cb=lambda msg: sio.emit("agent_progress", {"step": msg}))
             sio.emit("agent_progress", {"step": "수집 완료. 업로드 중..."})
             success = upload_reviews()
             sio.emit("scrape_done", {"success": success})
