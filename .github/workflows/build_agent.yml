@@ -13,19 +13,19 @@ jobs:
           python-version: '3.11'
       - name: Install dependencies
         run: pip install pyinstaller "python-socketio[client]" python-dotenv websocket-client requests certifi playwright openpyxl
-      - name: Install Playwright browsers
+      - name: Install Playwright Chromium
         run: playwright install chromium
         env:
           PLAYWRIGHT_BROWSERS_PATH: ./playwright-browsers
       - name: Build Mac executable
         run: pyinstaller MinBestAgent.spec
-        env:
-          PLAYWRIGHT_BROWSERS_PATH: ./playwright-browsers
+      - name: Copy browsers to dist
+        run: cp -r playwright-browsers dist/playwright-browsers
       - name: Upload Mac artifact
         uses: actions/upload-artifact@v4
         with:
           name: MinBestAgent-Mac
-          path: dist/MinBestAgent
+          path: dist/
 
   build-windows:
     runs-on: windows-latest
@@ -36,16 +36,16 @@ jobs:
           python-version: '3.11'
       - name: Install dependencies
         run: pip install pyinstaller "python-socketio[client]" python-dotenv websocket-client requests certifi playwright openpyxl
-      - name: Install Playwright browsers
+      - name: Install Playwright Chromium
         run: playwright install chromium
         env:
           PLAYWRIGHT_BROWSERS_PATH: ./playwright-browsers
       - name: Build Windows executable
         run: pyinstaller MinBestAgent.spec
-        env:
-          PLAYWRIGHT_BROWSERS_PATH: ./playwright-browsers
+      - name: Copy browsers to dist
+        run: Copy-Item -Recurse playwright-browsers dist\playwright-browsers
       - name: Upload Windows artifact
         uses: actions/upload-artifact@v4
         with:
           name: MinBestAgent-Windows
-          path: dist/MinBestAgent.exe
+          path: dist/

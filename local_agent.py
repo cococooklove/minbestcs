@@ -25,8 +25,8 @@ if getattr(sys, 'frozen', False):
     if os.path.exists(_certifi_path):
         os.environ['SSL_CERT_FILE'] = _certifi_path
         os.environ['REQUESTS_CA_BUNDLE'] = _certifi_path
-    # Playwright 브라우저 경로 (번들 내 포함)
-    os.environ['PLAYWRIGHT_BROWSERS_PATH'] = os.path.join(sys._MEIPASS, 'playwright-browsers')
+    # Playwright 브라우저 경로 (실행파일 옆 playwright-browsers 폴더)
+    os.environ['PLAYWRIGHT_BROWSERS_PATH'] = os.path.join(_base_dir, 'playwright-browsers')
 
 RAILWAY_URL  = os.environ.get("RAILWAY_URL", "").rstrip("/")
 AGENT_TOKEN  = os.environ.get("AGENT_TOKEN", "")
