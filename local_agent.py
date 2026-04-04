@@ -116,14 +116,13 @@ def on_do_login(data):
     def run_login():
         try:
             ensure_chromium()
-            os.environ["SCRAPER_PROFILE_DIR"] = PROFILE_DIR
             import login as login_mod
-            import importlib
-            importlib.reload(login_mod)
+            login_mod.PROFILE_DIR = PROFILE_DIR  # reload 대신 직접 설정
             success = login_mod.main()
             sio.emit("login_done", {"success": bool(success)})
             print("로그인 완료" if success else "로그인 실패")
         except Exception as e:
+            print(f"로그인 오류: {e}")
             sio.emit("login_done", {"success": False, "error": str(e)})
 
     threading.Thread(target=run_login, daemon=True).start()
@@ -140,8 +139,7 @@ def on_do_scrape(data):
             # 브라우저 프로필 경로 전달 (로그인 세션 유지)
             os.environ["SCRAPER_PROFILE_DIR"] = PROFILE_DIR
             import scraper
-            import importlib
-            importlib.reload(scraper)  # 환경변수 반영을 위해 reload
+            scraper.PROFILE_DIR = PROFILE_DIR  # reload 대신 직접 설정
             scraper.main(progress_cb=lambda msg: sio.emit("agent_progress", {"step": msg}))
             sio.emit("agent_progress", {"step": "수집 완료. 업로드 중..."})
             success = upload_reviews()
