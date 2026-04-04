@@ -1229,7 +1229,7 @@ socket.on('login_status', data => {
   } else {
     btnLogin.textContent = '로그인';
     btnLogin.disabled = false;
-    showToast('로그인 실패. 다시 시도해주세요.', 3000);
+    showToast('로그인 실패: ' + (data.error || '알 수 없는 오류'), 8000);
   }
 });
 
