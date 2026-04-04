@@ -118,23 +118,23 @@ def main(progress_cb=None, existing_page=None):
         page = context.pages[0] if context.pages else context.new_page()
         page.on("dialog", lambda d: d.accept())
 
+    def _is_on_login_page(pg):
+        url = pg.url.lower()
+        return any(x in url for x in ("nid.naver.com", "login", "nidlogin", "oauth", "signin", "checklogin"))
+
     excel_path = None
     try:
-        # 셀러센터로 이동 (로그인 안 됐으면 로그인 페이지로 리다이렉트됨)
-        progress("셀러센터로 이동 중...")
-        try:
-            page.goto("https://sell.smartstore.naver.com/#/review/search", timeout=15000)
-        except Exception:
-            pass
-
         if existing_page is None:
-            # 로그인 대기 (최대 5분)
+            # 셀러센터로 이동 후 로그인 대기 (최대 5분)
+            progress("셀러센터로 이동 중...")
+            try:
+                page.goto("https://sell.smartstore.naver.com/#/review/search", timeout=15000)
+            except Exception:
+                pass
             progress("로그인 대기 중...")
             for _ in range(300):
                 url = page.url.lower()
-                if "sell.smartstore.naver.com" in url and not any(
-                    x in url for x in ("login", "nidlogin", "oauth", "signin")
-                ):
+                if "sell.smartstore.naver.com" in url and not _is_on_login_page(page):
                     break
                 time.sleep(1)
             else:
@@ -143,7 +143,7 @@ def main(progress_cb=None, existing_page=None):
                 pw.stop()
             return
 
-        # 리뷰 검색 페이지로 이동
+        # 기존 로그인 페이지 재사용: 리뷰 페이지로 이동
         progress("리뷰 페이지 로딩 중...")
         try:
             page.goto("https://sell.smartstore.naver.com/#/review/search", timeout=15000)
@@ -152,10 +152,16 @@ def main(progress_cb=None, existing_page=None):
             pass
         time.sleep(3)
 
-        # 로그인 세션 만료 확인
-        cur_url = page.url.lower()
-        if any(x in cur_url for x in ("login", "nidlogin", "oauth", "signin")):
-            raise Exception("세션이 만료됐습니다. 에이전트를 재시작하고 다시 로그인해주세요.")
+        # 세션 확인 페이지 감지 → 사용자가 처리할 때까지 대기
+        if _is_on_login_page(page):
+            progress("브라우저에서 로그인 확인을 완료해주세요...")
+            for _ in range(300):
+                time.sleep(1)
+                if not _is_on_login_page(page):
+                    break
+            else:
+                raise Exception("로그인 확인 시간 초과. 에이전트를 재시작하고 다시 로그인해주세요.")
+            time.sleep(2)
 
         # 엑셀다운 버튼 대기
         progress("엑셀다운 버튼 찾는 중...")
