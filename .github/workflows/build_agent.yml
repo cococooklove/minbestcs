@@ -12,13 +12,9 @@ jobs:
         with:
           python-version: '3.11'
       - name: Install dependencies
-        run: pip install pyinstaller "python-socketio[client]" python-dotenv
+        run: pip install pyinstaller "python-socketio[client]" python-dotenv websocket-client requests certifi
       - name: Build Mac executable
-        run: |
-          pyinstaller --onefile --name "MinBestAgent" \
-            --hidden-import=engineio.async_drivers.threading \
-            --hidden-import=socketio --hidden-import=dotenv \
-            local_agent.py
+        run: pyinstaller MinBestAgent.spec
       - name: Upload Mac artifact
         uses: actions/upload-artifact@v4
         with:
@@ -33,13 +29,9 @@ jobs:
         with:
           python-version: '3.11'
       - name: Install dependencies
-        run: pip install pyinstaller "python-socketio[client]" python-dotenv
+        run: pip install pyinstaller "python-socketio[client]" python-dotenv websocket-client requests certifi
       - name: Build Windows executable
-        run: |
-          pyinstaller --onefile --name "MinBestAgent" `
-            --hidden-import=engineio.async_drivers.threading `
-            --hidden-import=socketio --hidden-import=dotenv `
-            local_agent.py
+        run: pyinstaller MinBestAgent.spec
       - name: Upload Windows artifact
         uses: actions/upload-artifact@v4
         with:
