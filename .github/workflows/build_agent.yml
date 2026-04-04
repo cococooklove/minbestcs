@@ -12,7 +12,7 @@ jobs:
         with:
           python-version: '3.11'
       - name: Install dependencies
-        run: pip install pyinstaller "python-socketio[client]" python-dotenv websocket-client requests certifi playwright openpyxl
+        run: pip install pyinstaller flask flask-socketio "python-socketio[client]" python-dotenv requests certifi playwright openpyxl anthropic
       - name: Build Mac executable
         run: pyinstaller MinBestAgent.spec
       - name: Upload Mac artifact
@@ -29,7 +29,7 @@ jobs:
         with:
           python-version: '3.11'
       - name: Install dependencies
-        run: pip install pyinstaller "python-socketio[client]" python-dotenv websocket-client requests certifi playwright openpyxl
+        run: pip install pyinstaller flask flask-socketio "python-socketio[client]" python-dotenv requests certifi playwright openpyxl anthropic
       - name: Build Windows executable
         run: pyinstaller MinBestAgent.spec
       - name: Upload Windows artifact
