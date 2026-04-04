@@ -44,7 +44,7 @@ if not AGENT_TOKEN:
 
 import socketio as sio_client
 
-sio = sio_client.Client(reconnection=True, reconnection_attempts=0, reconnection_delay=3)
+sio = sio_client.Client(reconnection=False)
 
 
 def upload_reviews():
@@ -173,7 +173,9 @@ def main():
             sio.connect(RAILWAY_URL, transports=["websocket"], wait_timeout=10)
             print("연결 완료. 대기 중...", flush=True)
             sio.wait()
-            break
+            # sio.wait() 반환 = 서버가 연결 끊음 → 재연결
+            print("연결 끊김. 재시도 중...", flush=True)
+            time.sleep(3)
         except KeyboardInterrupt:
             print("종료합니다.", flush=True)
             sio.disconnect()
@@ -181,10 +183,10 @@ def main():
         except Exception as e:
             print(f"연결 오류: {e} — 5초 후 재시도...", flush=True)
             time.sleep(5)
-            try:
-                sio.disconnect()
-            except Exception:
-                pass
+        try:
+            sio.disconnect()
+        except Exception:
+            pass
 
 
 if __name__ == "__main__":
