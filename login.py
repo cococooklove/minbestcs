@@ -29,32 +29,36 @@ def wait_for_seller_center(page):
     return False
 
 
-def main():
+def main(keep_open=False):
     os.makedirs(PROFILE_DIR, exist_ok=True)
     for lock in ["SingletonLock", "SingletonCookie", "SingletonSocket"]:
         lp = os.path.join(PROFILE_DIR, lock)
         if os.path.exists(lp):
             os.remove(lp)
 
-    with sync_playwright() as p:
-        context = p.chromium.launch_persistent_context(
-            user_data_dir=PROFILE_DIR,
-            headless=False,
-            slow_mo=50,
-            viewport={"width": 1440, "height": 900},
-        )
-        page = context.pages[0] if context.pages else context.new_page()
+    pw = sync_playwright().start()
+    context = pw.chromium.launch_persistent_context(
+        user_data_dir=PROFILE_DIR,
+        headless=False,
+        slow_mo=50,
+        viewport={"width": 1440, "height": 900},
+        accept_downloads=True,
+    )
+    page = context.pages[0] if context.pages else context.new_page()
 
-        try:
-            page.goto("https://sell.smartstore.naver.com/", timeout=15000)
-        except Exception:
-            pass
+    try:
+        page.goto("https://sell.smartstore.naver.com/", timeout=15000)
+    except Exception:
+        pass
 
-        success = wait_for_seller_center(page)
+    success = wait_for_seller_center(page)
+    print("세션 저장 완료")
 
-        print("세션 저장 완료")
-        context.close()
-        return success
+    if keep_open and success:
+        return success, pw, context, page
+    context.close()
+    pw.stop()
+    return success, None, None, None
 
 
 if __name__ == "__main__":

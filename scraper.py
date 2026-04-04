@@ -87,34 +87,39 @@ def excel_to_reviews(filepath):
     return reviews
 
 
-def main(progress_cb=None):
+def main(progress_cb=None, existing_page=None):
     def progress(msg):
         print(msg)
         if progress_cb:
             progress_cb(msg)
 
     DOWNLOAD_DIR.mkdir(parents=True, exist_ok=True)
-    os.makedirs(PROFILE_DIR, exist_ok=True)
 
-    # 락 파일 정리
-    for lock in ["SingletonLock", "SingletonCookie", "SingletonSocket"]:
-        lp = os.path.join(PROFILE_DIR, lock)
-        if os.path.exists(lp):
-            os.remove(lp)
-
-    pw = sync_playwright().start()
-    context = pw.chromium.launch_persistent_context(
-        user_data_dir=PROFILE_DIR,
-        headless=False,
-        slow_mo=50,
-        viewport={"width": 1440, "height": 900},
-        accept_downloads=True,
-    )
-    excel_path = None
-    try:
+    # 기존 로그인 페이지 재사용
+    if existing_page is not None:
+        pw = None
+        context = None
+        page = existing_page
+        page.on("dialog", lambda d: d.accept())
+    else:
+        os.makedirs(PROFILE_DIR, exist_ok=True)
+        for lock in ["SingletonLock", "SingletonCookie", "SingletonSocket"]:
+            lp = os.path.join(PROFILE_DIR, lock)
+            if os.path.exists(lp):
+                os.remove(lp)
+        pw = sync_playwright().start()
+        context = pw.chromium.launch_persistent_context(
+            user_data_dir=PROFILE_DIR,
+            headless=False,
+            slow_mo=50,
+            viewport={"width": 1440, "height": 900},
+            accept_downloads=True,
+        )
         page = context.pages[0] if context.pages else context.new_page()
         page.on("dialog", lambda d: d.accept())
 
+    excel_path = None
+    try:
         # 셀러센터로 이동 (로그인 안 됐으면 로그인 페이지로 리다이렉트됨)
         progress("셀러센터로 이동 중...")
         try:
@@ -122,19 +127,20 @@ def main(progress_cb=None):
         except Exception:
             pass
 
-        # 로그인 대기 (최대 5분)
-        progress("로그인 대기 중...")
-        for _ in range(300):
-            url = page.url.lower()
-            if "sell.smartstore.naver.com" in url and not any(
-                x in url for x in ("login", "nidlogin", "oauth", "signin")
-            ):
-                break
-            time.sleep(1)
-        else:
-            progress("로그인 시간 초과")
-            context.close()
-            pw.stop()
+        if existing_page is None:
+            # 로그인 대기 (최대 5분)
+            progress("로그인 대기 중...")
+            for _ in range(300):
+                url = page.url.lower()
+                if "sell.smartstore.naver.com" in url and not any(
+                    x in url for x in ("login", "nidlogin", "oauth", "signin")
+                ):
+                    break
+                time.sleep(1)
+            else:
+                progress("로그인 시간 초과")
+                context.close()
+                pw.stop()
             return
 
         # 리뷰 검색 페이지로 이동
@@ -182,8 +188,10 @@ def main(progress_cb=None):
         import traceback
         traceback.print_exc()
     finally:
-        context.close()
-        pw.stop()
+        if context:
+            context.close()
+        if pw:
+            pw.stop()
 
     # 엑셀 파싱
     print("\n엑셀 파싱 중...")

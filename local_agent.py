@@ -87,6 +87,11 @@ def disconnect():
     print("서버 연결 해제됨. 재연결 중...")
 
 
+_login_pw = None
+_login_context = None
+_login_page = None
+
+
 @sio.on("agent_ready")
 def on_agent_ready(data):
     print("에이전트 인증 완료. 대기 중...")
@@ -115,11 +120,16 @@ def on_do_login(data):
     sio.emit("agent_progress", {"step": "브라우저를 열고 있습니다..."})
 
     def run_login():
+        global _login_pw, _login_context, _login_page
         try:
             ensure_chromium()
             import login as login_mod
-            login_mod.PROFILE_DIR = PROFILE_DIR  # reload 대신 직접 설정
-            success = login_mod.main()
+            login_mod.PROFILE_DIR = PROFILE_DIR
+            success, pw, context, page = login_mod.main(keep_open=True)
+            if success:
+                _login_pw = pw
+                _login_context = context
+                _login_page = page
             sio.emit("login_done", {"success": bool(success)})
             print("로그인 완료" if success else "로그인 실패")
         except Exception as e:
@@ -137,11 +147,12 @@ def on_do_scrape(data):
     def run_scrape():
         try:
             ensure_chromium()
-            # 브라우저 프로필 경로 전달 (로그인 세션 유지)
-            os.environ["SCRAPER_PROFILE_DIR"] = PROFILE_DIR
             import scraper
-            scraper.PROFILE_DIR = PROFILE_DIR  # reload 대신 직접 설정
-            scraper.main(progress_cb=lambda msg: sio.emit("agent_progress", {"step": msg}))
+            scraper.PROFILE_DIR = PROFILE_DIR
+            scraper.main(
+                progress_cb=lambda msg: sio.emit("agent_progress", {"step": msg}),
+                existing_page=_login_page,  # 로그인된 브라우저 재사용
+            )
             sio.emit("agent_progress", {"step": "수집 완료. 업로드 중..."})
             success = upload_reviews()
             sio.emit("scrape_done", {"success": success})
