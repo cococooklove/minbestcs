@@ -10,7 +10,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 app = Flask(__name__)
-socketio = SocketIO(app, cors_allowed_origins="*", async_mode="threading")
+socketio = SocketIO(app, cors_allowed_origins="*", async_mode="threading", ping_timeout=20, ping_interval=10)
 REVIEWS_FILE = "data/reviews.json"
 _agent_sid = None  # 연결된 로컬 에이전트 session id
 

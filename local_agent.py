@@ -155,7 +155,7 @@ def main():
     while True:
         try:
             print("연결 시도 중...", flush=True)
-            sio.connect(RAILWAY_URL, transports=["websocket", "polling"], wait_timeout=10)
+            sio.connect(RAILWAY_URL, transports=["websocket"], wait_timeout=10)
             print("연결 완료. 대기 중...", flush=True)
             sio.wait()
             break
