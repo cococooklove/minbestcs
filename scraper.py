@@ -220,7 +220,7 @@ def main(progress_cb=None, existing_page=None, cookies=None, headless=False):
         _ensure_review_page()
 
         # 조회 기간 최대(1년)로 설정 후 조회
-        progress("조회 기간 설정 중...")
+        progress("최근 1년치 리뷰를 다운로드 중입니다. 잠시 기다려주세요...")
         try:
             from datetime import timedelta
             today = datetime.now()
