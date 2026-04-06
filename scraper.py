@@ -198,11 +198,16 @@ def main(progress_cb=None, existing_page=None, cookies=None, headless=False):
                 raise Exception("로그인 확인 시간 초과. 다시 로그인해주세요.")
             time.sleep(2)
 
-        # 조회 기간 1년 설정 후 검색
+        # 전체 선택 + 1년 기간 설정 후 검색
         progress("최근 1년치 리뷰를 다운로드 중입니다. 잠시 기다려주세요...")
         try:
+            # 초기화로 전체 선택 상태 보장
+            page.click("button:has-text('초기화')", timeout=5000)
+            time.sleep(1)
+            # 1년 버튼 클릭
             page.click("button:has-text('1년')", timeout=5000)
             time.sleep(1)
+            # 검색
             page.click("button:has-text('검색')", timeout=5000)
             time.sleep(3)
         except Exception as e:
