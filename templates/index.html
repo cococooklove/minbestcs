@@ -124,32 +124,51 @@
   }
   /* 네이버 스타일 팝업 */
   .naver-popup-overlay {
-    display: none;
-    position: fixed; inset: 0;
-    background: rgba(0,0,0,.45);
-    z-index: 9998;
+    display: none; position: fixed; inset: 0;
+    background: rgba(0,0,0,.45); z-index: 9998;
     animation: fadeIn .15s ease;
   }
   .naver-popup {
     position: fixed; top: 50%; left: 50%;
     transform: translate(-50%, -50%);
-    background: #fff;
-    border-radius: 12px;
+    background: #fff; border-radius: 14px;
     box-shadow: 0 8px 32px rgba(0,0,0,.18);
-    z-index: 9999;
-    min-width: 300px; max-width: 420px;
-    padding: 28px 28px 20px;
-    display: none;
-    animation: popIn .18s ease;
+    z-index: 9999; width: 480px;
+    padding: 28px 28px 22px;
+    display: none; animation: popIn .18s ease;
     font-family: -apple-system, 'Malgun Gothic', sans-serif;
   }
-  .naver-popup .popup-icon {
-    font-size: 26px; text-align: center; margin-bottom: 10px;
+  /* 단계 표시 */
+  .popup-steps {
+    display: flex; align-items: center; margin-bottom: 22px;
   }
+  .popup-step {
+    display: flex; flex-direction: column; align-items: center; gap: 5px; flex-shrink: 0;
+  }
+  .step-circle {
+    width: 28px; height: 28px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 12px; font-weight: 700;
+    background: #f0f0f0; color: #aaa;
+    transition: all .3s;
+  }
+  .step-label {
+    font-size: 10px; color: #bbb; white-space: nowrap; transition: color .3s;
+  }
+  .step-line {
+    flex: 1; height: 2px; background: #e8e8e8; margin: 0 4px 18px; transition: background .3s;
+  }
+  .popup-step.active .step-circle { background: #e8f8f0; color: #03c75a; border: 2px solid #03c75a; }
+  .popup-step.active .step-label { color: #03c75a; font-weight: 600; }
+  .popup-step.done .step-circle { background: #03c75a; color: #fff; }
+  .popup-step.done .step-label { color: #03c75a; }
+  .popup-step.done + .step-line { background: #03c75a; }
+  /* 메시지 */
   .naver-popup .popup-msg {
-    font-size: 15px; color: #222; text-align: center;
-    line-height: 1.6; word-break: keep-all;
+    font-size: 14px; color: #444; text-align: center;
+    line-height: 1.7; word-break: keep-all; min-height: 22px;
   }
+  /* 확인 버튼 */
   .naver-popup .popup-close {
     display: block; width: 100%; margin-top: 20px;
     padding: 11px; background: #03c75a; color: #fff;
@@ -514,9 +533,19 @@
 
 <div class="naver-popup-overlay" id="popup-overlay" onclick="overlayClick()"></div>
 <div class="naver-popup" id="naver-popup">
-  <div class="popup-icon" id="popup-icon"></div>
+  <div class="popup-steps" id="popup-steps">
+    <div class="popup-step" id="pstep-0"><div class="step-circle">1</div><div class="step-label">페이지 이동</div></div>
+    <div class="step-line"></div>
+    <div class="popup-step" id="pstep-1"><div class="step-circle">2</div><div class="step-label">기간 설정</div></div>
+    <div class="step-line"></div>
+    <div class="popup-step" id="pstep-2"><div class="step-circle">3</div><div class="step-label">다운로드</div></div>
+    <div class="step-line"></div>
+    <div class="popup-step" id="pstep-3"><div class="step-circle">4</div><div class="step-label">파싱</div></div>
+    <div class="step-line"></div>
+    <div class="popup-step" id="pstep-4"><div class="step-circle">✓</div><div class="step-label">완료</div></div>
+  </div>
   <div class="popup-msg" id="popup-msg"></div>
-  <button class="popup-close" id="popup-close-btn" onclick="closePopup()">확인</button>
+  <button class="popup-close" id="popup-close-btn" onclick="closePopup()" style="display:none;">확인</button>
 </div>
 
 <div class="progress-overlay" id="classify-progress">
@@ -1001,45 +1030,85 @@ function rejectReply(idx) {
 }
 
 let _popupTimer = null;
-let _popupLocked = false; // 수집 중에는 닫기 불가
+let _popupLocked = false;
 
-function _openPopup(msg, icon, isError, locked) {
+// 진행 단계 매핑
+const _STEP_MAP = [
+  { step: 0, keys: ['페이지', '로딩', '로그인', '세션', '쿠키', '이동'] },
+  { step: 1, keys: ['1년치', '기간', '초기화', '검색 결과', '조회'] },
+  { step: 2, keys: ['엑셀다운', '다운로드'] },
+  { step: 3, keys: ['파싱'] },
+  { step: 4, keys: ['완료'] },
+];
+
+function _getMsgStep(msg) {
+  for (const { step, keys } of _STEP_MAP)
+    if (keys.some(k => msg.includes(k))) return step;
+  return -1;
+}
+
+function _setStep(activeStep) {
+  for (let i = 0; i <= 4; i++) {
+    const el = document.getElementById('pstep-' + i);
+    if (!el) continue;
+    el.className = 'popup-step' + (i < activeStep ? ' done' : i === activeStep ? ' active' : '');
+  }
+}
+
+function _resetSteps() {
+  for (let i = 0; i <= 4; i++) {
+    const el = document.getElementById('pstep-' + i);
+    if (el) el.className = 'popup-step';
+  }
+}
+
+function _openPopup(isError) {
   const popup = document.getElementById('naver-popup');
   const overlay = document.getElementById('popup-overlay');
-  const msgEl = document.getElementById('popup-msg');
-  const iconEl = document.getElementById('popup-icon');
-  const closeBtn = document.getElementById('popup-close-btn');
-
-  _popupLocked = locked;
-  iconEl.textContent = icon;
-  msgEl.textContent = msg;
   popup.className = 'naver-popup' + (isError ? ' error' : '');
   popup.style.display = 'block';
   overlay.style.display = 'block';
-  closeBtn.disabled = locked;
-  closeBtn.style.opacity = locked ? '0.45' : '1';
-  closeBtn.style.cursor = locked ? 'not-allowed' : 'pointer';
 }
 
-// 수집 진행 중: 팝업 열기/메시지 업데이트, 확인 버튼 비활성화
+// 수집 진행 중: 단계 업데이트, 확인 버튼 숨김
 function showProgress(msg) {
   if (_popupTimer) { clearTimeout(_popupTimer); _popupTimer = null; }
-  _openPopup(msg, '⏳', false, true);
+  _popupLocked = true;
+  _openPopup(false);
+  const stepsEl = document.getElementById('popup-steps');
+  const closeBtn = document.getElementById('popup-close-btn');
+  if (stepsEl) stepsEl.style.display = 'flex';
+  if (closeBtn) closeBtn.style.display = 'none';
+  document.getElementById('popup-msg').textContent = msg;
+  const s = _getMsgStep(msg);
+  if (s >= 0) _setStep(s);
 }
 
-// 수집 완료/실패: 확인 버튼 활성화
+// 수집 완료/실패: 단계 완료 표시, 확인 버튼 표시
 function showResult(msg, isError = false) {
   if (_popupTimer) { clearTimeout(_popupTimer); _popupTimer = null; }
-  const icon = isError ? '⚠️' : '✅';
-  _openPopup(msg, icon, isError, false);
+  _popupLocked = false;
+  _openPopup(isError);
+  const stepsEl = document.getElementById('popup-steps');
+  const closeBtn = document.getElementById('popup-close-btn');
+  if (!isError && stepsEl) { stepsEl.style.display = 'flex'; _setStep(5); }
+  else if (stepsEl) stepsEl.style.display = 'none';
+  document.getElementById('popup-msg').textContent = msg;
+  if (closeBtn) { closeBtn.style.display = 'block'; closeBtn.disabled = false; closeBtn.style.opacity = '1'; closeBtn.style.cursor = 'pointer'; }
 }
 
+// 일반 토스트 (AI 분석 완료 등)
 function showToast(msg, duration = 4000) {
   if (_popupTimer) clearTimeout(_popupTimer);
+  _popupLocked = false;
   const isError = msg.includes('실패') || msg.includes('오류');
-  const isSuccess = msg.includes('완료') || msg.includes('✓');
-  const icon = isError ? '⚠️' : isSuccess ? '✅' : 'ℹ️';
-  _openPopup(msg, icon, isError, false);
+  _openPopup(isError);
+  const stepsEl = document.getElementById('popup-steps');
+  const closeBtn = document.getElementById('popup-close-btn');
+  if (stepsEl) stepsEl.style.display = 'none';
+  _resetSteps();
+  document.getElementById('popup-msg').textContent = msg;
+  if (closeBtn) { closeBtn.style.display = 'block'; closeBtn.disabled = false; closeBtn.style.opacity = '1'; closeBtn.style.cursor = 'pointer'; }
   _popupTimer = setTimeout(closePopup, duration);
 }
 
@@ -1051,6 +1120,7 @@ function closePopup() {
   if (_popupLocked) return;
   document.getElementById('naver-popup').style.display = 'none';
   document.getElementById('popup-overlay').style.display = 'none';
+  _resetSteps();
   if (_popupTimer) { clearTimeout(_popupTimer); _popupTimer = null; }
 }
 
