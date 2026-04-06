@@ -122,20 +122,22 @@ document.addEventListener('DOMContentLoaded', async () => {
   });
 
   async function pollStatus(serverUrl) {
-    const dots = ['', '.', '..', '...'];
-    let i = 0;
     const interval = setInterval(async () => {
       try {
         const res = await fetch(`${serverUrl}/api/status`);
         const data = await res.json();
         if (data.scraping) {
-          resultDiv.textContent = '수집 중' + dots[i % 4];
+          resultDiv.textContent = data.step || '수집 중...';
           resultDiv.className = 'result';
-          i++;
         } else {
           clearInterval(interval);
-          resultDiv.textContent = '✓ 수집 완료! 웹에서 결과를 확인하세요.';
-          resultDiv.className = 'result success';
+          if (data.step && data.step.startsWith('실패')) {
+            resultDiv.textContent = '❌ ' + data.step;
+            resultDiv.className = 'result error';
+          } else {
+            resultDiv.textContent = '✓ 수집 완료! 웹에서 결과를 확인하세요.';
+            resultDiv.className = 'result success';
+          }
           collectBtn.disabled = false;
         }
       } catch {
@@ -144,6 +146,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         resultDiv.className = 'result error';
         collectBtn.disabled = false;
       }
-    }, 2000);
+    }, 1500);
   }
 });

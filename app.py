@@ -27,6 +27,7 @@ _login_context = None
 _login_page = None
 _scraping = False
 _session_cookies = None
+_progress_step = ""
 
 
 def ensure_chromium():
@@ -65,6 +66,7 @@ def api_status():
     return jsonify({
         "scraping": _scraping,
         "has_cookies": bool(_session_cookies),
+        "step": _progress_step,
     })
 
 
@@ -268,8 +270,15 @@ def api_login_status():
 
 def _run_server_collect():
     """IS_SERVER 모드: 쿠키로 headless 수집"""
-    global _scraping
+    global _scraping, _progress_step
+
+    def _progress(msg):
+        global _progress_step
+        _progress_step = msg
+        socketio.emit("agent_progress", {"step": msg})
+
     _scraping = True
+    _progress_step = "수집 준비 중..."
     try:
         socketio.emit("collect_status", {"step": "scraping"})
         ensure_chromium()
@@ -278,12 +287,14 @@ def _run_server_collect():
         scraper.OUTPUT_FILE = REVIEWS_FILE
         scraper.DOWNLOAD_DIR = Path(os.path.join(_base_dir, "data", "downloads"))
         scraper.main(
-            progress_cb=lambda msg: socketio.emit("agent_progress", {"step": msg}),
+            progress_cb=_progress,
             cookies=_session_cookies,
             headless=True,
         )
+        _progress_step = "완료"
         socketio.emit("collect_status", {"step": "done", "success": True})
     except Exception as e:
+        _progress_step = f"실패: {e}"
         socketio.emit("collect_status", {"step": "done", "success": False, "error": str(e)})
     finally:
         _scraping = False
