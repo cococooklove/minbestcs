@@ -203,33 +203,44 @@ def main(progress_cb=None, existing_page=None):
         excel_path = DOWNLOAD_DIR / f"reviews_{timestamp}.xlsx"
         download.save_as(str(excel_path))
 
-    except Exception:
+    except Exception as e:
         import traceback
         traceback.print_exc()
+        progress(f"수집 실패: {e}")
+        raise
     finally:
         if context:
             context.close()
         if pw:
             pw.stop()
 
+    if excel_path is None:
+        raise Exception("엑셀 파일 다운로드 실패")
+
     # 엑셀 파싱
-    print("\n엑셀 파싱 중...")
-    new_reviews = excel_to_reviews(str(excel_path))
-    print(f"파싱 완료: {len(new_reviews)}건")
+    progress("엑셀 파싱 중...")
+    try:
+        new_reviews = excel_to_reviews(str(excel_path))
+    except Exception as e:
+        raise Exception(f"엑셀 파싱 실패: {e}")
+    progress(f"파싱 완료: {len(new_reviews)}건")
 
-    existing = []
-    if os.path.exists(OUTPUT_FILE):
-        with open(OUTPUT_FILE, encoding="utf-8") as f:
-            existing = json.load(f)
+    try:
+        existing = []
+        if os.path.exists(OUTPUT_FILE):
+            with open(OUTPUT_FILE, encoding="utf-8") as f:
+                existing = json.load(f)
 
-    existing_keys = {(r.get("content", ""), r.get("date", ""), r.get("reviewer", "")) for r in existing}
-    added = [r for r in new_reviews if (r.get("content", ""), r.get("date", ""), r.get("reviewer", "")) not in existing_keys]
-    all_reviews = existing + added
+        existing_keys = {(r.get("content", ""), r.get("date", ""), r.get("reviewer", "")) for r in existing}
+        added = [r for r in new_reviews if (r.get("content", ""), r.get("date", ""), r.get("reviewer", "")) not in existing_keys]
+        all_reviews = existing + added
 
-    with open(OUTPUT_FILE, "w", encoding="utf-8") as f:
-        json.dump(all_reviews, f, ensure_ascii=False, indent=2)
+        with open(OUTPUT_FILE, "w", encoding="utf-8") as f:
+            json.dump(all_reviews, f, ensure_ascii=False, indent=2)
+    except Exception as e:
+        raise Exception(f"리뷰 저장 실패: {e}")
 
-    print(f"\n완료: 신규 {len(added)}건 추가 / 전체 {len(all_reviews)}건")
+    progress(f"완료: 신규 {len(added)}건 추가 / 전체 {len(all_reviews)}건")
 
 
 

@@ -362,8 +362,7 @@
   <svg width="22" height="22" viewBox="0 0 24 24" fill="white" style="cursor:pointer" onclick="goHome()"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 14.5v-9l6 4.5-6 4.5z"/></svg>
   <h1 style="cursor:pointer" onclick="goHome()">스마트스토어 리뷰 관리</h1>
   <div class="header-actions">
-    <button class="btn-classify" id="btn-login-agent" onclick="runLogin()" style="background:rgba(255,255,255,.18)">로그인</button>
-    <button class="btn-classify" id="btn-scrape" onclick="runScrape()" disabled style="opacity:.45">리뷰 수집</button>
+    <button class="btn-classify" id="btn-collect" onclick="runCollect()" style="background:rgba(255,255,255,.18)">로그인 및 리뷰 수집</button>
     <button class="btn-admin" id="btn-admin" onclick="toggleAdmin()">관리자</button>
     <span class="last-updated" id="last-updated">-</span>
   </div>
@@ -799,32 +798,19 @@ function fetchReviews() {
     });
 }
 
-function runLogin() {
-  const btn = document.getElementById('btn-login-agent');
+function runCollect() {
+  if (!confirm('로그인 및 리뷰를 수집하겠습니까?')) return;
+  const btn = document.getElementById('btn-collect');
   btn.disabled = true;
-  btn.textContent = '로그인 중...';
-  showToast('브라우저에서 네이버 로그인을 완료해주세요.', 60000);
-  fetch('/api/login/start', {method: 'POST'});
-}
-
-let scrapePoll = null;
-function runScrape() {
-  if (!confirm('리뷰를 수집하겠습니까?')) return;
-  fetch('/api/scrape', {method: 'POST'})
+  btn.textContent = '준비 중...';
+  fetch('/api/collect', {method: 'POST'})
     .then(r => r.json())
     .then(data => {
-      const baseMtime = data.mtime;
-      showToast('리뷰 수집 중... 완료되면 자동으로 반영됩니다.', 60000);
-      if (scrapePoll) clearInterval(scrapePoll);
-      scrapePoll = setInterval(() => {
-        fetch('/api/scrape/status').then(r => r.json()).then(d => {
-          if (d.mtime > baseMtime) {
-            clearInterval(scrapePoll);
-            showToast('리뷰 수집 완료!', 3000);
-            fetchReviews();
-          }
-        });
-      }, 3000);
+      if (data.error) {
+        showToast('오류: ' + data.error, 6000);
+        btn.disabled = false;
+        btn.textContent = '로그인 및 리뷰 수집';
+      }
     });
 }
 
@@ -1213,22 +1199,35 @@ socket.on('scrape_status', data => {
 });
 
 socket.on('agent_progress', data => {
-  showToast(data.step || '', 4000);
+  const msg = data.step || '';
+  const duration = msg.includes('실패') || msg.includes('오류') ? 8000 : 4000;
+  showToast(msg, duration);
 });
 
-socket.on('login_status', data => {
-  const btnLogin = document.getElementById('btn-login-agent');
-  const btnScrape = document.getElementById('btn-scrape');
-  if (data.logged_in) {
-    btnLogin.textContent = '✓ 로그인됨';
-    btnLogin.disabled = true;
-    btnScrape.disabled = false;
-    btnScrape.style.opacity = '1';
-    showToast('로그인 완료! 리뷰 수집 버튼을 눌러주세요.', 3000);
-  } else {
-    btnLogin.textContent = '로그인';
-    btnLogin.disabled = false;
+socket.on('collect_status', data => {
+  const btn = document.getElementById('btn-collect');
+  if (data.step === 'login_start') {
+    btn.textContent = '로그인 중...';
+    showToast('브라우저에서 네이버 로그인을 완료해주세요.', 60000);
+  } else if (data.step === 'login_done') {
+    btn.textContent = '수집 중...';
+    showToast('로그인 완료! 리뷰 수집 중...', 3000);
+  } else if (data.step === 'scraping') {
+    btn.textContent = '수집 중...';
+    showToast('리뷰 수집 중... 완료되면 자동으로 반영됩니다.', 60000);
+  } else if (data.step === 'login_failed') {
+    btn.disabled = false;
+    btn.textContent = '로그인 및 리뷰 수집';
     showToast('로그인 실패: ' + (data.error || '알 수 없는 오류'), 8000);
+  } else if (data.step === 'done') {
+    btn.disabled = false;
+    btn.textContent = '로그인 및 리뷰 수집';
+    if (data.success) {
+      showToast('리뷰 수집 완료!', 3000);
+      fetchReviews();
+    } else {
+      showToast('수집 실패: ' + (data.error || '알 수 없는 오류'), 8000);
+    }
   }
 });
 

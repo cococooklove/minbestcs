@@ -6,12 +6,19 @@
 from flask import Flask, render_template, jsonify, request
 from flask_socketio import SocketIO
 import json, os, threading, webbrowser, sys
+from pathlib import Path
 from dotenv import load_dotenv
-load_dotenv()
+
+if getattr(sys, 'frozen', False):
+    _base_dir = os.path.dirname(sys.executable)
+else:
+    _base_dir = os.path.dirname(os.path.abspath(__file__))
+
+load_dotenv(os.path.join(_base_dir, ".env"))
 
 app = Flask(__name__)
 socketio = SocketIO(app, cors_allowed_origins="*", async_mode="threading", ping_timeout=60, ping_interval=25)
-REVIEWS_FILE = "data/reviews.json"
+REVIEWS_FILE = os.path.join(_base_dir, "data", "reviews.json")
 
 _login_pw = None
 _login_context = None
@@ -143,9 +150,9 @@ def api_reviews():
     return jsonify({"reviews": indexed_reviews, "stats": stats})
 
 
-PROFILE_DIR = "data/browser_profile"
-SETTINGS_FILE = "config/settings.json"
-BRAND_TONE_FILE = "config/brand_tone.txt"
+PROFILE_DIR = os.path.join(_base_dir, "data", "browser_profile")
+SETTINGS_FILE = os.path.join(_base_dir, "config", "settings.json")
+BRAND_TONE_FILE = os.path.join(_base_dir, "config", "brand_tone.txt")
 
 
 def load_settings():
@@ -208,6 +215,45 @@ def api_login_status():
     cookies_path = os.path.join(PROFILE_DIR, "Default", "Cookies")
     logged_in = os.path.exists(cookies_path)
     return jsonify({"logged_in": logged_in})
+
+
+@app.route("/api/collect", methods=["POST"])
+def api_collect():
+    global _scraping
+    if _scraping:
+        return jsonify({"error": "수집 중입니다. 잠시 기다려주세요."}), 400
+    def run_collect():
+        global _login_pw, _login_context, _login_page, _scraping
+        try:
+            if _login_page is None:
+                socketio.emit("collect_status", {"step": "login_start"})
+                ensure_chromium()
+                import login as login_mod
+                login_mod.PROFILE_DIR = PROFILE_DIR
+                success, pw, context, page = login_mod.main(keep_open=True)
+                if not success:
+                    socketio.emit("collect_status", {"step": "login_failed", "error": "로그인 시간 초과"})
+                    return
+                _login_pw, _login_context, _login_page = pw, context, page
+                socketio.emit("collect_status", {"step": "login_done"})
+            _scraping = True
+            socketio.emit("collect_status", {"step": "scraping"})
+            ensure_chromium()
+            import scraper
+            scraper.PROFILE_DIR = PROFILE_DIR
+            scraper.OUTPUT_FILE = REVIEWS_FILE
+            scraper.DOWNLOAD_DIR = Path(os.path.join(_base_dir, "data", "downloads"))
+            scraper.main(
+                progress_cb=lambda msg: socketio.emit("agent_progress", {"step": msg}),
+                existing_page=_login_page,
+            )
+            socketio.emit("collect_status", {"step": "done", "success": True})
+        except Exception as e:
+            socketio.emit("collect_status", {"step": "done", "success": False, "error": str(e)})
+        finally:
+            _scraping = False
+    threading.Thread(target=run_collect, daemon=True).start()
+    return jsonify({"status": "started"})
 
 
 @app.route("/api/classify/progress")
@@ -441,13 +487,15 @@ def api_scrape():
             ensure_chromium()
             import scraper
             scraper.PROFILE_DIR = PROFILE_DIR
+            scraper.OUTPUT_FILE = REVIEWS_FILE
+            scraper.DOWNLOAD_DIR = Path(os.path.join(_base_dir, "data", "downloads"))
             scraper.main(
                 progress_cb=lambda msg: socketio.emit("agent_progress", {"step": msg}),
                 existing_page=_login_page,
             )
-            socketio.emit("scrape_done", {"success": True})
+            socketio.emit("scrape_status", {"done": True, "success": True})
         except Exception as e:
-            socketio.emit("scrape_done", {"success": False, "error": str(e)})
+            socketio.emit("scrape_status", {"done": True, "success": False, "error": str(e)})
         finally:
             _scraping = False
     threading.Thread(target=run_scrape, daemon=True).start()
