@@ -219,6 +219,46 @@ def main(progress_cb=None, existing_page=None, cookies=None, headless=False):
 
         _ensure_review_page()
 
+        # 조회 기간 최대(1년)로 설정 후 조회
+        progress("조회 기간 설정 중...")
+        try:
+            from datetime import timedelta
+            today = datetime.now()
+            start = today - timedelta(days=365)
+            start_str = start.strftime("%Y.%m.%d")
+            end_str = today.strftime("%Y.%m.%d")
+
+            # 날짜 입력 필드 찾기 (스마트스토어 날짜 picker)
+            date_inputs = page.locator("input[type='text'][class*='date'], input[placeholder*='날짜'], input[placeholder*='YYYY']")
+            if date_inputs.count() >= 2:
+                date_inputs.nth(0).triple_click()
+                date_inputs.nth(0).fill(start_str)
+                date_inputs.nth(1).triple_click()
+                date_inputs.nth(1).fill(end_str)
+            else:
+                # 대체: 1년 버튼 클릭 시도
+                for label in ["1년", "12개월", "1 년"]:
+                    try:
+                        btn_period = page.get_by_text(label, exact=True).first
+                        if btn_period.count() > 0:
+                            btn_period.click()
+                            break
+                    except Exception:
+                        continue
+
+            # 조회 버튼 클릭
+            for sel in ["button:has-text('조회')", "button:has-text('검색')"]:
+                try:
+                    search_btn = page.wait_for_selector(sel, timeout=3000, state="visible")
+                    if search_btn:
+                        search_btn.click()
+                        break
+                except Exception:
+                    continue
+            time.sleep(3)
+        except Exception as e:
+            progress(f"기간 설정 실패(기본값으로 진행): {e}")
+
         # 엑셀다운 버튼 대기
         progress("엑셀다운 버튼 찾는 중...")
         btn = page.get_by_text("엑셀다운").first
