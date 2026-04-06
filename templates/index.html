@@ -156,9 +156,9 @@
     border: none; border-radius: 8px; font-size: 14px;
     font-weight: 600; cursor: pointer; transition: background .15s;
   }
-  .naver-popup .popup-close:hover { background: #02a84d; }
-  .naver-popup.error .popup-close { background: #e74c3c; }
-  .naver-popup.error .popup-close:hover { background: #c0392b; }
+  .naver-popup .popup-close:not(:disabled):hover { background: #02a84d; }
+  .naver-popup.error .popup-close:not(:disabled) { background: #e74c3c; }
+  .naver-popup.error .popup-close:not(:disabled):hover { background: #c0392b; }
   @keyframes fadeIn { from { opacity:0 } to { opacity:1 } }
   @keyframes popIn { from { opacity:0; transform:translate(-50%,-48%) scale(.96) } to { opacity:1; transform:translate(-50%,-50%) scale(1) } }
 
@@ -512,11 +512,11 @@
   <button class="btn-classify-main" onclick="runClassify()">✦ AI 분석</button>
 </div>
 
-<div class="naver-popup-overlay" id="popup-overlay" onclick="closePopup()"></div>
+<div class="naver-popup-overlay" id="popup-overlay" onclick="overlayClick()"></div>
 <div class="naver-popup" id="naver-popup">
   <div class="popup-icon" id="popup-icon"></div>
   <div class="popup-msg" id="popup-msg"></div>
-  <button class="popup-close" onclick="closePopup()">확인</button>
+  <button class="popup-close" id="popup-close-btn" onclick="closePopup()">확인</button>
 </div>
 
 <div class="progress-overlay" id="classify-progress">
@@ -996,27 +996,54 @@ function rejectReply(idx) {
 }
 
 let _popupTimer = null;
+let _popupLocked = false; // 수집 중에는 닫기 불가
 
-function showToast(msg, duration = 4000) {
+function _openPopup(msg, icon, isError, locked) {
   const popup = document.getElementById('naver-popup');
   const overlay = document.getElementById('popup-overlay');
   const msgEl = document.getElementById('popup-msg');
   const iconEl = document.getElementById('popup-icon');
+  const closeBtn = document.getElementById('popup-close-btn');
 
-  const isError = msg.includes('실패') || msg.includes('오류');
-  const isSuccess = msg.includes('완료') || msg.includes('✓');
-
-  iconEl.textContent = isError ? '⚠️' : isSuccess ? '✅' : 'ℹ️';
+  _popupLocked = locked;
+  iconEl.textContent = icon;
   msgEl.textContent = msg;
   popup.className = 'naver-popup' + (isError ? ' error' : '');
   popup.style.display = 'block';
   overlay.style.display = 'block';
+  closeBtn.disabled = locked;
+  closeBtn.style.opacity = locked ? '0.45' : '1';
+  closeBtn.style.cursor = locked ? 'not-allowed' : 'pointer';
+}
 
+// 수집 진행 중: 팝업 열기/메시지 업데이트, 확인 버튼 비활성화
+function showProgress(msg) {
+  if (_popupTimer) { clearTimeout(_popupTimer); _popupTimer = null; }
+  _openPopup(msg, '⏳', false, true);
+}
+
+// 수집 완료/실패: 확인 버튼 활성화
+function showResult(msg, isError = false) {
+  if (_popupTimer) { clearTimeout(_popupTimer); _popupTimer = null; }
+  const icon = isError ? '⚠️' : '✅';
+  _openPopup(msg, icon, isError, false);
+}
+
+function showToast(msg, duration = 4000) {
   if (_popupTimer) clearTimeout(_popupTimer);
+  const isError = msg.includes('실패') || msg.includes('오류');
+  const isSuccess = msg.includes('완료') || msg.includes('✓');
+  const icon = isError ? '⚠️' : isSuccess ? '✅' : 'ℹ️';
+  _openPopup(msg, icon, isError, false);
   _popupTimer = setTimeout(closePopup, duration);
 }
 
+function overlayClick() {
+  if (!_popupLocked) closePopup();
+}
+
 function closePopup() {
+  if (_popupLocked) return;
   document.getElementById('naver-popup').style.display = 'none';
   document.getElementById('popup-overlay').style.display = 'none';
   if (_popupTimer) { clearTimeout(_popupTimer); _popupTimer = null; }
@@ -1290,18 +1317,16 @@ socket.on('scrape_status', data => {
   clearInterval(scrapePoll);
   if (data.done) {
     if (data.success === false) {
-      showToast('수집 실패. 로그인 상태를 확인해주세요.', 5000);
+      showResult('수집 실패. 로그인 상태를 확인해주세요.', true);
     } else {
-      showToast('리뷰 수집 완료!', 3000);
+      showResult('리뷰 수집 완료!');
       fetchReviews();
     }
   }
 });
 
 socket.on('agent_progress', data => {
-  const msg = data.step || '';
-  const duration = msg.includes('실패') || msg.includes('오류') ? 8000 : 4000;
-  showToast(msg, duration);
+  showProgress(data.step || '수집 중...');
 });
 
 const IS_SERVER = {{ is_server | tojson }};
@@ -1318,7 +1343,7 @@ if (IS_SERVER) {
     if (data.scraping) {
       if (dot) dot.style.background = '#f0a500';
       if (cookieStatus) cookieStatus.textContent = '리뷰 수집 중...';
-      showToast('리뷰 수집이 진행 중입니다. 완료되면 자동으로 반영됩니다.', 10000);
+      showProgress(data.step || '리뷰 수집 중...');
     } else if (data.has_cookies) {
       if (dot) dot.style.background = '#03c75a';
       if (cookieStatus) cookieStatus.textContent = '쿠키 수신됨 — 수집 버튼을 누르거나 확장에서 재시작하세요';
@@ -1342,30 +1367,28 @@ socket.on('collect_status', data => {
   }
   if (data.step === 'cookies_received') {
     if (btn) { btn.textContent = '수집 중...'; btn.disabled = true; }
-    showToast('쿠키 수신됨! 리뷰 수집 중...', 5000);
+    showProgress('쿠키 수신됨 — 리뷰 수집 준비 중...');
     return;
   }
   if (data.step === 'login_start') {
-    btn.textContent = '로그인 중...';
-    showToast('브라우저에서 네이버 로그인을 완료해주세요.', 60000);
+    if (btn) btn.textContent = '로그인 중...';
+    showProgress('브라우저에서 네이버 로그인을 완료해주세요.');
   } else if (data.step === 'login_done') {
-    btn.textContent = '수집 중...';
-    showToast('로그인 완료! 리뷰 수집 중...', 3000);
+    if (btn) btn.textContent = '수집 중...';
+    showProgress('로그인 완료 — 리뷰 수집 시작 중...');
   } else if (data.step === 'scraping') {
-    btn.textContent = '수집 중...';
-    showToast('리뷰 수집 중... 완료되면 자동으로 반영됩니다.', 60000);
+    if (btn) btn.textContent = '수집 중...';
+    showProgress('리뷰 수집 중...');
   } else if (data.step === 'login_failed') {
-    btn.disabled = false;
-    btn.textContent = '로그인 및 리뷰 수집';
-    showToast('로그인 실패: ' + (data.error || '알 수 없는 오류'), 8000);
+    if (btn) { btn.disabled = false; btn.textContent = '로그인 및 리뷰 수집'; }
+    showResult('로그인 실패: ' + (data.error || '알 수 없는 오류'), true);
   } else if (data.step === 'done') {
-    btn.disabled = false;
-    btn.textContent = '로그인 및 리뷰 수집';
+    if (btn) { btn.disabled = false; btn.textContent = '로그인 및 리뷰 수집'; }
     if (data.success) {
-      showToast('리뷰 수집 완료!', 3000);
+      showResult('리뷰 수집 완료!');
       fetchReviews();
     } else {
-      showToast('수집 실패: ' + (data.error || '알 수 없는 오류'), 8000);
+      showResult('수집 실패: ' + (data.error || '알 수 없는 오류'), true);
     }
   }
 });
