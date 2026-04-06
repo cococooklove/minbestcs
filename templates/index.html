@@ -607,8 +607,8 @@
   <!-- 브랜드 톤 가이드 -->
   <div class="admin-section">
     <div class="admin-section-title">🎨 브랜드 톤 가이드</div>
-    <label class="admin-label">AI 답변 스타일 가이드</label>
-    <textarea class="admin-textarea" id="brand-tone-text" rows="8" oninput="enableSave('btn-save-brand')" placeholder="브랜드 톤 가이드를 입력하세요..."></textarea>
+    <textarea id="brand-tone-text" style="display:none"></textarea>
+    <div id="brand-tone-sections" style="display:flex;flex-direction:column;gap:12px;"></div>
     <div class="admin-footer">
       <button class="btn-save" id="btn-save-brand" onclick="saveBrandTone(this)" disabled>저장됨</button>
     </div>
@@ -1215,6 +1215,7 @@ function loadAdminData() {
   ]).then(([cfg, bt]) => {
     adminConfig = cfg;
     document.getElementById('brand-tone-text').value = bt.content;
+    renderBrandToneSections(bt.content);
     document.getElementById('report-criteria').value = (cfg.report_criteria || []).join(', ');
     const toggle = document.getElementById('toggle-auto-generate');
     toggle.classList.toggle('on', cfg.auto_generate_reply);
@@ -1305,8 +1306,54 @@ function saveCsSettings(btn) {
   }).then(() => flashSaved(btn));
 }
 
+function renderBrandToneSections(text) {
+  const container = document.getElementById('brand-tone-sections');
+  // ## 헤더로 분리
+  const parts = text.split(/\n(?=## )/);
+  // 첫 부분(# 주석 등) 제외하고 ## 섹션만 추출
+  const sections = parts.filter(p => p.trimStart().startsWith('## '));
+  if (sections.length === 0) {
+    // 섹션 없으면 단일 textarea 폴백
+    container.innerHTML = `<textarea class="admin-textarea" data-section-idx="0" rows="8"
+      oninput="enableSave('btn-save-brand')">${text}</textarea>`;
+    return;
+  }
+  container.innerHTML = sections.map((sec, i) => {
+    const lines = sec.split('\n');
+    const title = lines[0].replace(/^##\s*/, '').trim();
+    const body = lines.slice(1).join('\n').trim();
+    return `<div style="border:1px solid #e8e8e8;border-radius:10px;overflow:hidden;">
+      <div style="background:#f8f8f8;padding:10px 14px;font-size:12px;font-weight:700;color:#444;border-bottom:1px solid #e8e8e8;display:flex;align-items:center;gap:6px;">
+        <span style="color:#03c75a">##</span> ${title}
+      </div>
+      <textarea class="admin-textarea" data-section-title="${title}" data-section-idx="${i}"
+        rows="${Math.max(3, body.split('\n').length + 1)}"
+        style="border:none;border-radius:0;"
+        oninput="enableSave('btn-save-brand')">${body}</textarea>
+    </div>`;
+  }).join('');
+}
+
+function assembleBrandTone() {
+  const hidden = document.getElementById('brand-tone-text').value;
+  const container = document.getElementById('brand-tone-sections');
+  const textareas = container.querySelectorAll('textarea[data-section-title]');
+  if (textareas.length === 0) {
+    // 폴백 모드
+    const fb = container.querySelector('textarea[data-section-idx="0"]');
+    return fb ? fb.value : hidden;
+  }
+  // 원본에서 ## 이전 preamble 보존
+  const preamble = hidden.split(/\n(?=## )/)[0];
+  const sections = Array.from(textareas).map(ta => {
+    const title = ta.getAttribute('data-section-title');
+    return `## ${title}\n${ta.value.trim()}`;
+  });
+  return (preamble ? preamble.trimEnd() + '\n\n' : '') + sections.join('\n\n');
+}
+
 function saveBrandTone(btn) {
-  const content = document.getElementById('brand-tone-text').value;
+  const content = assembleBrandTone();
   fetch('/api/admin/brand-tone', {
     method: 'POST',
     headers: {'Content-Type': 'application/json'},
