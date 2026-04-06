@@ -201,22 +201,20 @@ def main(progress_cb=None, existing_page=None, cookies=None, headless=False):
         # 전체 선택 + 1년 기간 설정 후 검색
         progress("최근 1년치 리뷰를 다운로드 중입니다. 잠시 기다려주세요...")
         try:
-            # 초기화로 전체 선택 상태 보장
-            page.click("button:has-text('초기화')", timeout=5000)
+            page.click("button:has-text('초기화')", timeout=8000)
+            time.sleep(2)
+            page.click("button:has-text('1년')", timeout=8000)
             time.sleep(1)
-            # 1년 버튼 클릭
-            page.click("button:has-text('1년')", timeout=5000)
-            time.sleep(1)
-            # 검색
-            page.click("button:has-text('검색')", timeout=5000)
-            time.sleep(3)
+            page.click("button:has-text('검색')", timeout=8000)
+            progress("검색 결과 로딩 중...")
+            time.sleep(6)
         except Exception as e:
             progress(f"기간 설정 실패(기본값으로 진행): {e}")
 
         # 엑셀다운 버튼 대기
         progress("엑셀다운 버튼 찾는 중...")
         btn = page.get_by_text("엑셀다운").first
-        btn.wait_for(state="visible", timeout=30000)
+        btn.wait_for(state="visible", timeout=60000)
         progress("엑셀다운 버튼 클릭 중...")
         with page.expect_download(timeout=60000) as dl_info:
             btn.click()
