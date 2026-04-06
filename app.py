@@ -31,11 +31,14 @@ _session_cookies = None
 
 def ensure_chromium():
     import glob, platform, subprocess
+    # Playwright 베이스 이미지 등 이미 경로가 설정된 경우 그대로 사용
+    if os.environ.get("PLAYWRIGHT_BROWSERS_PATH"):
+        return
     if platform.system() == "Windows":
         _pw_path = os.path.join(os.environ.get("LOCALAPPDATA", ""), "ms-playwright")
     elif platform.system() == "Darwin":
         _pw_path = os.path.join(os.path.expanduser("~"), "Library", "Caches", "ms-playwright")
-    else:  # Linux (Railway)
+    else:  # Linux
         _pw_path = os.path.join(os.path.expanduser("~"), ".cache", "ms-playwright")
     os.environ["PLAYWRIGHT_BROWSERS_PATH"] = _pw_path
     if not glob.glob(os.path.join(_pw_path, "chromium*")):
