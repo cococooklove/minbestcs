@@ -147,8 +147,8 @@ def main(progress_cb=None, existing_page=None, cookies=None, headless=False):
 
     excel_path = None
     try:
-        if existing_page is None:
-            # 셀러센터로 이동 후 로그인 대기 (최대 5분)
+        if existing_page is None and not cookies:
+            # 셀러센터로 이동 후 로그인 대기 (최대 5분, 로컬 모드 전용)
             progress("셀러센터로 이동 중...")
             try:
                 page.goto("https://sell.smartstore.naver.com/#/review/search", timeout=15000)
