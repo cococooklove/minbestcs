@@ -203,19 +203,25 @@ def main(progress_cb=None, existing_page=None, cookies=None, headless=False):
         def _ensure_review_page():
             if "review/search" in page.url:
                 return
-            progress("리뷰 관리 메뉴로 이동 중...")
+            progress("리뷰 관리 페이지로 이동 중...")
+            # 1차: URL 직접 이동
             try:
-                page.click("text=문의/리뷰관리")
-                time.sleep(1)
-                page.click("text=리뷰 관리")
-                time.sleep(3)
+                page.goto("https://sell.smartstore.naver.com/#/review/search",
+                          wait_until="domcontentloaded", timeout=20000)
+                time.sleep(4)
             except Exception:
-                try:
-                    page.goto("https://sell.smartstore.naver.com/#/review/search",
-                              wait_until="domcontentloaded", timeout=20000)
-                    time.sleep(3)
-                except Exception:
-                    pass
+                pass
+            if "review/search" in page.url:
+                return
+            # 2차: 메뉴 클릭
+            progress("메뉴에서 리뷰 관리로 이동 중...")
+            try:
+                page.click("text=문의/리뷰관리", timeout=5000)
+                time.sleep(1)
+                page.click("text=리뷰 관리", timeout=5000)
+                time.sleep(4)
+            except Exception:
+                pass
 
         _ensure_review_page()
 
