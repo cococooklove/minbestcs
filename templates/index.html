@@ -122,12 +122,45 @@
     display: flex; align-items: center; justify-content: center;
     flex-shrink: 0;
   }
-  .login-toast {
-    position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
-    background: #333; color: white; border-radius: 8px;
-    padding: 10px 18px; font-size: 13px; z-index: 999;
-    display: none; white-space: nowrap;
+  /* 네이버 스타일 팝업 */
+  .naver-popup-overlay {
+    display: none;
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,.45);
+    z-index: 9998;
+    animation: fadeIn .15s ease;
   }
+  .naver-popup {
+    position: fixed; top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    background: #fff;
+    border-radius: 12px;
+    box-shadow: 0 8px 32px rgba(0,0,0,.18);
+    z-index: 9999;
+    min-width: 300px; max-width: 420px;
+    padding: 28px 28px 20px;
+    display: none;
+    animation: popIn .18s ease;
+    font-family: -apple-system, 'Malgun Gothic', sans-serif;
+  }
+  .naver-popup .popup-icon {
+    font-size: 26px; text-align: center; margin-bottom: 10px;
+  }
+  .naver-popup .popup-msg {
+    font-size: 15px; color: #222; text-align: center;
+    line-height: 1.6; word-break: keep-all;
+  }
+  .naver-popup .popup-close {
+    display: block; width: 100%; margin-top: 20px;
+    padding: 11px; background: #03c75a; color: #fff;
+    border: none; border-radius: 8px; font-size: 14px;
+    font-weight: 600; cursor: pointer; transition: background .15s;
+  }
+  .naver-popup .popup-close:hover { background: #02a84d; }
+  .naver-popup.error .popup-close { background: #e74c3c; }
+  .naver-popup.error .popup-close:hover { background: #c0392b; }
+  @keyframes fadeIn { from { opacity:0 } to { opacity:1 } }
+  @keyframes popIn { from { opacity:0; transform:translate(-50%,-48%) scale(.96) } to { opacity:1; transform:translate(-50%,-50%) scale(1) } }
 
   .stats-bar {
     background: white; border-bottom: 1px solid #e8e8e8;
@@ -479,7 +512,12 @@
   <button class="btn-classify-main" onclick="runClassify()">✦ AI 분석</button>
 </div>
 
-<div class="login-toast" id="login-toast"></div>
+<div class="naver-popup-overlay" id="popup-overlay" onclick="closePopup()"></div>
+<div class="naver-popup" id="naver-popup">
+  <div class="popup-icon" id="popup-icon"></div>
+  <div class="popup-msg" id="popup-msg"></div>
+  <button class="popup-close" onclick="closePopup()">확인</button>
+</div>
 
 <div class="progress-overlay" id="classify-progress">
   <div class="progress-title">
@@ -957,11 +995,31 @@ function rejectReply(idx) {
   fetch(`/api/reply/reject/${idx}`, {method: 'POST'}).then(() => fetchReviews());
 }
 
+let _popupTimer = null;
+
 function showToast(msg, duration = 4000) {
-  const t = document.getElementById('login-toast');
-  t.textContent = msg;
-  t.style.display = 'block';
-  setTimeout(() => { t.style.display = 'none'; }, duration);
+  const popup = document.getElementById('naver-popup');
+  const overlay = document.getElementById('popup-overlay');
+  const msgEl = document.getElementById('popup-msg');
+  const iconEl = document.getElementById('popup-icon');
+
+  const isError = msg.includes('실패') || msg.includes('오류');
+  const isSuccess = msg.includes('완료') || msg.includes('✓');
+
+  iconEl.textContent = isError ? '⚠️' : isSuccess ? '✅' : 'ℹ️';
+  msgEl.textContent = msg;
+  popup.className = 'naver-popup' + (isError ? ' error' : '');
+  popup.style.display = 'block';
+  overlay.style.display = 'block';
+
+  if (_popupTimer) clearTimeout(_popupTimer);
+  _popupTimer = setTimeout(closePopup, duration);
+}
+
+function closePopup() {
+  document.getElementById('naver-popup').style.display = 'none';
+  document.getElementById('popup-overlay').style.display = 'none';
+  if (_popupTimer) { clearTimeout(_popupTimer); _popupTimer = null; }
 }
 
 // 관리자 탭
