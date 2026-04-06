@@ -1009,8 +1009,8 @@ function runClassify(days = 365) {
             if (btn) { btn.disabled = false; btn.textContent = '✦ AI 분석'; }
             fetch('/api/admin/config').then(r => r.json()).then(cfg => {
               window.adminSettings = cfg;
-              fetchReviews();
-              showToast('AI 분석 완료!', 3000);
+              _popupCloseCallback = fetchReviews;
+              showResult('AI 분석 완료! 확인을 눌러 결과를 반영하세요.');
             });
           }
         });
@@ -1087,6 +1087,7 @@ function rejectReply(idx) {
 
 let _popupTimer = null;
 let _popupLocked = false;
+let _popupCloseCallback = null;
 
 // 진행 단계 매핑
 const _STEP_MAP = [
@@ -1178,6 +1179,7 @@ function closePopup() {
   document.getElementById('popup-overlay').style.display = 'none';
   _resetSteps();
   if (_popupTimer) { clearTimeout(_popupTimer); _popupTimer = null; }
+  if (_popupCloseCallback) { const cb = _popupCloseCallback; _popupCloseCallback = null; cb(); }
 }
 
 // 관리자 탭
