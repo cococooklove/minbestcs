@@ -31,18 +31,18 @@ _session_cookies = None
 
 def ensure_chromium():
     import glob, platform, subprocess
-    # Playwright 베이스 이미지 등 이미 경로가 설정된 경우 그대로 사용
-    if os.environ.get("PLAYWRIGHT_BROWSERS_PATH"):
-        return
-    if platform.system() == "Windows":
-        _pw_path = os.path.join(os.environ.get("LOCALAPPDATA", ""), "ms-playwright")
-    elif platform.system() == "Darwin":
-        _pw_path = os.path.join(os.path.expanduser("~"), "Library", "Caches", "ms-playwright")
-    else:  # Linux
-        _pw_path = os.path.join(os.path.expanduser("~"), ".cache", "ms-playwright")
-    os.environ["PLAYWRIGHT_BROWSERS_PATH"] = _pw_path
+    # 환경변수로 경로가 이미 지정된 경우 (Railway 볼륨, Playwright 베이스 이미지 등)
+    _pw_path = os.environ.get("PLAYWRIGHT_BROWSERS_PATH")
+    if not _pw_path:
+        if platform.system() == "Windows":
+            _pw_path = os.path.join(os.environ.get("LOCALAPPDATA", ""), "ms-playwright")
+        elif platform.system() == "Darwin":
+            _pw_path = os.path.join(os.path.expanduser("~"), "Library", "Caches", "ms-playwright")
+        else:
+            _pw_path = os.path.join(os.path.expanduser("~"), ".cache", "ms-playwright")
+        os.environ["PLAYWRIGHT_BROWSERS_PATH"] = _pw_path
     if not glob.glob(os.path.join(_pw_path, "chromium*")):
-        socketio.emit("agent_progress", {"step": "Chromium 설치 중 (최초 1회)..."})
+        socketio.emit("agent_progress", {"step": "Chromium 설치 중 (최초 1회, 이후 유지됩니다)..."})
         from playwright._impl._driver import compute_driver_executable
         driver_executable, driver_cli = compute_driver_executable()
         subprocess.run([str(driver_executable), str(driver_cli), "install", "chromium"], check=True)
