@@ -169,11 +169,11 @@ def main(progress_cb=None, existing_page=None, cookies=None, headless=False):
         # 기존 로그인 페이지 재사용: 리뷰 페이지로 이동
         progress("리뷰 페이지 로딩 중...")
         try:
-            page.goto("https://sell.smartstore.naver.com/#/review/search", timeout=15000)
-            page.wait_for_load_state("networkidle", timeout=15000)
+            page.goto("https://sell.smartstore.naver.com/#/review/search",
+                      wait_until="domcontentloaded", timeout=20000)
         except Exception:
             pass
-        time.sleep(3)
+        time.sleep(5)
 
         # 세션 확인 페이지 감지 (URL 또는 페이지 내 텍스트)
         def _needs_auth_check():
