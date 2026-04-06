@@ -63,7 +63,7 @@ def api_classify(review: dict, client, report_criteria: list = None,
   "report_reason": {criteria_str} | "",{reply_field}
 }}"""
 
-    max_tokens = 768 if include_reply else 256
+    max_tokens = 768 if include_reply else 150
     for attempt in range(2):
         try:
             resp = client.messages.create(
@@ -162,7 +162,7 @@ def process_batch():
         return
 
     client = anthropic.Anthropic(api_key=api_key)
-    print("Claude API로 분류 실행 (병렬 5개)")
+    print("Claude API로 분류 실행 (병렬 10개)")
 
     brand_tone = load_brand_tone()
     settings = load_settings()
@@ -211,7 +211,7 @@ def process_batch():
             done_count[0] += 1
             write_progress(done_count[0], total, f"처리 중 ({done_count[0]}/{total})")
 
-    with ThreadPoolExecutor(max_workers=5) as executor:
+    with ThreadPoolExecutor(max_workers=10) as executor:
         futures = [executor.submit(process_one, i) for i in unclassified]
         for f in as_completed(futures):
             try:
