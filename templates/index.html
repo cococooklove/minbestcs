@@ -528,14 +528,7 @@
     <option value="rating_low">별점 낮은순</option>
   </select>
   <span class="filter-count" id="filter-count"></span>
-  <select id="classify-period" style="padding:6px 8px;border:1px solid #ddd;border-radius:6px;font-size:12px;color:#444;cursor:pointer;">
-    <option value="30">최근 1개월</option>
-    <option value="90">최근 3개월</option>
-    <option value="180">최근 6개월</option>
-    <option value="365" selected>최근 1년</option>
-    <option value="0">전체</option>
-  </select>
-  <button class="btn-classify-main" onclick="runClassify()">✦ AI 분석</button>
+  <button class="btn-classify-main" onclick="openClassifyModal()">✦ AI 분석</button>
 </div>
 
 <div class="naver-popup-overlay" id="popup-overlay" onclick="overlayClick()"></div>
@@ -553,6 +546,17 @@
   </div>
   <div class="popup-msg" id="popup-msg"></div>
   <button class="popup-close" id="popup-close-btn" onclick="closePopup()" style="display:none;">확인</button>
+</div>
+
+<!-- AI 분석 기간 선택 모달 -->
+<div id="classify-modal-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:9998;" onclick="closeClassifyModal()"></div>
+<div id="classify-modal" style="display:none;position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:#fff;border-radius:14px;box-shadow:0 8px 32px rgba(0,0,0,.18);z-index:9999;width:420px;padding:26px 24px 20px;font-family:-apple-system,'Malgun Gothic',sans-serif;">
+  <div style="font-size:15px;font-weight:700;color:#222;margin-bottom:6px;">AI 분류 기간 선택</div>
+  <div style="font-size:12px;color:#888;margin-bottom:18px;">선택한 기간 내 미분류 리뷰만 처리합니다.</div>
+  <div id="classify-period-list" style="display:flex;flex-direction:column;gap:8px;">
+    <div style="text-align:center;color:#aaa;font-size:13px;padding:20px;">로딩 중...</div>
+  </div>
+  <button onclick="closeClassifyModal()" style="display:block;width:100%;margin-top:16px;padding:10px;background:#f5f5f5;color:#666;border:none;border-radius:8px;font-size:13px;cursor:pointer;">취소</button>
 </div>
 
 <div class="progress-overlay" id="classify-progress">
@@ -931,12 +935,55 @@ function runCollect() {
 }
 
 let classifyPoll = null;
-function runClassify() {
-  if (!confirm('미분류 리뷰를 AI로 분류하겠습니까?')) return;
+const _PERIOD_LABELS = {
+  '30': '최근 1개월', '90': '최근 3개월',
+  '180': '최근 6개월', '365': '최근 1년', '0': '전체'
+};
+
+function _estimateTime(count) {
+  if (count === 0) return '0초';
+  const secs = Math.ceil(count / 8); // 10 workers, 약 8건/초
+  if (secs < 60) return `약 ${secs}초`;
+  const mins = Math.ceil(secs / 60);
+  return `약 ${mins}분`;
+}
+
+function openClassifyModal() {
+  document.getElementById('classify-modal-overlay').style.display = 'block';
+  document.getElementById('classify-modal').style.display = 'block';
+  const list = document.getElementById('classify-period-list');
+  list.innerHTML = '<div style="text-align:center;color:#aaa;font-size:13px;padding:20px;">로딩 중...</div>';
+
+  fetch('/api/classify/count').then(r => r.json()).then(counts => {
+    list.innerHTML = Object.entries(_PERIOD_LABELS).map(([days, label]) => {
+      const cnt = counts[days] ?? 0;
+      const time = _estimateTime(cnt);
+      const disabled = cnt === 0;
+      return `<button onclick="closeClassifyModal();runClassify(${days})"
+        ${disabled ? 'disabled' : ''}
+        style="display:flex;justify-content:space-between;align-items:center;
+               padding:12px 16px;border-radius:8px;border:1px solid #e8e8e8;
+               background:${disabled ? '#fafafa' : '#fff'};cursor:${disabled ? 'not-allowed' : 'pointer'};
+               font-size:13px;color:${disabled ? '#bbb' : '#222'};transition:background .15s;"
+        onmouseover="if(!this.disabled)this.style.background='#f0faf4'"
+        onmouseout="if(!this.disabled)this.style.background='#fff'">
+        <span style="font-weight:600;">${label}</span>
+        <span style="color:#888;font-size:12px;">${cnt}건 · ${time}</span>
+      </button>`;
+    }).join('');
+  }).catch(() => {
+    list.innerHTML = '<div style="color:#e74c3c;font-size:13px;text-align:center;padding:10px;">로드 실패</div>';
+  });
+}
+
+function closeClassifyModal() {
+  document.getElementById('classify-modal-overlay').style.display = 'none';
+  document.getElementById('classify-modal').style.display = 'none';
+}
+
+function runClassify(days = 365) {
   const btn = document.querySelector('.btn-classify-main');
   if (btn) { btn.disabled = true; btn.textContent = '⏳ 분류 중...'; }
-
-  const days = parseInt(document.getElementById('classify-period')?.value || '365');
 
   const overlay = document.getElementById('classify-progress');
   overlay.classList.add('open');
@@ -944,7 +991,7 @@ function runClassify() {
   document.getElementById('progress-step').textContent = '준비 중...';
   document.getElementById('progress-count').textContent = '';
 
-  fetch('/api/classify', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({days})})
+  fetch('/api/classify', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({days: days})})
     .then(r => { if (!r.ok) throw new Error(`서버 오류 (${r.status})`); return r.json(); })
     .then(data => {
       const baseMtime = data.mtime;

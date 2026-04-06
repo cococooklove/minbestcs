@@ -353,6 +353,22 @@ def api_classify_progress():
         return jsonify(json.load(f))
 
 
+@app.route("/api/classify/count")
+def api_classify_count():
+    """기간별 미분류 리뷰 건수 반환"""
+    from datetime import datetime, timedelta
+    reviews = load_reviews()
+    periods = {"30": 30, "90": 90, "180": 180, "365": 365, "0": 0}
+    result = {}
+    for key, days in periods.items():
+        cutoff = (datetime.now() - timedelta(days=days)).strftime("%Y-%m-%d") if days > 0 else None
+        count = sum(1 for r in reviews
+                    if r.get("sentiment") is None and not r.get("replied")
+                    and (cutoff is None or r.get("date", "") >= cutoff))
+        result[key] = count
+    return jsonify(result)
+
+
 @app.route("/api/classify", methods=["POST"])
 def api_classify():
     """미분류 리뷰 일괄 분류"""
