@@ -166,15 +166,14 @@ def main(progress_cb=None, existing_page=None, cookies=None, headless=False):
             progress("로그인 확인됨. 수집 시작...")
             time.sleep(3)
 
-        # 리뷰 페이지로 이동 (쿠키 모드 또는 existing_page 모드)
-        if existing_page is not None or cookies:
-            progress("리뷰 페이지 로딩 중...")
-            try:
-                page.goto("https://sell.smartstore.naver.com/#/review/search",
-                          wait_until="domcontentloaded", timeout=20000)
-            except Exception:
-                pass
-            time.sleep(5)
+        # 리뷰 페이지로 이동
+        progress("리뷰 페이지 로딩 중...")
+        try:
+            page.goto("https://sell.smartstore.naver.com/#/review/search",
+                      wait_until="domcontentloaded", timeout=20000)
+        except Exception:
+            pass
+        time.sleep(5)
 
         # 세션 만료 감지
         def _needs_auth_check():
@@ -198,32 +197,6 @@ def main(progress_cb=None, existing_page=None, cookies=None, headless=False):
             else:
                 raise Exception("로그인 확인 시간 초과. 다시 로그인해주세요.")
             time.sleep(2)
-
-        # 리뷰 관리 페이지 확인 및 이동
-        def _ensure_review_page():
-            if "review/search" in page.url:
-                return
-            progress("리뷰 관리 페이지로 이동 중...")
-            # 1차: URL 직접 이동
-            try:
-                page.goto("https://sell.smartstore.naver.com/#/review/search",
-                          wait_until="domcontentloaded", timeout=20000)
-                time.sleep(4)
-            except Exception:
-                pass
-            if "review/search" in page.url:
-                return
-            # 2차: 메뉴 클릭
-            progress("메뉴에서 리뷰 관리로 이동 중...")
-            try:
-                page.click("text=문의/리뷰관리", timeout=5000)
-                time.sleep(1)
-                page.click("text=리뷰 관리", timeout=5000)
-                time.sleep(4)
-            except Exception:
-                pass
-
-        _ensure_review_page()
 
         # 조회 기간 최대(1년)로 설정 후 조회
         progress("최근 1년치 리뷰를 다운로드 중입니다. 잠시 기다려주세요...")
