@@ -198,42 +198,12 @@ def main(progress_cb=None, existing_page=None, cookies=None, headless=False):
                 raise Exception("로그인 확인 시간 초과. 다시 로그인해주세요.")
             time.sleep(2)
 
-        # 조회 기간 최대(1년)로 설정 후 조회
+        # 조회 기간 1년 설정 후 검색
         progress("최근 1년치 리뷰를 다운로드 중입니다. 잠시 기다려주세요...")
         try:
-            from datetime import timedelta
-            today = datetime.now()
-            start = today - timedelta(days=365)
-            start_str = start.strftime("%Y.%m.%d")
-            end_str = today.strftime("%Y.%m.%d")
-
-            # 날짜 입력 필드 찾기 (스마트스토어 날짜 picker)
-            date_inputs = page.locator("input[type='text'][class*='date'], input[placeholder*='날짜'], input[placeholder*='YYYY']")
-            if date_inputs.count() >= 2:
-                date_inputs.nth(0).triple_click()
-                date_inputs.nth(0).fill(start_str)
-                date_inputs.nth(1).triple_click()
-                date_inputs.nth(1).fill(end_str)
-            else:
-                # 대체: 1년 버튼 클릭 시도
-                for label in ["1년", "12개월", "1 년"]:
-                    try:
-                        btn_period = page.get_by_text(label, exact=True).first
-                        if btn_period.count() > 0:
-                            btn_period.click()
-                            break
-                    except Exception:
-                        continue
-
-            # 조회 버튼 클릭
-            for sel in ["button:has-text('조회')", "button:has-text('검색')"]:
-                try:
-                    search_btn = page.wait_for_selector(sel, timeout=3000, state="visible")
-                    if search_btn:
-                        search_btn.click()
-                        break
-                except Exception:
-                    continue
+            page.click("button:has-text('1년')", timeout=5000)
+            time.sleep(1)
+            page.click("button:has-text('검색')", timeout=5000)
             time.sleep(3)
         except Exception as e:
             progress(f"기간 설정 실패(기본값으로 진행): {e}")
