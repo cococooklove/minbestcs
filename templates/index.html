@@ -374,12 +374,36 @@
   <a href="/extension/download" style="margin-left:auto;padding:5px 12px;background:#03c75a;color:#fff;border-radius:5px;text-decoration:none;font-size:12px;font-weight:600;" download>확장 프로그램 다운로드</a>
   <button onclick="document.getElementById('ext-guide').style.display=document.getElementById('ext-guide').style.display==='none'?'flex':'none'" style="background:none;border:1px solid #aaa;border-radius:4px;padding:4px 8px;font-size:11px;cursor:pointer;color:#555;">설치방법</button>
 </div>
-<div id="ext-guide" style="display:none;background:#fffbe6;border-bottom:1px solid #ffe58f;padding:10px 20px;font-size:12px;color:#5c4a00;line-height:1.8;">
-  ① 위 버튼으로 zip 다운로드 → 압축 해제<br>
-  ② Chrome에서 <b>chrome://extensions</b> 열기<br>
-  ③ 우측 상단 <b>개발자 모드</b> 켜기<br>
-  ④ <b>압축해제된 확장 프로그램을 로드합니다</b> 클릭 → 폴더 선택<br>
-  ⑤ 네이버 셀러센터 로그인 후 확장 아이콘 클릭 → <b>리뷰 수집 시작</b>
+<div id="ext-guide" style="display:none;background:#fafafa;border-bottom:1px solid #e0e0e0;padding:24px 32px;">
+  <div style="font-size:14px;font-weight:700;color:#222;margin-bottom:18px;">Chrome 확장 프로그램 설치 방법 <span style="font-size:12px;font-weight:400;color:#888;">— 최초 1회만</span></div>
+  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px;">
+
+    <div style="background:#fff;border:1px solid #e8e8e8;border-radius:10px;padding:16px;">
+      <div style="font-size:11px;font-weight:700;color:#03c75a;margin-bottom:6px;letter-spacing:.5px;">STEP 1</div>
+      <div style="font-size:13px;font-weight:600;color:#222;margin-bottom:6px;">확장 프로그램 다운로드</div>
+      <div style="font-size:12px;color:#555;line-height:1.7;">상단 <b>확장 프로그램 다운로드</b> 버튼 클릭<br>→ zip 파일 저장 후 <b>압축 해제</b></div>
+    </div>
+
+    <div style="background:#fff;border:1px solid #e8e8e8;border-radius:10px;padding:16px;">
+      <div style="font-size:11px;font-weight:700;color:#03c75a;margin-bottom:6px;letter-spacing:.5px;">STEP 2</div>
+      <div style="font-size:13px;font-weight:600;color:#222;margin-bottom:6px;">Chrome 확장 관리 열기</div>
+      <div style="font-size:12px;color:#555;line-height:1.7;">Chrome 주소창에 입력:<br><code style="background:#f0f0f0;padding:2px 6px;border-radius:4px;font-size:11px;">chrome://extensions</code><br>→ 오른쪽 상단 <b>개발자 모드</b> 토글 켜기</div>
+    </div>
+
+    <div style="background:#fff;border:1px solid #e8e8e8;border-radius:10px;padding:16px;">
+      <div style="font-size:11px;font-weight:700;color:#03c75a;margin-bottom:6px;letter-spacing:.5px;">STEP 3</div>
+      <div style="font-size:13px;font-weight:600;color:#222;margin-bottom:6px;">폴더 불러오기</div>
+      <div style="font-size:12px;color:#555;line-height:1.7;"><b>압축해제된 확장 프로그램을 로드합니다</b> 클릭<br>→ 압축 해제한 폴더 선택<br>→ 확장 프로그램 목록에 추가됨</div>
+    </div>
+
+    <div style="background:#fff;border:1px solid #e8e8e8;border-radius:10px;padding:16px;">
+      <div style="font-size:11px;font-weight:700;color:#03c75a;margin-bottom:6px;letter-spacing:.5px;">STEP 4</div>
+      <div style="font-size:13px;font-weight:600;color:#222;margin-bottom:6px;">수집 시작</div>
+      <div style="font-size:12px;color:#555;line-height:1.7;"><a href="https://sell.smartstore.naver.com" target="_blank" style="color:#03c75a;">네이버 셀러센터</a>에 로그인<br>→ Chrome 우측 상단 <b>확장 아이콘(🧩)</b> 클릭<br>→ <b>리뷰 수집 시작</b> 버튼 클릭</div>
+    </div>
+
+  </div>
+  <div style="margin-top:14px;font-size:11px;color:#aaa;">※ 설치 후에는 매번 STEP 4만 반복하면 됩니다.</div>
 </div>
 
 <div class="stats-bar" id="stats-bar">
