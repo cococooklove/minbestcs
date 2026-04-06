@@ -1,0 +1,15 @@
+{
+  "manifest_version": 3,
+  "name": "민베스트 리뷰 수집",
+  "version": "1.0",
+  "description": "네이버 스마트스토어 리뷰를 한 번에 수집합니다.",
+  "permissions": ["cookies", "storage", "tabs"],
+  "host_permissions": ["https://*.naver.com/*", "<all_urls>"],
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "민베스트 리뷰 수집"
+  },
+  "background": {
+    "service_worker": "background.js"
+  }
+}

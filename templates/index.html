@@ -368,6 +368,22 @@
   </div>
 </header>
 
+{% if is_server %}
+<div id="ext-banner" style="background:#f0faf4;border-bottom:1px solid #c3e6cb;padding:10px 20px;display:flex;align-items:center;gap:12px;font-size:13px;color:#2d6a4f;">
+  <span id="cookie-dot" style="width:9px;height:9px;border-radius:50%;background:#ccc;flex-shrink:0;display:inline-block;"></span>
+  <span id="cookie-status">확장 프로그램으로 수집을 시작하세요</span>
+  <a href="/extension/download" style="margin-left:auto;padding:5px 12px;background:#03c75a;color:#fff;border-radius:5px;text-decoration:none;font-size:12px;font-weight:600;" download>확장 프로그램 다운로드</a>
+  <button onclick="document.getElementById('ext-guide').style.display=document.getElementById('ext-guide').style.display==='none'?'block':'none'" style="background:none;border:1px solid #aaa;border-radius:4px;padding:4px 8px;font-size:11px;cursor:pointer;color:#555;">설치방법</button>
+</div>
+<div id="ext-guide" style="display:none;background:#fffbe6;border-bottom:1px solid #ffe58f;padding:10px 20px;font-size:12px;color:#5c4a00;line-height:1.8;">
+  ① 위 버튼으로 zip 다운로드 → 압축 해제<br>
+  ② Chrome에서 <b>chrome://extensions</b> 열기<br>
+  ③ 우측 상단 <b>개발자 모드</b> 켜기<br>
+  ④ <b>압축해제된 확장 프로그램을 로드합니다</b> 클릭 → 폴더 선택<br>
+  ⑤ 네이버 셀러센터 로그인 후 확장 아이콘 클릭 → <b>리뷰 수집 시작</b>
+</div>
+{% endif %}
+
 <div class="stats-bar" id="stats-bar">
   <div class="stat"><div class="val" id="stat-total">-</div><div class="lbl">전체 리뷰</div></div>
   <div class="stat"><div class="val" id="stat-avg">-</div><div class="lbl">평균 별점</div></div>
@@ -799,6 +815,10 @@ function fetchReviews() {
 }
 
 function runCollect() {
+  if (IS_SERVER) {
+    showToast('확장 프로그램 아이콘을 클릭하고 "리뷰 수집 시작"을 눌러주세요.', 5000);
+    return;
+  }
   if (!confirm('로그인 및 리뷰를 수집하겠습니까?')) return;
   const btn = document.getElementById('btn-collect');
   btn.disabled = true;
@@ -1204,8 +1224,27 @@ socket.on('agent_progress', data => {
   showToast(msg, duration);
 });
 
+const IS_SERVER = {{ is_server | tojson }};
+
 socket.on('collect_status', data => {
   const btn = document.getElementById('btn-collect');
+  // 확장 프로그램 쿠키 상태 표시
+  const dot = document.getElementById('cookie-dot');
+  const cookieStatus = document.getElementById('cookie-status');
+  if (dot && cookieStatus) {
+    if (data.step === 'cookies_received' || data.step === 'scraping') {
+      dot.style.background = '#03c75a';
+      cookieStatus.textContent = '쿠키 수신됨 — 수집 중...';
+    } else if (data.step === 'done') {
+      dot.style.background = data.success ? '#03c75a' : '#e74c3c';
+      cookieStatus.textContent = data.success ? '수집 완료' : '수집 실패';
+    }
+  }
+  if (data.step === 'cookies_received') {
+    if (btn) { btn.textContent = '수집 중...'; btn.disabled = true; }
+    showToast('쿠키 수신됨! 리뷰 수집 중...', 5000);
+    return;
+  }
   if (data.step === 'login_start') {
     btn.textContent = '로그인 중...';
     showToast('브라우저에서 네이버 로그인을 완료해주세요.', 60000);

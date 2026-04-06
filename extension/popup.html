@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { width: 260px; padding: 16px; font-family: -apple-system, 'Malgun Gothic', sans-serif; background: #fff; }
+h2 { font-size: 14px; font-weight: 700; color: #222; margin-bottom: 14px; }
+.row { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
+.dot { width: 9px; height: 9px; border-radius: 50%; background: #ccc; flex-shrink: 0; }
+.dot.green { background: #03c75a; }
+.dot.red { background: #e74c3c; }
+.status-text { font-size: 12px; color: #555; }
+.url-input { flex: 1; padding: 6px 8px; border: 1px solid #ddd; border-radius: 5px; font-size: 11px; color: #333; }
+.url-input:focus { outline: none; border-color: #03c75a; }
+.btn-save { padding: 6px 10px; background: #555; color: #fff; border: none; border-radius: 5px; font-size: 11px; cursor: pointer; white-space: nowrap; }
+.btn-save:hover { background: #333; }
+.btn-collect { width: 100%; padding: 11px; background: #03c75a; color: #fff; border: none; border-radius: 7px; font-size: 14px; font-weight: 600; cursor: pointer; margin-top: 4px; }
+.btn-collect:disabled { opacity: 0.45; cursor: not-allowed; }
+.btn-collect:hover:not(:disabled) { background: #02a84d; }
+.result { margin-top: 10px; font-size: 12px; color: #444; text-align: center; min-height: 18px; line-height: 1.4; }
+.result.error { color: #e74c3c; }
+.result.success { color: #03c75a; }
+hr { border: none; border-top: 1px solid #eee; margin: 12px 0; }
+</style>
+</head>
+<body>
+<h2>민베스트 리뷰 수집</h2>
+
+<div class="row">
+  <div class="dot" id="naver-dot"></div>
+  <span class="status-text" id="naver-status">확인 중...</span>
+</div>
+
+<hr>
+
+<div class="row">
+  <input class="url-input" id="server-url" placeholder="서버 URL" />
+  <button class="btn-save" id="save-url">저장</button>
+</div>
+
+<button class="btn-collect" id="collect-btn" disabled>리뷰 수집 시작</button>
+
+<div class="result" id="result"></div>
+
+<script src="config.js"></script>
+<script src="popup.js"></script>
+</body>
+</html>

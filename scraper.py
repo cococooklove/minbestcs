@@ -87,7 +87,7 @@ def excel_to_reviews(filepath):
     return reviews
 
 
-def main(progress_cb=None, existing_page=None):
+def main(progress_cb=None, existing_page=None, cookies=None, headless=False):
     def progress(msg):
         print(msg)
         if progress_cb:
@@ -95,11 +95,27 @@ def main(progress_cb=None, existing_page=None):
 
     DOWNLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
+    browser = None
     # 기존 로그인 페이지 재사용
     if existing_page is not None:
         pw = None
         context = None
         page = existing_page
+        page.on("dialog", lambda d: d.accept())
+    elif cookies:
+        # 서버 headless 모드: 쿠키 주입
+        pw = sync_playwright().start()
+        browser = pw.chromium.launch(
+            headless=True,
+            args=["--no-sandbox", "--disable-setuid-sandbox", "--disable-dev-shm-usage",
+                  "--disable-gpu", "--single-process"],
+        )
+        context = browser.new_context(
+            viewport={"width": 1440, "height": 900},
+            accept_downloads=True,
+        )
+        context.add_cookies(cookies)
+        page = context.new_page()
         page.on("dialog", lambda d: d.accept())
     else:
         os.makedirs(PROFILE_DIR, exist_ok=True)
@@ -110,7 +126,7 @@ def main(progress_cb=None, existing_page=None):
         pw = sync_playwright().start()
         context = pw.chromium.launch_persistent_context(
             user_data_dir=PROFILE_DIR,
-            headless=False,
+            headless=headless,
             slow_mo=50,
             viewport={"width": 1440, "height": 900},
             accept_downloads=True,
@@ -211,6 +227,8 @@ def main(progress_cb=None, existing_page=None):
     finally:
         if context:
             context.close()
+        if browser:
+            browser.close()
         if pw:
             pw.stop()
 

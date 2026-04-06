@@ -16,6 +16,8 @@ else:
 
 load_dotenv(os.path.join(_base_dir, ".env"))
 
+IS_SERVER = bool(os.environ.get("RAILWAY_ENVIRONMENT") or os.environ.get("RAILWAY_SERVICE_NAME"))
+
 app = Flask(__name__)
 socketio = SocketIO(app, cors_allowed_origins="*", async_mode="threading", ping_timeout=60, ping_interval=25)
 REVIEWS_FILE = os.path.join(_base_dir, "data", "reviews.json")
@@ -24,14 +26,17 @@ _login_pw = None
 _login_context = None
 _login_page = None
 _scraping = False
+_session_cookies = None
 
 
 def ensure_chromium():
     import glob, platform, subprocess
     if platform.system() == "Windows":
         _pw_path = os.path.join(os.environ.get("LOCALAPPDATA", ""), "ms-playwright")
-    else:
+    elif platform.system() == "Darwin":
         _pw_path = os.path.join(os.path.expanduser("~"), "Library", "Caches", "ms-playwright")
+    else:  # Linux (Railway)
+        _pw_path = os.path.join(os.path.expanduser("~"), ".cache", "ms-playwright")
     os.environ["PLAYWRIGHT_BROWSERS_PATH"] = _pw_path
     if not glob.glob(os.path.join(_pw_path, "chromium*")):
         socketio.emit("agent_progress", {"step": "Chromium 설치 중 (최초 1회)..."})
@@ -54,7 +59,40 @@ def save_reviews(reviews):
 
 @app.route("/")
 def index():
-    return render_template("index.html")
+    return render_template("index.html", is_server=IS_SERVER)
+
+
+@app.route("/api/cookies", methods=["POST"])
+def api_receive_cookies():
+    global _session_cookies, _scraping
+    if _scraping:
+        return jsonify({"error": "수집 중입니다. 잠시 기다려주세요."}), 400
+    data = request.json or {}
+    cookies = data.get("cookies", [])
+    if not cookies:
+        return jsonify({"error": "쿠키가 없습니다. 네이버에 로그인 후 다시 시도해주세요."}), 400
+    _session_cookies = cookies
+    socketio.emit("collect_status", {"step": "cookies_received"})
+    threading.Thread(target=_run_server_collect, daemon=True).start()
+    return jsonify({"status": "started"})
+
+
+@app.route("/extension/download")
+def download_extension():
+    import io, zipfile
+    from flask import send_file
+    server_url = request.host_url.rstrip('/')
+    ext_dir = os.path.join(_base_dir, "extension")
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, 'w', zipfile.ZIP_DEFLATED) as zf:
+        for fname in ['manifest.json', 'popup.html', 'popup.js', 'background.js']:
+            fpath = os.path.join(ext_dir, fname)
+            if os.path.exists(fpath):
+                zf.write(fpath, fname)
+        zf.writestr('config.js', f'const SERVER_URL = "{server_url}";')
+    buf.seek(0)
+    return send_file(buf, mimetype='application/zip', as_attachment=True,
+                     download_name='민베스트_확장프로그램.zip')
 
 
 @app.route("/api/reviews")
@@ -217,11 +255,39 @@ def api_login_status():
     return jsonify({"logged_in": logged_in})
 
 
+def _run_server_collect():
+    """IS_SERVER 모드: 쿠키로 headless 수집"""
+    global _scraping
+    _scraping = True
+    try:
+        socketio.emit("collect_status", {"step": "scraping"})
+        ensure_chromium()
+        import scraper
+        scraper.PROFILE_DIR = PROFILE_DIR
+        scraper.OUTPUT_FILE = REVIEWS_FILE
+        scraper.DOWNLOAD_DIR = Path(os.path.join(_base_dir, "data", "downloads"))
+        scraper.main(
+            progress_cb=lambda msg: socketio.emit("agent_progress", {"step": msg}),
+            cookies=_session_cookies,
+            headless=True,
+        )
+        socketio.emit("collect_status", {"step": "done", "success": True})
+    except Exception as e:
+        socketio.emit("collect_status", {"step": "done", "success": False, "error": str(e)})
+    finally:
+        _scraping = False
+
+
 @app.route("/api/collect", methods=["POST"])
 def api_collect():
     global _scraping
     if _scraping:
         return jsonify({"error": "수집 중입니다. 잠시 기다려주세요."}), 400
+    if IS_SERVER:
+        if not _session_cookies:
+            return jsonify({"error": "확장 프로그램에서 수집을 시작해주세요."}), 400
+        threading.Thread(target=_run_server_collect, daemon=True).start()
+        return jsonify({"status": "started"})
     def run_collect():
         global _login_pw, _login_context, _login_page, _scraping
         try:
