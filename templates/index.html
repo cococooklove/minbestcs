@@ -528,6 +528,13 @@
     <option value="rating_low">별점 낮은순</option>
   </select>
   <span class="filter-count" id="filter-count"></span>
+  <select id="classify-period" style="padding:6px 8px;border:1px solid #ddd;border-radius:6px;font-size:12px;color:#444;cursor:pointer;">
+    <option value="30">최근 1개월</option>
+    <option value="90">최근 3개월</option>
+    <option value="180">최근 6개월</option>
+    <option value="365" selected>최근 1년</option>
+    <option value="0">전체</option>
+  </select>
   <button class="btn-classify-main" onclick="runClassify()">✦ AI 분석</button>
 </div>
 
@@ -929,13 +936,15 @@ function runClassify() {
   const btn = document.querySelector('.btn-classify-main');
   if (btn) { btn.disabled = true; btn.textContent = '⏳ 분류 중...'; }
 
+  const days = parseInt(document.getElementById('classify-period')?.value || '365');
+
   const overlay = document.getElementById('classify-progress');
   overlay.classList.add('open');
   document.getElementById('progress-bar').style.width = '0%';
   document.getElementById('progress-step').textContent = '준비 중...';
   document.getElementById('progress-count').textContent = '';
 
-  fetch('/api/classify', {method: 'POST'})
+  fetch('/api/classify', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({days})})
     .then(r => { if (!r.ok) throw new Error(`서버 오류 (${r.status})`); return r.json(); })
     .then(data => {
       const baseMtime = data.mtime;

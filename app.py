@@ -356,7 +356,9 @@ def api_classify_progress():
 @app.route("/api/classify", methods=["POST"])
 def api_classify():
     """미분류 리뷰 일괄 분류"""
-    subprocess.Popen([sys.executable, "classifier.py"], cwd=_base_dir)
+    data = request.get_json() or {}
+    days = str(data.get("days", 365))
+    subprocess.Popen([sys.executable, "classifier.py", "--days", days], cwd=_base_dir)
     mtime = os.path.getmtime(REVIEWS_FILE) if os.path.exists(REVIEWS_FILE) else 0
     return jsonify({"status": "started", "mtime": mtime})
 

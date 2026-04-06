@@ -3,12 +3,14 @@
 - 실행: python3 classifier.py  (미분류 리뷰 일괄 처리)
 - ANTHROPIC_API_KEY 환경변수 필요
 """
-import json, os, time, re, threading
+import json, os, time, re, threading, argparse
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from datetime import datetime, timedelta
 from dotenv import load_dotenv
 load_dotenv()
 
 REVIEWS_FILE = "data/reviews.json"
+_days = 365  # 기본값, __main__에서 오버라이드
 PROGRESS_FILE = "data/classify_progress.json"
 BRAND_TONE_FILE = "config/brand_tone.txt"
 SETTINGS_FILE = "config/settings.json"
@@ -167,8 +169,10 @@ def process_batch():
     report_criteria = settings.get("report_criteria", ["욕설", "경쟁사 언급", "광고성", "반복 내용"])
     auto_generate = settings.get("auto_generate_reply", False)
 
+    cutoff = (datetime.now() - timedelta(days=_days)).strftime("%Y-%m-%d") if _days > 0 else None
     unclassified = [i for i, r in enumerate(reviews)
-                    if r.get("sentiment") is None and not r.get("replied")]
+                    if r.get("sentiment") is None and not r.get("replied")
+                    and (cutoff is None or r.get("date", "") >= cutoff)]
     total = len(unclassified)
     print(f"미분류 리뷰: {total}건")
     write_progress(0, total, "시작 중")
@@ -234,4 +238,8 @@ def process_batch():
 
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--days", type=int, default=365, help="최근 N일 리뷰만 분류 (0=전체)")
+    args = parser.parse_args()
+    _days = args.days
     process_batch()
