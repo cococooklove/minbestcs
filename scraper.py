@@ -148,10 +148,11 @@ def main(progress_cb=None, existing_page=None, cookies=None, headless=False):
     excel_path = None
     try:
         if existing_page is None and not cookies:
-            # 셀러센터로 이동 후 로그인 대기 (최대 5분, 로컬 모드 전용)
+            # 셀러센터로 이동 후 로그인 대기 (최대 5분, 로컬 직접 실행 전용)
             progress("셀러센터로 이동 중...")
             try:
-                page.goto("https://sell.smartstore.naver.com/#/review/search", timeout=15000)
+                page.goto("https://sell.smartstore.naver.com/#/review/search",
+                          wait_until="domcontentloaded", timeout=20000)
             except Exception:
                 pass
             progress("로그인 대기 중...")
@@ -161,21 +162,21 @@ def main(progress_cb=None, existing_page=None, cookies=None, headless=False):
                     break
                 time.sleep(1)
             else:
-                progress("로그인 시간 초과")
-                context.close()
-                pw.stop()
-            return
+                raise Exception("로그인 시간 초과 (5분). 다시 시도해주세요.")
+            progress("로그인 확인됨. 수집 시작...")
+            time.sleep(3)
 
-        # 기존 로그인 페이지 재사용: 리뷰 페이지로 이동
-        progress("리뷰 페이지 로딩 중...")
-        try:
-            page.goto("https://sell.smartstore.naver.com/#/review/search",
-                      wait_until="domcontentloaded", timeout=20000)
-        except Exception:
-            pass
-        time.sleep(5)
+        # 리뷰 페이지로 이동 (쿠키 모드 또는 existing_page 모드)
+        if existing_page is not None or cookies:
+            progress("리뷰 페이지 로딩 중...")
+            try:
+                page.goto("https://sell.smartstore.naver.com/#/review/search",
+                          wait_until="domcontentloaded", timeout=20000)
+            except Exception:
+                pass
+            time.sleep(5)
 
-        # 세션 확인 페이지 감지 (URL 또는 페이지 내 텍스트)
+        # 세션 만료 감지
         def _needs_auth_check():
             if _is_on_login_page(page):
                 return True
@@ -185,13 +186,17 @@ def main(progress_cb=None, existing_page=None, cookies=None, headless=False):
                 return False
 
         if _needs_auth_check():
+            if cookies:
+                # headless 모드: 쿠키 만료 → 즉시 실패
+                raise Exception("쿠키가 만료되었습니다. 확장 프로그램에서 다시 수집을 시작해주세요.")
+            # 로컬/existing_page 모드: 사용자 개입 대기
             progress("브라우저에서 로그인 확인을 완료해주세요...")
             for _ in range(300):
                 time.sleep(1)
                 if not _needs_auth_check():
                     break
             else:
-                raise Exception("로그인 확인 시간 초과. 에이전트를 재시작하고 다시 로그인해주세요.")
+                raise Exception("로그인 확인 시간 초과. 다시 로그인해주세요.")
             time.sleep(2)
 
         # 엑셀다운 버튼 대기
