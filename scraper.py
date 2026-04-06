@@ -199,6 +199,26 @@ def main(progress_cb=None, existing_page=None, cookies=None, headless=False):
                 raise Exception("로그인 확인 시간 초과. 다시 로그인해주세요.")
             time.sleep(2)
 
+        # 리뷰 관리 페이지 확인 및 이동
+        def _ensure_review_page():
+            if "review/search" in page.url:
+                return
+            progress("리뷰 관리 메뉴로 이동 중...")
+            try:
+                page.click("text=문의/리뷰관리")
+                time.sleep(1)
+                page.click("text=리뷰 관리")
+                time.sleep(3)
+            except Exception:
+                try:
+                    page.goto("https://sell.smartstore.naver.com/#/review/search",
+                              wait_until="domcontentloaded", timeout=20000)
+                    time.sleep(3)
+                except Exception:
+                    pass
+
+        _ensure_review_page()
+
         # 엑셀다운 버튼 대기
         progress("엑셀다운 버튼 찾는 중...")
         btn = page.get_by_text("엑셀다운").first
