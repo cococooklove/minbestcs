@@ -99,8 +99,8 @@ document.addEventListener('DOMContentLoaded', async () => {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || `서버 오류 (${res.status})`);
 
-      resultDiv.textContent = '✓ 수집 시작! 웹에서 확인하세요.';
-      resultDiv.className = 'result success';
+      resultDiv.textContent = '수집 중... 잠시 기다려주세요.';
+      resultDiv.className = 'result';
 
       // 웹 UI 열기 (이미 열려있으면 포커스)
       const tabs = await chrome.tabs.query({ url: serverUrl + '/*' });
@@ -111,10 +111,39 @@ document.addEventListener('DOMContentLoaded', async () => {
         chrome.tabs.create({ url: serverUrl });
       }
 
+      // 팝업에서 수집 완료까지 상태 폴링
+      await pollStatus(serverUrl);
+
     } catch (e) {
       resultDiv.textContent = '오류: ' + e.message;
       resultDiv.className = 'result error';
       collectBtn.disabled = false;
     }
   });
+
+  async function pollStatus(serverUrl) {
+    const dots = ['', '.', '..', '...'];
+    let i = 0;
+    const interval = setInterval(async () => {
+      try {
+        const res = await fetch(`${serverUrl}/api/status`);
+        const data = await res.json();
+        if (data.scraping) {
+          resultDiv.textContent = '수집 중' + dots[i % 4];
+          resultDiv.className = 'result';
+          i++;
+        } else {
+          clearInterval(interval);
+          resultDiv.textContent = '✓ 수집 완료! 웹에서 결과를 확인하세요.';
+          resultDiv.className = 'result success';
+          collectBtn.disabled = false;
+        }
+      } catch {
+        clearInterval(interval);
+        resultDiv.textContent = '서버 연결 오류';
+        resultDiv.className = 'result error';
+        collectBtn.disabled = false;
+      }
+    }, 2000);
+  }
 });

@@ -60,6 +60,14 @@ def save_reviews(reviews):
         json.dump(reviews, f, ensure_ascii=False, indent=2)
 
 
+@app.route("/api/status")
+def api_status():
+    return jsonify({
+        "scraping": _scraping,
+        "has_cookies": bool(_session_cookies),
+    })
+
+
 @app.route("/")
 def index():
     return render_template("index.html", is_server=IS_SERVER)

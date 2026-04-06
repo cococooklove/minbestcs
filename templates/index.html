@@ -1252,6 +1252,20 @@ if (IS_SERVER) {
   if (banner) { banner.style.display = 'flex'; }
   const collectBtn = document.getElementById('btn-collect');
   if (collectBtn) { collectBtn.style.display = 'none'; }
+
+  // 페이지 로드 시 수집 중 상태 복원
+  fetch('/api/status').then(r => r.json()).then(data => {
+    const dot = document.getElementById('cookie-dot');
+    const cookieStatus = document.getElementById('cookie-status');
+    if (data.scraping) {
+      if (dot) dot.style.background = '#f0a500';
+      if (cookieStatus) cookieStatus.textContent = '리뷰 수집 중...';
+      showToast('리뷰 수집이 진행 중입니다. 완료되면 자동으로 반영됩니다.', 10000);
+    } else if (data.has_cookies) {
+      if (dot) dot.style.background = '#03c75a';
+      if (cookieStatus) cookieStatus.textContent = '쿠키 수신됨 — 수집 버튼을 누르거나 확장에서 재시작하세요';
+    }
+  }).catch(() => {});
 }
 
 socket.on('collect_status', data => {
