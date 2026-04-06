@@ -907,7 +907,7 @@ function runClassify() {
   document.getElementById('progress-count').textContent = '';
 
   fetch('/api/classify', {method: 'POST'})
-    .then(r => r.json())
+    .then(r => { if (!r.ok) throw new Error(`서버 오류 (${r.status})`); return r.json(); })
     .then(data => {
       const baseMtime = data.mtime;
       if (classifyPoll) clearInterval(classifyPoll);
@@ -930,6 +930,11 @@ function runClassify() {
           }
         });
       }, 1500);
+    })
+    .catch(e => {
+      overlay.classList.remove('open');
+      if (btn) { btn.disabled = false; btn.textContent = '✦ AI 분석'; }
+      showResult('AI 분석 시작 실패: ' + e.message, true);
     });
 }
 

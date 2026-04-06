@@ -5,7 +5,7 @@
 """
 from flask import Flask, render_template, jsonify, request
 from flask_socketio import SocketIO
-import json, os, threading, webbrowser, sys
+import json, os, threading, webbrowser, sys, subprocess
 from pathlib import Path
 from dotenv import load_dotenv
 
@@ -356,7 +356,7 @@ def api_classify_progress():
 @app.route("/api/classify", methods=["POST"])
 def api_classify():
     """미분류 리뷰 일괄 분류"""
-    subprocess.Popen([sys.executable, "classifier.py"])
+    subprocess.Popen([sys.executable, "classifier.py"], cwd=_base_dir)
     mtime = os.path.getmtime(REVIEWS_FILE) if os.path.exists(REVIEWS_FILE) else 0
     return jsonify({"status": "started", "mtime": mtime})
 
