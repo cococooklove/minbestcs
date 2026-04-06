@@ -114,7 +114,14 @@ def main(progress_cb=None, existing_page=None, cookies=None, headless=False):
             viewport={"width": 1440, "height": 900},
             accept_downloads=True,
         )
-        context.add_cookies(cookies)
+        # Chrome 확장 sameSite 값 → Playwright 형식 변환
+        SAME_SITE_MAP = {"no_restriction": "None", "lax": "Lax", "strict": "Strict", "unspecified": "Lax"}
+        normalized = []
+        for c in cookies:
+            c = dict(c)
+            c["sameSite"] = SAME_SITE_MAP.get(str(c.get("sameSite", "")).lower(), "Lax")
+            normalized.append(c)
+        context.add_cookies(normalized)
         page = context.new_page()
         page.on("dialog", lambda d: d.accept())
     else:
