@@ -41,19 +41,20 @@ chrome.runtime.onMessage.addListener((msg, sender, respond) => {
 
         // 마지막 수집 날짜 기준으로 최소 기간 선택
         let periodBtn = '1년';
+        let periodMsg = '전체 1년치 다운로드 중...';
         try {
           const r = await fetch(`${msg.serverUrl}/api/latest-review-date`);
           const d = await r.json();
           if (d.date) {
             const daysSince = Math.floor((Date.now() - new Date(d.date)) / 86400000);
-            if (daysSince <= 7)        periodBtn = '1주일';
-            else if (daysSince <= 30)  periodBtn = '1개월';
-            else if (daysSince <= 90)  periodBtn = '3개월';
-            else if (daysSince <= 180) periodBtn = '6개월';
+            if (daysSince <= 7)        { periodBtn = '1주일'; periodMsg = `최근 ${daysSince}일치만 다운로드 중... (마지막 수집: ${d.date})`; }
+            else if (daysSince <= 30)  { periodBtn = '1개월'; periodMsg = `최근 ${daysSince}일치만 다운로드 중... (마지막 수집: ${d.date})`; }
+            else if (daysSince <= 90)  { periodBtn = '3개월'; periodMsg = `최근 ${daysSince}일치만 다운로드 중... (마지막 수집: ${d.date})`; }
+            else if (daysSince <= 180) { periodBtn = '6개월'; periodMsg = `최근 ${daysSince}일치만 다운로드 중... (마지막 수집: ${d.date})`; }
           }
         } catch (e) {}
 
-        sendProgress(`기간 ${periodBtn} 설정 중...`);
+        sendProgress(periodMsg);
         await clickByText(periodBtn);
         await sleep(800);
 
