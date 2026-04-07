@@ -5,7 +5,7 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
   }
 });
 
-// Naver 다운로드 감지 — 브라우저 레벨 인터셉트 후 MAIN world에서 재요청
+// Naver 다운로드 감지 — 쿠키 직접 추출 후 background에서 fetch
 chrome.downloads.onCreated.addListener(async (item) => {
   if (!_serverUrl) return;
   const url = item.url || '';
@@ -13,48 +13,100 @@ chrome.downloads.onCreated.addListener(async (item) => {
   if (!url.includes('naver.com') && !url.includes('smartstore')) return;
   if (!url.match(/excel|xlsx|download|export/i) && !filename.match(/\.xlsx?$/i)) return;
 
-  // Downloads 폴더 저장 취소
-  chrome.downloads.cancel(item.id, () => {});
-
-  const tabs = await chrome.tabs.query({});
-  const naverTab = tabs.find(t => t.url?.includes('sell.smartstore.naver.com'));
-  if (!naverTab) {
-    reportProgress(_serverUrl, '실패: 셀러센터 탭을 찾을 수 없습니다.');
-    return;
-  }
-
   const sv = _serverUrl;
   reportProgress(sv, '파일 수신 중...');
 
-  // MAIN world에서 실행 → sell.smartstore.naver.com origin으로 fetch (CORS 없음)
-  chrome.scripting.executeScript({
-    target: { tabId: naverTab.id },
-    world: 'MAIN',
-    func: async (downloadUrl, serverUrl) => {
-      try {
-        const res = await fetch(downloadUrl, { credentials: 'include' });
-        if (!res.ok) {
-          document.dispatchEvent(new CustomEvent('__minbest_progress', { detail: `실패: 파일 요청 실패 (${res.status})` }));
-          return;
-        }
-        const buf = await res.arrayBuffer();
-        const blob = new Blob([buf], {
-          type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-        });
-        document.dispatchEvent(new CustomEvent('__minbest_progress', { detail: '서버로 파일 전송 중...' }));
-        const form = new FormData();
-        form.append('file', blob, 'reviews.xlsx');
-        const r = await fetch(`${serverUrl}/api/upload-excel`, { method: 'POST', body: form });
-        const data = await r.json();
-        document.dispatchEvent(new CustomEvent('__minbest_progress', {
-          detail: r.ok ? '완료' : `실패: ${data.error || '업로드 실패'}`
-        }));
-      } catch (e) {
-        document.dispatchEvent(new CustomEvent('__minbest_progress', { detail: `실패: ${e.message}` }));
+  try {
+    // 모든 naver.com 관련 도메인 쿠키 수집
+    const [cookies1, cookies2, cookies3] = await Promise.all([
+      chrome.cookies.getAll({ domain: 'naver.com' }),
+      chrome.cookies.getAll({ domain: 'sell.smartstore.naver.com' }),
+      chrome.cookies.getAll({ domain: '.naver.com' }),
+    ]);
+
+    const allCookies = [...cookies1, ...cookies2, ...cookies3];
+    // 중복 제거
+    const seen = new Set();
+    const uniqueCookies = allCookies.filter(c => {
+      const key = `${c.domain}|${c.name}`;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+    const cookieStr = uniqueCookies.map(c => `${c.name}=${c.value}`).join('; ');
+
+    // background service worker에서 fetch — Cookie 헤더 직접 설정 가능
+    const res = await fetch(url, {
+      method: 'GET',
+      headers: {
+        'Cookie': cookieStr,
+        'Referer': 'https://sell.smartstore.naver.com/',
+        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+        'Accept': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,*/*',
       }
-    },
-    args: [url, sv]
-  });
+    });
+
+    if (!res.ok) {
+      // 실패 시 로컬 다운로드 파일을 직접 읽는 방식으로 폴백
+      reportProgress(sv, `fetch 실패 (${res.status}) — 로컬 파일 감지 대기 중...`);
+      _pendingDownloadId = item.id;
+      return;
+    }
+
+    // 다운로드 취소 (Downloads 폴더에 중복 저장 방지)
+    chrome.downloads.cancel(item.id, () => {});
+
+    const buf = await res.arrayBuffer();
+    reportProgress(sv, '서버로 파일 전송 중...');
+
+    const blob = new Blob([buf], {
+      type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    });
+    const form = new FormData();
+    form.append('file', blob, 'reviews.xlsx');
+    const r = await fetch(`${sv}/api/upload-excel`, { method: 'POST', body: form });
+    const data = await r.json();
+    reportProgress(sv, r.ok ? '완료' : `실패: ${data.error || '업로드 실패'}`);
+  } catch (e) {
+    reportProgress(sv, `실패: ${e.message}`);
+  }
+});
+
+// 로컬 다운로드 완료 감지 — fetch 실패 폴백
+let _pendingDownloadId = null;
+chrome.downloads.onChanged.addListener(async (delta) => {
+  if (!_serverUrl || !_pendingDownloadId) return;
+  if (delta.id !== _pendingDownloadId) return;
+  if (delta.state?.current !== 'complete') return;
+
+  _pendingDownloadId = null;
+  const sv = _serverUrl;
+
+  try {
+    const [downloadItem] = await chrome.downloads.search({ id: delta.id });
+    if (!downloadItem?.filename) {
+      reportProgress(sv, '실패: 다운로드 파일 경로 없음');
+      return;
+    }
+
+    reportProgress(sv, '다운로드된 파일 읽는 중...');
+
+    // content script를 통해 파일을 File API로 읽어 업로드
+    const tabs = await chrome.tabs.query({});
+    const naverTab = tabs.find(t => t.url?.includes('sell.smartstore.naver.com'));
+    if (!naverTab) {
+      reportProgress(sv, '실패: 셀러센터 탭 없음');
+      return;
+    }
+
+    chrome.tabs.sendMessage(naverTab.id, {
+      type: 'upload_local_file',
+      filename: downloadItem.filename,
+      serverUrl: sv
+    });
+  } catch (e) {
+    reportProgress(sv, `실패: ${e.message}`);
+  }
 });
 
 let _serverUrl = '';
@@ -112,6 +164,5 @@ async function handleCollect(serverUrl) {
 
   await waitForTabLoad(tab.id);
 
-  // serverUrl을 content script에 전달, 이후 업로드는 content script가 직접 처리
   chrome.tabs.sendMessage(tab.id, { type: 'start_collect', serverUrl });
 }
