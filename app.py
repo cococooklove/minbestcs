@@ -75,6 +75,14 @@ def index():
     return render_template("index.html", is_server=IS_SERVER)
 
 
+@app.route("/api/reset", methods=["POST"])
+def api_reset():
+    global _scraping, _progress_step
+    _scraping = False
+    _progress_step = ""
+    return jsonify({"status": "reset"})
+
+
 @app.route("/api/cookies", methods=["POST"])
 def api_receive_cookies():
     global _session_cookies, _scraping

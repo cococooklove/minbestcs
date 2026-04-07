@@ -36,15 +36,17 @@ document.addEventListener('DOMContentLoaded', async () => {
     // 네이버 로그인 여부 (NID_AUT = 실제 로그인 토큰)
     const hasNaverLogin = allCookies.some(c => c.name === 'NID_AUT');
 
-    // 셀러센터 탭이 열려 있고 로그인 페이지가 아닌지 확인
-    const sellerTabs = await chrome.tabs.query({ url: 'https://sell.smartstore.naver.com/*' });
-    const hasSellerTab = sellerTabs.some(t => t.url && !t.url.includes('login') && !t.url.includes('nidlogin'));
+    // 셀러센터 세션 쿠키 확인 (탭 오픈 여부가 아닌 실제 세션 쿠키로 판단)
+    const sellerCookies = await chrome.cookies.getAll({ domain: 'sell.smartstore.naver.com' });
+    const hasSellerSession = sellerCookies.some(c =>
+      ['SID', 'JSESSIONID', 'nstore_prd_session', 'NSP_SESSION'].includes(c.name)
+    );
 
     let loggedIn = false;
     if (!hasNaverLogin) {
       naverDot.className = 'dot red';
       naverStatus.innerHTML = '네이버 로그인 필요 &nbsp;<a href="https://nid.naver.com/nidlogin.login" target="_blank" style="color:#03c75a;font-weight:600;">로그인하기 →</a>';
-    } else if (!hasSellerTab) {
+    } else if (!hasSellerSession) {
       naverDot.className = 'dot red';
       naverStatus.innerHTML = '셀러센터를 열고 로그인해주세요 &nbsp;<a href="https://sell.smartstore.naver.com/" target="_blank" style="color:#03c75a;font-weight:600;">열기 →</a>';
     } else {
@@ -90,11 +92,24 @@ document.addEventListener('DOMContentLoaded', async () => {
         throw new Error('쿠키를 찾을 수 없습니다. 네이버에 로그인해주세요.');
       }
 
-      const res = await fetch(`${serverUrl}/api/cookies`, {
+      let res = await fetch(`${serverUrl}/api/cookies`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ cookies: allCookies })
       });
+
+      // 이전 수집이 비정상 종료돼 플래그가 고착된 경우 자동 리셋 후 재시도
+      if (res.status === 400) {
+        const errData = await res.json();
+        if (errData.error && errData.error.includes('수집 중')) {
+          await fetch(`${serverUrl}/api/reset`, { method: 'POST' });
+          res = await fetch(`${serverUrl}/api/cookies`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ cookies: allCookies })
+          });
+        }
+      }
 
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || `서버 오류 (${res.status})`);

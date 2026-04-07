@@ -1521,9 +1521,10 @@ if (IS_SERVER) {
     const dot = document.getElementById('cookie-dot');
     const cookieStatus = document.getElementById('cookie-status');
     if (data.scraping) {
-      if (dot) dot.style.background = '#f0a500';
-      if (cookieStatus) cookieStatus.textContent = '리뷰 수집 중...';
-      showProgress(data.step || '리뷰 수집 중...');
+      // 페이지 로드 시점에 scraping=true면 서버 재시작으로 인한 고착 상태 — 자동 리셋
+      fetch('/api/reset', { method: 'POST' }).catch(() => {});
+      if (dot) dot.style.background = '#ccc';
+      if (cookieStatus) cookieStatus.textContent = '';
     } else if (data.has_cookies) {
       if (dot) dot.style.background = '#03c75a';
       if (cookieStatus) cookieStatus.textContent = '쿠키 수신됨 — 수집 버튼을 누르거나 확장에서 재시작하세요';
