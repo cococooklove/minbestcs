@@ -544,6 +544,7 @@
     <div class="step-line"></div>
     <div class="popup-step" id="pstep-4"><div class="step-circle">✓</div><div class="step-label">완료</div></div>
   </div>
+  <div id="popup-incremental-note" style="display:none;font-size:11px;color:#03c75a;text-align:center;margin-bottom:6px;font-weight:600;"></div>
   <div class="popup-msg" id="popup-msg"></div>
   <button class="popup-close" id="popup-close-btn" onclick="closePopup()" style="display:none;">확인</button>
 </div>
@@ -1216,6 +1217,8 @@ function overlayClick() {
 function closePopup() {
   if (_popupLocked) return;
   _collectDone = false;
+  const note = document.getElementById('popup-incremental-note');
+  if (note) note.style.display = 'none';
   document.getElementById('naver-popup').style.display = 'none';
   document.getElementById('popup-overlay').style.display = 'none';
   _resetSteps();
@@ -1561,6 +1564,18 @@ if (IS_SERVER) {
   if (new URLSearchParams(location.search).get('collecting') === '1') {
     showProgress('수집 준비 중...');
     history.replaceState(null, '', location.pathname);
+    // 최신 리뷰 날짜 조회 후 안내 표시
+    fetch('/api/latest-review-date').then(r => r.json()).then(d => {
+      const note = document.getElementById('popup-incremental-note');
+      if (!note) return;
+      if (d.date) {
+        note.textContent = `마지막 수집: ${d.date} 이후 신규 리뷰만 다운로드`;
+        note.style.display = 'block';
+      } else {
+        note.textContent = '전체 1년치 리뷰 다운로드 (최초 수집)';
+        note.style.display = 'block';
+      }
+    }).catch(() => {});
   }
 
   // 페이지 로드 시 수집 중 상태 복원
