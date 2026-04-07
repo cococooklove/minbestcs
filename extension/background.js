@@ -92,7 +92,8 @@ chrome.downloads.onChanged.addListener(async (delta) => {
     reportProgress(sv, '다운로드 완료 — 파일 읽는 중...');
 
     // background에서 file:// 프로토콜로 직접 읽기
-    const fileUrl = 'file://' + downloadItem.filename.replace(/\\/g, '/');
+    const normalized = downloadItem.filename.replace(/\\/g, '/');
+    const fileUrl = normalized.startsWith('/') ? 'file://' + normalized : 'file:///' + normalized;
     const fileRes = await fetch(fileUrl);
     if (!fileRes.ok) {
       reportProgress(sv, '실패: 로컬 파일 읽기 실패 (파일 접근 권한 확인 필요)');
