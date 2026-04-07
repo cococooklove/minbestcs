@@ -242,41 +242,51 @@ def main(progress_cb=None, existing_page=None, cookies=None, headless=False):
             except Exception:
                 return None
 
-        with page.expect_download(timeout=30000) as dl_info:
-            btn.click()
-            time.sleep(3)
+        # context 레벨에서 download 이벤트 수신 (새 탭으로 트리거되는 경우도 포함)
+        import threading
+        _download_event = threading.Event()
+        _download_holder = [None]
 
-            # 버튼 클릭 직후 화면 캡처 (팝업 감지 디버그용)
-            _save_screenshot("after_excel_click")
+        def _on_download(dl):
+            _download_holder[0] = dl
+            _download_event.set()
 
-            # 현재 페이지에 보이는 모든 버튼 텍스트 로그
-            try:
-                visible_btns = page.locator("button:visible").all_text_contents()
-                progress(f"[디버그] 감지된 버튼들: {', '.join(visible_btns[:10])}")
-            except Exception:
-                pass
+        # context가 있으면 context에, 없으면 page에 리스너 등록
+        _dl_target = context if context is not None else page
+        _dl_target.on("download", _on_download)
 
-            for sel in POPUP_SELS:
-                try:
-                    confirm = page.wait_for_selector(sel, timeout=2000, state="visible")
-                    if confirm:
-                        progress(f"팝업 감지됨 — 확인 클릭 중... ({sel})")
-                        _save_screenshot("popup_found")
-                        confirm.click()
-                        _popup_clicked = True
-                        time.sleep(1)
-                        break
-                except Exception:
-                    continue
+        btn.click()
+        time.sleep(3)
 
-            if not _popup_clicked:
-                progress("[디버그] 팝업 버튼을 찾지 못함 — 다운로드 이벤트 대기 중...")
-                _save_screenshot("no_popup_found")
+        # 버튼 클릭 직후 화면 캡처
+        _save_screenshot("after_excel_click")
 
+        # 현재 페이지에 보이는 모든 버튼 텍스트 로그
         try:
-            download = dl_info.value
+            visible_btns = page.locator("button:visible").all_text_contents()
+            progress(f"[디버그] 감지된 버튼들: {', '.join(visible_btns[:10])}")
         except Exception:
-            # 다운로드 타임아웃 — 원인 진단 + 스크린샷
+            pass
+
+        for sel in POPUP_SELS:
+            try:
+                confirm = page.wait_for_selector(sel, timeout=2000, state="visible")
+                if confirm:
+                    progress(f"팝업 감지됨 — 확인 클릭 중... ({sel})")
+                    _save_screenshot("popup_found")
+                    confirm.click()
+                    _popup_clicked = True
+                    time.sleep(1)
+                    break
+            except Exception:
+                continue
+
+        if not _popup_clicked:
+            progress("[디버그] 팝업 버튼을 찾지 못함 — 다운로드 이벤트 대기 중...")
+            _save_screenshot("no_popup_found")
+
+        progress("다운로드 시작 대기 중...")
+        if not _download_event.wait(timeout=30):
             _save_screenshot("download_timeout")
             try:
                 cur_url = page.url
@@ -292,9 +302,11 @@ def main(progress_cb=None, existing_page=None, cookies=None, headless=False):
                 )
             else:
                 raise Exception(
-                    f"엑셀다운 버튼 클릭 후 다운로드 팝업이 나타나지 않았습니다. "
-                    f"(/api/screenshot 에서 캡처 확인 가능)"
+                    "엑셀다운 버튼 클릭 후 다운로드 팝업이 나타나지 않았습니다. "
+                    "(/api/screenshot 에서 캡처 확인 가능)"
                 )
+
+        download = _download_holder[0]
         progress(f"다운로드 완료: {download.suggested_filename}")
 
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
