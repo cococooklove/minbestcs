@@ -1507,6 +1507,9 @@ socket.on('scrape_status', data => {
 
 socket.on('agent_progress', data => {
   showProgress(data.step || '수집 중...');
+  if (data.step && data.step.includes('파싱 완료')) {
+    fetchReviews();
+  }
 });
 
 const IS_SERVER = {{ is_server | tojson }};
