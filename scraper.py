@@ -230,15 +230,38 @@ def main(progress_cb=None, existing_page=None, cookies=None, headless=False):
             "[class*='modal'] button[class*='confirm']",
         ]
         _popup_clicked = False
+        _screenshot_dir = Path(os.path.dirname(OUTPUT_FILE)) / "screenshots"
+        _screenshot_dir.mkdir(parents=True, exist_ok=True)
+
+        def _save_screenshot(label):
+            try:
+                ts = datetime.now().strftime("%H%M%S")
+                path = _screenshot_dir / f"{label}_{ts}.png"
+                page.screenshot(path=str(path), full_page=False)
+                return str(path)
+            except Exception:
+                return None
 
         with page.expect_download(timeout=30000) as dl_info:
             btn.click()
             time.sleep(3)
+
+            # 버튼 클릭 직후 화면 캡처 (팝업 감지 디버그용)
+            _save_screenshot("after_excel_click")
+
+            # 현재 페이지에 보이는 모든 버튼 텍스트 로그
+            try:
+                visible_btns = page.locator("button:visible").all_text_contents()
+                progress(f"[디버그] 감지된 버튼들: {', '.join(visible_btns[:10])}")
+            except Exception:
+                pass
+
             for sel in POPUP_SELS:
                 try:
                     confirm = page.wait_for_selector(sel, timeout=2000, state="visible")
                     if confirm:
-                        progress("팝업 확인 클릭 중...")
+                        progress(f"팝업 감지됨 — 확인 클릭 중... ({sel})")
+                        _save_screenshot("popup_found")
                         confirm.click()
                         _popup_clicked = True
                         time.sleep(1)
@@ -246,10 +269,15 @@ def main(progress_cb=None, existing_page=None, cookies=None, headless=False):
                 except Exception:
                     continue
 
+            if not _popup_clicked:
+                progress("[디버그] 팝업 버튼을 찾지 못함 — 다운로드 이벤트 대기 중...")
+                _save_screenshot("no_popup_found")
+
         try:
             download = dl_info.value
         except Exception:
-            # 다운로드 타임아웃 — 원인 진단
+            # 다운로드 타임아웃 — 원인 진단 + 스크린샷
+            _save_screenshot("download_timeout")
             try:
                 cur_url = page.url
             except Exception:
@@ -259,12 +287,13 @@ def main(progress_cb=None, existing_page=None, cookies=None, headless=False):
             elif _popup_clicked:
                 raise Exception(
                     "팝업 확인 클릭 후 다운로드가 시작되지 않았습니다. "
-                    "셀러센터 엑셀 다운로드 팝업 구조가 변경되었거나 권한이 없을 수 있습니다."
+                    "셀러센터 엑셀 다운로드 팝업 구조가 변경되었거나 권한이 없을 수 있습니다. "
+                    "(/api/screenshot 에서 캡처 확인 가능)"
                 )
             else:
                 raise Exception(
-                    "엑셀다운 버튼 클릭 후 다운로드 팝업이 나타나지 않았습니다. "
-                    "셀러센터 페이지 로딩이 완료되지 않았거나 리뷰가 없을 수 있습니다."
+                    f"엑셀다운 버튼 클릭 후 다운로드 팝업이 나타나지 않았습니다. "
+                    f"(/api/screenshot 에서 캡처 확인 가능)"
                 )
         progress(f"다운로드 완료: {download.suggested_filename}")
 

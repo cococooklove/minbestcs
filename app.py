@@ -83,6 +83,25 @@ def api_reset():
     return jsonify({"status": "reset"})
 
 
+@app.route("/api/screenshot")
+def api_screenshot():
+    """가장 최근 스크린샷 반환 (디버그용)"""
+    from flask import send_file
+    screenshot_dir = os.path.join(_base_dir, "data", "screenshots")
+    if not os.path.exists(screenshot_dir):
+        return jsonify({"error": "스크린샷 없음"}), 404
+    files = sorted(
+        [f for f in os.listdir(screenshot_dir) if f.endswith(".png")],
+        reverse=True
+    )
+    if not files:
+        return jsonify({"error": "스크린샷 없음"}), 404
+    # ?all=1 이면 목록 반환
+    if request.args.get("all"):
+        return jsonify({"files": files[:10]})
+    return send_file(os.path.join(screenshot_dir, files[0]), mimetype="image/png")
+
+
 @app.route("/api/cookies", methods=["POST"])
 def api_receive_cookies():
     global _session_cookies, _scraping
