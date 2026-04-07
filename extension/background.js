@@ -147,12 +147,24 @@ async function reportProgress(serverUrl, step) {
   } catch (e) {}
 }
 
-async function waitForTabLoad(tabId) {
+async function sendLog(serverUrl, msg) {
+  try {
+    await fetch(`${serverUrl}/api/log`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ msg })
+    });
+  } catch (e) {}
+}
+
+async function waitForTabLoad(tabId, timeoutMs = 15000) {
   return new Promise(resolve => {
     chrome.tabs.get(tabId, tab => {
       if (tab?.status === 'complete') { return setTimeout(resolve, 1500); }
+      const timer = setTimeout(resolve, timeoutMs); // 타임아웃 보장
       function listener(id, info) {
         if (id === tabId && info.status === 'complete') {
+          clearTimeout(timer);
           chrome.tabs.onUpdated.removeListener(listener);
           setTimeout(resolve, 1500);
         }
@@ -167,15 +179,21 @@ async function handleCollect(serverUrl) {
   await reportProgress(serverUrl, '셀러센터 리뷰 페이지 열기...');
 
   const existing = await chrome.tabs.query({ url: 'https://sell.smartstore.naver.com/*' });
+  await sendLog(serverUrl, `스마트스토어 탭 ${existing.length}개 발견`);
+
   let tab;
   if (existing.length > 0) {
     tab = existing[0];
+    await sendLog(serverUrl, `기존 탭 재사용 (tabId: ${tab.id}, url: ${tab.url})`);
     await chrome.tabs.update(tab.id, { active: false, url: reviewUrl });
   } else {
     tab = await chrome.tabs.create({ url: reviewUrl, active: false });
+    await sendLog(serverUrl, `새 탭 생성 (tabId: ${tab.id})`);
   }
 
+  await sendLog(serverUrl, `탭 로딩 대기 중... (tabId: ${tab.id})`);
   await waitForTabLoad(tab.id);
+  await sendLog(serverUrl, '탭 로딩 완료 → content.js 메시지 전송');
 
   chrome.tabs.sendMessage(tab.id, { type: 'start_collect', serverUrl });
 }

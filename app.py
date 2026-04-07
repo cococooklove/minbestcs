@@ -163,15 +163,27 @@ def api_client_progress():
     data = request.json or {}
     step = data.get("step", "")
     _progress_step = step
+    _log(f"[EXT] {step}")
     if step.startswith("실패"):
         _scraping = False
         socketio.emit("collect_status", {"step": "done", "success": False, "error": step})
     elif step == "완료":
         _scraping = False
+        _log("✅ 확장프로그램 수집 완료")
         socketio.emit("collect_status", {"step": "done", "success": True})
     else:
         _scraping = True
         socketio.emit("agent_progress", {"step": step})
+    return jsonify({"ok": True})
+
+
+@app.route("/api/log", methods=["POST"])
+def api_log():
+    """확장프로그램에서 보내는 디버그 로그"""
+    data = request.json or {}
+    msg = data.get("msg", "")
+    if msg:
+        _log(f"[EXT-DBG] {msg}")
     return jsonify({"ok": True})
 
 
@@ -229,6 +241,7 @@ def api_receive_cookies():
         return jsonify({"error": "수집 중입니다. 잠시 기다려주세요."}), 400
     data = request.json or {}
     cookies = data.get("cookies", [])
+    _log(f"[EXT-DBG] 쿠키 수신 요청: {len(cookies)}개")
     if not cookies:
         return jsonify({"error": "쿠키가 없습니다. 네이버에 로그인 후 다시 시도해주세요."}), 400
     _session_cookies = cookies
