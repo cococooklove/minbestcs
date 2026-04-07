@@ -99,8 +99,9 @@ chrome.downloads.onChanged.addListener(async (delta) => {
       return;
     }
 
-    reportProgress(sv, '파일 읽기 완료 — 서버로 전송 중...');
     const buf = await fileRes.arrayBuffer();
+    const sizeKB = Math.round(buf.byteLength / 1024);
+    reportProgress(sv, `파일 읽기 완료 (${sizeKB} KB) — 서버로 전송 중...`);
     const blob = new Blob([buf], {
       type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
     });
@@ -111,9 +112,9 @@ chrome.downloads.onChanged.addListener(async (delta) => {
     const data = await r.json();
 
     if (r.ok) {
+      reportProgress(sv, '파일 전송 완료 — 서버 처리 중...');
       // 업로드 성공 후 로컬 파일 삭제
       chrome.downloads.removeFile(delta.id, () => {});
-      reportProgress(sv, '완료');
     } else {
       reportProgress(sv, `실패: ${data.error || '업로드 실패'}`);
     }
