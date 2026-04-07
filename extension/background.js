@@ -5,6 +5,32 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
   }
 });
 
+// Naver 다운로드 감지 — JS 몽키패칭 대신 브라우저 레벨에서 인터셉트
+chrome.downloads.onCreated.addListener(async (item) => {
+  if (!_serverUrl) return; // 수집 진행 중일 때만
+  const url = item.url || '';
+  const filename = item.filename || '';
+  if (!url.includes('naver.com') && !url.includes('smartstore')) return;
+  if (!url.match(/excel|xlsx|download|export/i) && !filename.match(/\.xlsx?$/i)) return;
+
+  // Downloads 폴더 저장 취소
+  chrome.downloads.cancel(item.id, () => {});
+
+  // 셀러센터 탭에 fetch_and_upload 전달
+  const tabs = await chrome.tabs.query({});
+  const naverTab = tabs.find(t => t.url?.includes('sell.smartstore.naver.com'));
+  if (!naverTab) {
+    reportProgress(_serverUrl, '실패: 셀러센터 탭을 찾을 수 없습니다.');
+    return;
+  }
+
+  chrome.tabs.sendMessage(naverTab.id, {
+    type: 'fetch_and_upload',
+    url,
+    serverUrl: _serverUrl
+  });
+});
+
 let _serverUrl = '';
 
 chrome.runtime.onMessage.addListener((msg, sender, respond) => {
