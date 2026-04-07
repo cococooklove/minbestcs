@@ -77,7 +77,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     resultDiv.textContent = '수집 준비 중...';
     resultDiv.className = 'result';
 
-    // 웹 UI를 즉시 열어 사용자가 바로 진행 화면을 보게 함 (?collecting=1 → 즉시 모달 표시)
+    // 웹 UI 즉시 열기
     const collectUrl = serverUrl + '/?collecting=1';
     const existingTabs = await chrome.tabs.query({ url: serverUrl + '/*' });
     if (existingTabs.length > 0) {
@@ -88,48 +88,12 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     try {
-      const seen = new Set();
-      const allCookies = [];
-      for (const domain of NAVER_DOMAINS) {
-        const cookies = await chrome.cookies.getAll({ domain });
-        for (const c of cookies) {
-          const key = c.name + '|' + c.domain;
-          if (!seen.has(key)) { seen.add(key); allCookies.push(c); }
-        }
-      }
+      // background service worker에 수집 위임
+      await chrome.runtime.sendMessage({ type: 'collect', serverUrl });
 
-      if (allCookies.length === 0) {
-        throw new Error('쿠키를 찾을 수 없습니다. 네이버에 로그인해주세요.');
-      }
-
-      let res = await fetch(`${serverUrl}/api/cookies`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ cookies: allCookies })
-      });
-
-      // 이전 수집이 비정상 종료돼 플래그가 고착된 경우 자동 리셋 후 재시도
-      if (res.status === 400) {
-        const errData = await res.json();
-        if (errData.error && errData.error.includes('수집 중')) {
-          await fetch(`${serverUrl}/api/reset`, { method: 'POST' });
-          res = await fetch(`${serverUrl}/api/cookies`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ cookies: allCookies })
-          });
-        }
-      }
-
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || `서버 오류 (${res.status})`);
-
-      resultDiv.textContent = '수집 중... 잠시 기다려주세요.';
+      resultDiv.textContent = '수집 진행 중...';
       resultDiv.className = 'result';
-
-      // 팝업에서 수집 완료까지 상태 폴링
       await pollStatus(serverUrl);
-
     } catch (e) {
       resultDiv.textContent = '오류: ' + e.message;
       resultDiv.className = 'result error';

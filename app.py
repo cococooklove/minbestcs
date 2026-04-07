@@ -102,6 +102,70 @@ def api_screenshot():
     return send_file(os.path.join(screenshot_dir, files[0]), mimetype="image/png")
 
 
+@app.route("/api/client-progress", methods=["POST"])
+def api_client_progress():
+    """확장프로그램에서 보내는 진행 상황을 UI에 emit"""
+    global _scraping, _progress_step
+    data = request.json or {}
+    step = data.get("step", "")
+    _progress_step = step
+    if step.startswith("실패"):
+        _scraping = False
+        socketio.emit("collect_status", {"step": "done", "success": False, "error": step})
+    elif step == "완료":
+        _scraping = False
+        socketio.emit("collect_status", {"step": "done", "success": True})
+    else:
+        _scraping = True
+        socketio.emit("agent_progress", {"step": step})
+    return jsonify({"ok": True})
+
+
+@app.route("/api/upload-excel", methods=["POST"])
+def api_upload_excel():
+    """확장프로그램이 직접 다운로드한 엑셀 파일을 받아 파싱·저장"""
+    global _scraping, _progress_step
+    if "file" not in request.files:
+        return jsonify({"error": "파일 없음"}), 400
+    f = request.files["file"]
+    os.makedirs(os.path.join(_base_dir, "data", "downloads"), exist_ok=True)
+    from datetime import datetime
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    excel_path = os.path.join(_base_dir, "data", "downloads", f"reviews_{timestamp}.xlsx")
+    f.save(excel_path)
+
+    def _parse_and_save():
+        global _scraping, _progress_step
+        try:
+            import scraper as scraper_mod
+            scraper_mod.OUTPUT_FILE = REVIEWS_FILE
+            _progress_step = "엑셀 파싱 중..."
+            socketio.emit("agent_progress", {"step": _progress_step})
+            new_reviews = scraper_mod.excel_to_reviews(excel_path)
+            _progress_step = f"파싱 완료: {len(new_reviews)}건"
+            socketio.emit("agent_progress", {"step": _progress_step})
+
+            existing = []
+            if os.path.exists(REVIEWS_FILE):
+                with open(REVIEWS_FILE, encoding="utf-8") as fp:
+                    existing = json.load(fp)
+            existing_keys = {(r.get("order_no"), r.get("reviewer"), r.get("date")) for r in existing}
+            added = [r for r in new_reviews if (r.get("order_no"), r.get("reviewer"), r.get("date")) not in existing_keys]
+            merged = added + existing
+            os.makedirs(os.path.dirname(REVIEWS_FILE), exist_ok=True)
+            with open(REVIEWS_FILE, "w", encoding="utf-8") as fp:
+                json.dump(merged, fp, ensure_ascii=False, indent=2)
+
+            _scraping = False
+            socketio.emit("collect_status", {"step": "done", "success": True})
+        except Exception as e:
+            _scraping = False
+            socketio.emit("collect_status", {"step": "done", "success": False, "error": str(e)})
+
+    threading.Thread(target=_parse_and_save, daemon=True).start()
+    return jsonify({"ok": True})
+
+
 @app.route("/api/cookies", methods=["POST"])
 def api_receive_cookies():
     global _session_cookies, _scraping
@@ -125,7 +189,7 @@ def download_extension():
     ext_dir = os.path.join(_base_dir, "extension")
     buf = io.BytesIO()
     with zipfile.ZipFile(buf, 'w', zipfile.ZIP_DEFLATED) as zf:
-        for fname in ['manifest.json', 'popup.html', 'popup.js', 'background.js']:
+        for fname in ['manifest.json', 'popup.html', 'popup.js', 'background.js', 'content_main.js', 'content.js']:
             fpath = os.path.join(ext_dir, fname)
             if os.path.exists(fpath):
                 zf.write(fpath, fname)
