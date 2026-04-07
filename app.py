@@ -208,7 +208,7 @@ def download_extension():
 
 @app.route("/api/reviews")
 def api_reviews():
-    reviews = load_reviews()
+    all_r = load_reviews()  # 단 1회 로드
 
     q = request.args.get("q", "").strip().lower()
     rating = request.args.get("rating", "")
@@ -218,53 +218,55 @@ def api_reviews():
     reportable = request.args.get("reportable", "")
     sort = request.args.get("sort", "newest")
 
+    # 필터
+    reviews_idx = list(range(len(all_r)))
     if q:
-        reviews = [r for r in reviews if q in r.get("content", "").lower()
-                   or q in r.get("product", "").lower()
-                   or q in r.get("reviewer", "").lower()]
+        reviews_idx = [i for i in reviews_idx if
+                       q in all_r[i].get("content", "").lower()
+                       or q in all_r[i].get("product", "").lower()
+                       or q in all_r[i].get("reviewer", "").lower()]
     if rating:
-        reviews = [r for r in reviews if str(r.get("rating", "")).startswith(rating)]
+        reviews_idx = [i for i in reviews_idx if str(all_r[i].get("rating", "")).startswith(rating)]
     if replied == "yes":
-        reviews = [r for r in reviews if r.get("replied")]
+        reviews_idx = [i for i in reviews_idx if all_r[i].get("replied")]
     elif replied == "no":
-        reviews = [r for r in reviews if not r.get("replied")]
+        reviews_idx = [i for i in reviews_idx if not all_r[i].get("replied")]
     if sentiment:
-        reviews = [r for r in reviews if r.get("sentiment") == sentiment]
+        reviews_idx = [i for i in reviews_idx if all_r[i].get("sentiment") == sentiment]
     if topic:
-        reviews = [r for r in reviews if topic in (r.get("topics") or [])]
+        reviews_idx = [i for i in reviews_idx if topic in (all_r[i].get("topics") or [])]
     if reportable == "yes":
-        reviews = [r for r in reviews if r.get("reportable")]
+        reviews_idx = [i for i in reviews_idx if all_r[i].get("reportable")]
 
     sort_key = {
-        "oldest": lambda r: r.get("date", ""),
-        "rating_high": lambda r: float(r.get("rating", 0) or 0),
-        "rating_low": lambda r: float(r.get("rating", 0) or 0),
-        "newest": lambda r: r.get("date", ""),
+        "oldest":      lambda i: all_r[i].get("date", ""),
+        "rating_high": lambda i: float(all_r[i].get("rating", 0) or 0),
+        "rating_low":  lambda i: float(all_r[i].get("rating", 0) or 0),
+        "newest":      lambda i: all_r[i].get("date", ""),
     }
-    reviews = sorted(reviews, key=sort_key.get(sort, sort_key["newest"]),
-                     reverse=sort not in ("oldest", "rating_low"))
+    reviews_idx = sorted(reviews_idx, key=sort_key.get(sort, sort_key["newest"]),
+                         reverse=sort not in ("oldest", "rating_low"))
 
-    all_reviews = load_reviews()
-    ratings = [float(r.get("rating", 0) or 0) for r in all_reviews if r.get("rating")]
+    # 통계
+    ratings = [float(r.get("rating", 0) or 0) for r in all_r if r.get("rating")]
     stats = {
-        "total": len(all_reviews),
-        "filtered": len(reviews),
+        "total": len(all_r),
+        "filtered": len(reviews_idx),
         "avg_rating": round(sum(ratings) / len(ratings), 1) if ratings else 0,
-        "replied_count": sum(1 for r in all_reviews if r.get("replied")),
+        "replied_count": sum(1 for r in all_r if r.get("replied")),
         "rating_dist": {str(i): sum(1 for r in ratings if int(r) == i) for i in range(1, 6)},
         "sentiment_dist": {
-            "positive": sum(1 for r in all_reviews if r.get("sentiment") == "positive"),
-            "negative": sum(1 for r in all_reviews if r.get("sentiment") == "negative"),
-            "mixed": sum(1 for r in all_reviews if r.get("sentiment") == "mixed"),
-            "unclassified": sum(1 for r in all_reviews if not r.get("sentiment")),
+            "positive":    sum(1 for r in all_r if r.get("sentiment") == "positive"),
+            "negative":    sum(1 for r in all_r if r.get("sentiment") == "negative"),
+            "mixed":       sum(1 for r in all_r if r.get("sentiment") == "mixed"),
+            "unclassified":sum(1 for r in all_r if not r.get("sentiment")),
         },
-        "reportable_count": sum(1 for r in all_reviews if r.get("reportable")),
-        "draft_count": sum(1 for r in all_reviews if r.get("reply_status") == "draft"),
-        "need_reply_count": sum(1 for r in all_reviews if not r.get("replied") and not r.get("ai_reply")),
+        "reportable_count":  sum(1 for r in all_r if r.get("reportable")),
+        "draft_count":       sum(1 for r in all_r if r.get("reply_status") == "draft"),
+        "need_reply_count":  sum(1 for r in all_r if not r.get("replied") and not r.get("ai_reply")),
     }
 
-    # 전체 기준 reviewer → 인덱스 목록 맵
-    all_r = load_reviews()
+    # reviewer → 인덱스 목록 맵 (O(n) 선처리)
     reviewer_map = {}
     for i, r in enumerate(all_r):
         rv = r.get("reviewer", "")
@@ -274,27 +276,22 @@ def api_reviews():
     settings_data = load_settings()
     manual_tags   = load_manual_tags()
 
-    # 필터된 리뷰에 _idx + reviewer_history + customer_type 붙이기
     indexed_reviews = []
-    for r in reviews:
-        for i, ar in enumerate(all_r):
-            if (ar.get("content") == r.get("content") and
-                    ar.get("date") == r.get("date") and
-                    ar.get("reviewer") == r.get("reviewer")):
-                history = [
-                    {
-                        "date": all_r[j].get("date"),
-                        "rating": all_r[j].get("rating"),
-                        "product": all_r[j].get("product"),
-                        "content": all_r[j].get("content"),
-                        "replied": all_r[j].get("replied"),
-                    }
-                    for j in reviewer_map.get(ar.get("reviewer", ""), [])
-                    if j != i
-                ]
-                customer_type = calculate_customer_type(history, manual_tags, ar.get("reviewer", ""), settings_data)
-                indexed_reviews.append({"_idx": i, **ar, "reviewer_history": history, "customer_type": customer_type})
-                break
+    for i in reviews_idx:
+        r = all_r[i]
+        history = [
+            {
+                "date":    all_r[j].get("date"),
+                "rating":  all_r[j].get("rating"),
+                "product": all_r[j].get("product"),
+                "content": all_r[j].get("content"),
+                "replied": all_r[j].get("replied"),
+            }
+            for j in reviewer_map.get(r.get("reviewer", ""), [])
+            if j != i
+        ]
+        customer_type = calculate_customer_type(history, manual_tags, r.get("reviewer", ""), settings_data)
+        indexed_reviews.append({"_idx": i, **r, "reviewer_history": history, "customer_type": customer_type})
 
     return jsonify({"reviews": indexed_reviews, "stats": stats})
 
