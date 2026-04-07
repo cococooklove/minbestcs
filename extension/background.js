@@ -161,7 +161,7 @@ async function waitForTabLoad(tabId, timeoutMs = 15000) {
   return new Promise(resolve => {
     chrome.tabs.get(tabId, tab => {
       if (tab?.status === 'complete') { return setTimeout(resolve, 1500); }
-      const timer = setTimeout(resolve, timeoutMs); // 타임아웃 보장
+      const timer = setTimeout(resolve, timeoutMs);
       function listener(id, info) {
         if (id === tabId && info.status === 'complete') {
           clearTimeout(timer);
@@ -193,7 +193,30 @@ async function handleCollect(serverUrl) {
 
   await sendLog(serverUrl, `탭 로딩 대기 중... (tabId: ${tab.id})`);
   await waitForTabLoad(tab.id);
-  await sendLog(serverUrl, '탭 로딩 완료 → content.js 메시지 전송');
 
-  chrome.tabs.sendMessage(tab.id, { type: 'start_collect', serverUrl });
+  // 로딩 후 실제 URL 확인 — 로그인 페이지 감지
+  const loadedTab = await chrome.tabs.get(tab.id);
+  const loadedUrl = loadedTab?.url || '';
+  await sendLog(serverUrl, `탭 로딩 후 URL: ${loadedUrl}`);
+
+  const isLoginPage = /nid\.naver\.com|nidlogin|oauth|signin/i.test(loadedUrl);
+  const isSellerCenter = loadedUrl.includes('sell.smartstore.naver.com');
+
+  if (isLoginPage || !isSellerCenter) {
+    await reportProgress(serverUrl, '실패: 셀러센터 로그인이 필요합니다. 네이버에 로그인 후 다시 시도해주세요.');
+    return;
+  }
+
+  await sendLog(serverUrl, 'URL 확인 완료 → content.js 메시지 전송');
+
+  // content.js가 메시지를 받았는지 확인
+  chrome.tabs.sendMessage(tab.id, { type: 'start_collect', serverUrl }, (res) => {
+    if (chrome.runtime.lastError) {
+      const err = chrome.runtime.lastError.message;
+      sendLog(serverUrl, `content.js 응답 없음: ${err}`);
+      reportProgress(serverUrl, '실패: 확장프로그램이 셀러센터 탭에 로드되지 않았습니다. 탭을 닫고 다시 시도해주세요.');
+    } else {
+      sendLog(serverUrl, 'content.js 응답 수신 완료');
+    }
+  });
 }
