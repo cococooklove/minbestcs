@@ -146,6 +146,13 @@ def api_screenshot():
     # ?all=1 이면 목록 반환
     if request.args.get("all"):
         return jsonify({"files": files[:10]})
+    # ?file=filename 이면 특정 파일 반환
+    req_file = request.args.get("file")
+    if req_file:
+        target = os.path.join(screenshot_dir, os.path.basename(req_file))
+        if not os.path.exists(target):
+            return jsonify({"error": "파일 없음"}), 404
+        return send_file(target, mimetype="image/png")
     return send_file(os.path.join(screenshot_dir, files[0]), mimetype="image/png")
 
 
