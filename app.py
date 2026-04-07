@@ -90,6 +90,15 @@ def api_reset():
     return jsonify({"status": "reset"})
 
 
+@app.route("/api/latest-review-date")
+def api_latest_review_date():
+    reviews = load_reviews()
+    if not reviews:
+        return jsonify({"date": None})
+    latest = max((r.get("date", "") for r in reviews if r.get("date")), default=None)
+    return jsonify({"date": latest})
+
+
 @app.route("/api/reviews/clear", methods=["POST"])
 def api_reviews_clear():
     if os.path.exists(REVIEWS_FILE):

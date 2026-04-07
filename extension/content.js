@@ -39,8 +39,22 @@ chrome.runtime.onMessage.addListener((msg, sender, respond) => {
         await clickByText('초기화');
         await sleep(1500);
 
-        sendProgress('기간 1년 설정 중...');
-        await clickByText('1년');
+        // 마지막 수집 날짜 기준으로 최소 기간 선택
+        let periodBtn = '1년';
+        try {
+          const r = await fetch(`${msg.serverUrl}/api/latest-review-date`);
+          const d = await r.json();
+          if (d.date) {
+            const daysSince = Math.floor((Date.now() - new Date(d.date)) / 86400000);
+            if (daysSince <= 7)        periodBtn = '1주일';
+            else if (daysSince <= 30)  periodBtn = '1개월';
+            else if (daysSince <= 90)  periodBtn = '3개월';
+            else if (daysSince <= 180) periodBtn = '6개월';
+          }
+        } catch (e) {}
+
+        sendProgress(`기간 ${periodBtn} 설정 중...`);
+        await clickByText(periodBtn);
         await sleep(800);
 
         sendProgress('검색 실행 중...');
