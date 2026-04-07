@@ -110,3 +110,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     }, 1500);
   }
 });
+
+document.getElementById('reload-btn').addEventListener('click', () => {
+  chrome.runtime.reload();
+});

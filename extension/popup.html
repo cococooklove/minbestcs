@@ -22,6 +22,8 @@ h2 { font-size: 14px; font-weight: 700; color: #222; margin-bottom: 14px; }
 .result.error { color: #e74c3c; }
 .result.success { color: #03c75a; }
 hr { border: none; border-top: 1px solid #eee; margin: 12px 0; }
+.btn-reload { width: 100%; padding: 7px; background: #f0f0f0; color: #555; border: none; border-radius: 5px; font-size: 11px; cursor: pointer; margin-top: 6px; }
+.btn-reload:hover { background: #e0e0e0; }
 </style>
 </head>
 <body>
@@ -42,6 +44,7 @@ hr { border: none; border-top: 1px solid #eee; margin: 12px 0; }
 <button class="btn-collect" id="collect-btn" disabled>리뷰 수집 시작</button>
 
 <div class="result" id="result"></div>
+<button class="btn-reload" id="reload-btn">확장 프로그램 재로드</button>
 
 <script src="config.js"></script>
 <script src="popup.js"></script>
