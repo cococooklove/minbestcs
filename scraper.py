@@ -218,33 +218,54 @@ def main(progress_cb=None, existing_page=None, cookies=None, headless=False):
         progress("엑셀다운 버튼 클릭 중...")
 
         # 팝업 확인 + 다운로드를 분리해서 처리
-        with page.expect_download(timeout=90000) as dl_info:
+        POPUP_SELS = [
+            "[role='dialog'] button:has-text('확인')",
+            "[role='dialog'] button:has-text('다운로드')",
+            "[role='dialog'] button:has-text('예')",
+            "[class*='Modal'] button:has-text('확인')",
+            "[class*='modal'] button:has-text('확인')",
+            "[class*='Popup'] button:has-text('확인')",
+            "[class*='popup'] button:has-text('확인')",
+            "[class*='Modal'] button[class*='primary']",
+            "[class*='modal'] button[class*='confirm']",
+        ]
+        _popup_clicked = False
+
+        with page.expect_download(timeout=30000) as dl_info:
             btn.click()
             time.sleep(3)
-            # 모달/다이얼로그 내부 버튼만 대상으로 한정
-            POPUP_SELS = [
-                "[role='dialog'] button:has-text('확인')",
-                "[role='dialog'] button:has-text('다운로드')",
-                "[role='dialog'] button:has-text('예')",
-                "[class*='Modal'] button:has-text('확인')",
-                "[class*='modal'] button:has-text('확인')",
-                "[class*='Popup'] button:has-text('확인')",
-                "[class*='popup'] button:has-text('확인')",
-                "[class*='Modal'] button[class*='primary']",
-                "[class*='modal'] button[class*='confirm']",
-            ]
             for sel in POPUP_SELS:
                 try:
                     confirm = page.wait_for_selector(sel, timeout=2000, state="visible")
                     if confirm:
                         progress("팝업 확인 클릭 중...")
                         confirm.click()
+                        _popup_clicked = True
                         time.sleep(1)
                         break
                 except Exception:
                     continue
 
-        download = dl_info.value
+        try:
+            download = dl_info.value
+        except Exception:
+            # 다운로드 타임아웃 — 원인 진단
+            try:
+                cur_url = page.url
+            except Exception:
+                cur_url = "알 수 없음"
+            if "login" in cur_url.lower() or "nid.naver" in cur_url.lower():
+                raise Exception("세션이 만료되어 로그인 페이지로 이동되었습니다. 확장프로그램에서 다시 수집을 시작해주세요.")
+            elif _popup_clicked:
+                raise Exception(
+                    "팝업 확인 클릭 후 다운로드가 시작되지 않았습니다. "
+                    "셀러센터 엑셀 다운로드 팝업 구조가 변경되었거나 권한이 없을 수 있습니다."
+                )
+            else:
+                raise Exception(
+                    "엑셀다운 버튼 클릭 후 다운로드 팝업이 나타나지 않았습니다. "
+                    "셀러센터 페이지 로딩이 완료되지 않았거나 리뷰가 없을 수 있습니다."
+                )
         progress(f"다운로드 완료: {download.suggested_filename}")
 
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
