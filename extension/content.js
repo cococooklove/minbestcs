@@ -25,10 +25,13 @@ chrome.runtime.onMessage.addListener((msg, sender, respond) => {
 
   // background.js로부터 수집 시작 명령 → 버튼 클릭 자동화
   if (msg.type === 'start_collect') {
-    respond({ ok: true }); // 즉시 응답 (서비스워커 블로킹 방지)
+    respond({ ok: true });
 
     (async () => {
       try {
+        // DOM attribute로 MAIN world와 serverUrl 공유
+        document.documentElement.setAttribute('data-minbest-server', msg.serverUrl);
+
         sendProgress('리뷰 페이지 준비 중...');
         await sleep(2000);
 

@@ -1,90 +1,101 @@
 (function () {
-  function postExcel(buf) {
-    if (buf.byteLength < 100) return;
-    window.postMessage({ __minbest_type: 'excel', data: Array.from(new Uint8Array(buf)) }, '*');
+  function looksLikeExcel(url) {
+    return /excel|xlsx|export|download/i.test(url);
   }
 
-  function looksLikeExcel(ct, url) {
-    if (ct.includes('spreadsheet') || ct.includes('excel') || ct.includes('ms-excel')) return true;
-    if (ct.includes('octet-stream')) return true;
-    if (url && (url.includes('excel') || url.includes('xlsx') ||
-                url.includes('download') || url.includes('export'))) return true;
-    return false;
+  function getServerUrl() {
+    return document.documentElement.getAttribute('data-minbest-server') || '';
   }
 
-  // 1. fetch 인터셉트
-  const origFetch = window.fetch.bind(window);
-  window.fetch = async function (input, init) {
-    const res = await origFetch(input, init);
+  async function interceptDownload(url, method, body) {
+    const serverUrl = getServerUrl();
+    if (!serverUrl) return false;
+
+    document.dispatchEvent(new CustomEvent('__minbest_progress', { detail: '파일 수신 중...' }));
     try {
-      const ct = res.headers.get('content-type') || '';
-      const url = typeof input === 'string' ? input : (input?.url || '');
-      if (looksLikeExcel(ct, url)) {
-        res.clone().arrayBuffer().then(postExcel);
+      const opts = { credentials: 'include' };
+      if (method === 'POST' && body) {
+        opts.method = 'POST';
+        opts.body = body;
       }
-    } catch (e) {}
-    return res;
-  };
+      const res = await fetch(url, opts);
+      if (!res.ok) throw new Error(`Naver 응답 오류 (${res.status})`);
+      const buf = await res.arrayBuffer();
 
-  // 2. XHR 인터셉트 (blob / arraybuffer 응답)
-  const origXhrOpen = XMLHttpRequest.prototype.open;
-  const origXhrSend = XMLHttpRequest.prototype.send;
-  XMLHttpRequest.prototype.open = function (method, url) {
-    this.__mbUrl = url || '';
-    return origXhrOpen.apply(this, arguments);
-  };
-  XMLHttpRequest.prototype.send = function () {
-    this.addEventListener('load', function () {
-      if (this.status !== 200) return;
-      const ct = this.getResponseHeader('content-type') || '';
-      if (!looksLikeExcel(ct, this.__mbUrl)) return;
-      try {
-        if (this.responseType === 'arraybuffer' && this.response) {
-          postExcel(this.response);
-        } else if (this.responseType === 'blob' && this.response) {
-          this.response.arrayBuffer().then(postExcel);
+      document.dispatchEvent(new CustomEvent('__minbest_progress', { detail: '서버로 파일 전송 중...' }));
+      const blob = new Blob([buf], {
+        type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+      });
+      const form = new FormData();
+      form.append('file', blob, 'reviews.xlsx');
+      const r = await fetch(`${serverUrl}/api/upload-excel`, { method: 'POST', body: form });
+      const data = await r.json();
+      document.dispatchEvent(new CustomEvent('__minbest_progress', {
+        detail: r.ok ? '완료' : `실패: ${data.error || '업로드 실패'}`
+      }));
+    } catch (e) {
+      document.dispatchEvent(new CustomEvent('__minbest_progress', { detail: `실패: ${e.message}` }));
+    }
+    return true; // 인터셉트 성공
+  }
+
+  // 1. location.href setter 오버라이드 (window.location.href = url)
+  try {
+    const desc = Object.getOwnPropertyDescriptor(Location.prototype, 'href');
+    if (desc && desc.set) {
+      Object.defineProperty(Location.prototype, 'href', {
+        ...desc,
+        set(url) {
+          if (looksLikeExcel(url) && getServerUrl()) {
+            interceptDownload(url, 'GET', null);
+            return; // 브라우저 다운로드 차단
+          }
+          desc.set.call(this, url);
         }
-      } catch (e) {}
-    });
-    return origXhrSend.apply(this, arguments);
-  };
-
-  // 3. blob URL 생성 인터셉트
-  const origCOU = URL.createObjectURL.bind(URL);
-  URL.createObjectURL = function (obj) {
-    if (obj instanceof Blob && obj.size > 100) {
-      obj.arrayBuffer().then(buf => {
-        if (looksLikeExcel(obj.type || '', '')) postExcel(buf);
       });
     }
-    return origCOU(obj);
+  } catch (e) {}
+
+  // 2. location.assign 오버라이드
+  const origAssign = Location.prototype.assign;
+  Location.prototype.assign = function (url) {
+    if (looksLikeExcel(url) && getServerUrl()) {
+      interceptDownload(url, 'GET', null);
+      return;
+    }
+    return origAssign.call(this, url);
   };
 
-  // 4. <a> 태그 다운로드 클릭 인터셉트
+  // 3. form.submit() 오버라이드 (hidden form POST 다운로드)
+  const origSubmit = HTMLFormElement.prototype.submit;
+  HTMLFormElement.prototype.submit = function () {
+    const action = this.action || '';
+    if (looksLikeExcel(action) && getServerUrl()) {
+      interceptDownload(action, 'POST', new FormData(this));
+      return;
+    }
+    return origSubmit.call(this);
+  };
+
+  // 4. <a download> 클릭 오버라이드
   document.addEventListener('click', function (e) {
     const a = e.target.closest('a');
     if (!a) return;
     const href = a.href || '';
-    if (a.hasAttribute('download') || looksLikeExcel('', href)) {
+    if ((a.hasAttribute('download') || looksLikeExcel(href)) && getServerUrl()) {
       e.preventDefault();
       e.stopPropagation();
-      fetch(href, { credentials: 'include' })
-        .then(r => r.arrayBuffer())
-        .then(postExcel)
-        .catch(() => {});
+      interceptDownload(href, 'GET', null);
     }
   }, true);
 
-  // 5. window.open 인터셉트 (새 창 다운로드)
-  const origWindowOpen = window.open.bind(window);
+  // 5. window.open 오버라이드
+  const origOpen = window.open.bind(window);
   window.open = function (url, ...args) {
-    if (url && looksLikeExcel('', String(url))) {
-      fetch(String(url), { credentials: 'include' })
-        .then(r => r.arrayBuffer())
-        .then(postExcel)
-        .catch(() => {});
+    if (url && looksLikeExcel(String(url)) && getServerUrl()) {
+      interceptDownload(String(url), 'GET', null);
       return null;
     }
-    return origWindowOpen(url, ...args);
+    return origOpen(url, ...args);
   };
 })();

@@ -15,6 +15,12 @@
   "content_scripts": [
     {
       "matches": ["https://sell.smartstore.naver.com/*"],
+      "js": ["content_main.js"],
+      "world": "MAIN",
+      "run_at": "document_start"
+    },
+    {
+      "matches": ["https://sell.smartstore.naver.com/*"],
       "js": ["content.js"],
       "run_at": "document_idle"
     }
