@@ -36,6 +36,30 @@ _scraping = False
 _session_cookies = None
 _progress_step = ""
 
+def _log(msg):
+    from datetime import datetime
+    print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] {msg}", flush=True)
+
+EVENT_LOG_FILE = os.path.join(_base_dir, "data", "event_log.json")
+
+def _log_event(event_type, message, detail=None):
+    from datetime import datetime
+    entry = {"ts": datetime.now().strftime("%Y-%m-%d %H:%M:%S"), "type": event_type, "msg": message}
+    if detail:
+        entry["detail"] = str(detail)
+    try:
+        os.makedirs(os.path.dirname(EVENT_LOG_FILE), exist_ok=True)
+        logs = []
+        if os.path.exists(EVENT_LOG_FILE):
+            with open(EVENT_LOG_FILE, encoding="utf-8") as f:
+                logs = json.load(f)
+        logs.insert(0, entry)
+        logs = logs[:200]  # 최대 200개 유지
+        with open(EVENT_LOG_FILE, "w", encoding="utf-8") as f:
+            json.dump(logs, f, ensure_ascii=False, indent=2)
+    except Exception:
+        pass
+
 
 def ensure_chromium():
     import glob, platform, subprocess
@@ -180,9 +204,11 @@ def api_upload_excel():
                 json.dump(merged, fp, ensure_ascii=False, indent=2)
 
             _scraping = False
+            _log(f"✅ 엑셀 업로드 성공: {len(added)}건 신규 / 전체 {len(merged)}건")
             socketio.emit("collect_status", {"step": "done", "success": True})
         except Exception as e:
             _scraping = False
+            _log(f"❌ 엑셀 업로드 실패: {e}")
             socketio.emit("collect_status", {"step": "done", "success": False, "error": str(e)})
 
     threading.Thread(target=_parse_and_save, daemon=True).start()
@@ -199,6 +225,7 @@ def api_receive_cookies():
     if not cookies:
         return jsonify({"error": "쿠키가 없습니다. 네이버에 로그인 후 다시 시도해주세요."}), 400
     _session_cookies = cookies
+    _log("🟡 수집 시작 (쿠키 수신)")
     socketio.emit("collect_status", {"step": "cookies_received"})
     threading.Thread(target=_run_server_collect, daemon=True).start()
     return jsonify({"status": "started"})
@@ -403,9 +430,11 @@ def _run_server_collect():
             headless=True,
         )
         _progress_step = "완료"
+        _log("✅ 수집 성공")
         socketio.emit("collect_status", {"step": "done", "success": True})
     except Exception as e:
         _progress_step = f"실패: {e}"
+        _log(f"❌ 수집 실패: {e}")
         socketio.emit("collect_status", {"step": "done", "success": False, "error": str(e)})
     finally:
         _scraping = False
@@ -485,6 +514,7 @@ def api_classify():
     """미분류 리뷰 일괄 분류"""
     data = request.get_json() or {}
     days = str(data.get("days", 365))
+    _log(f"🤖 AI 분석 시작 ({days}일 기준)")
     subprocess.Popen([sys.executable, "classifier.py", "--days", days], cwd=_base_dir)
     mtime = os.path.getmtime(REVIEWS_FILE) if os.path.exists(REVIEWS_FILE) else 0
     return jsonify({"status": "started", "mtime": mtime})
