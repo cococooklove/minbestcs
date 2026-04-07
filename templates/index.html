@@ -892,6 +892,8 @@ function renderStats(stats) {
 }
 
 function fetchReviews() {
+  const container = document.getElementById('reviews-container');
+  container.innerHTML = '<div class="loading">불러오는 중...</div>';
   const params = new URLSearchParams({
     q: document.getElementById('search').value,
     rating: document.getElementById('filter-rating').value,
@@ -909,7 +911,7 @@ function fetchReviews() {
       document.getElementById('last-updated').textContent = new Date().toLocaleTimeString('ko-KR');
     })
     .catch(() => {
-      document.getElementById('reviews-container').innerHTML =
+      container.innerHTML =
         '<div class="empty-state"><div class="icon">⚠️</div><p>데이터를 불러오지 못했습니다</p></div>';
     });
 }
