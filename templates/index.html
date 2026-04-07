@@ -1145,14 +1145,28 @@ function _openPopup(isError) {
 }
 
 // 수집 진행 중: 단계 업데이트, 확인 버튼 숨김
+let _progressTimeout = null;
 function showProgress(msg) {
   if (_popupTimer) { clearTimeout(_popupTimer); _popupTimer = null; }
+  if (_progressTimeout) { clearTimeout(_progressTimeout); _progressTimeout = null; }
   _popupLocked = true;
   _openPopup(false);
   const stepsEl = document.getElementById('popup-steps');
   const closeBtn = document.getElementById('popup-close-btn');
   if (stepsEl) stepsEl.style.display = 'flex';
   if (closeBtn) closeBtn.style.display = 'none';
+  // "서버 처리 중..." 상태에서만 15초 타임아웃 후 확인 버튼 표시
+  if (msg.includes('서버 처리 중')) {
+    _progressTimeout = setTimeout(() => {
+      const btn = document.getElementById('popup-close-btn');
+      if (btn && btn.style.display === 'none') {
+        _popupLocked = false;
+        btn.style.display = 'block';
+        btn.disabled = false;
+        document.getElementById('popup-msg').textContent = msg + ' (완료 후 확인을 눌러주세요)';
+      }
+    }, 15000);
+  }
   document.getElementById('popup-msg').textContent = msg;
   const s = _getMsgStep(msg);
   if (s >= 0) _setStep(s);
