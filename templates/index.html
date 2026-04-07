@@ -1180,6 +1180,7 @@ function showProgress(msg) {
 
 // 수집 완료/실패: 단계 완료 표시, 확인 버튼 표시
 function showResult(msg, isError = false) {
+  if (!isError && _collectDone) return; // 성공 팝업 중복 방지
   if (_popupTimer) { clearTimeout(_popupTimer); _popupTimer = null; }
   if (_progressTimeout) { clearTimeout(_progressTimeout); _progressTimeout = null; }
   if (!isError) _collectDone = true;
@@ -1539,7 +1540,7 @@ socket.on('scrape_status', data => {
     if (data.success === false) {
       showResult('수집 실패. 로그인 상태를 확인해주세요.', true);
     } else {
-      showResult('리뷰 수집 완료!');
+      showResult('리뷰 수집 완료!'); // _collectDone 중복 방지로 한 번만 실행됨
       fetchReviews();
     }
   }
@@ -1547,9 +1548,6 @@ socket.on('scrape_status', data => {
 
 socket.on('agent_progress', data => {
   showProgress(data.step || '수집 중...');
-  if (data.step && data.step.includes('파싱 완료')) {
-    fetchReviews();
-  }
 });
 
 const IS_SERVER = {{ is_server | tojson }};
