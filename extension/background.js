@@ -48,7 +48,7 @@ chrome.downloads.onCreated.addListener(async (item) => {
 
     if (!res.ok) {
       // 실패 시 로컬 다운로드 파일을 직접 읽는 방식으로 폴백
-      reportProgress(sv, `fetch 실패 (${res.status}) — 로컬 파일 감지 대기 중...`);
+      reportProgress(sv, '로컬 파일 감지 대기 중...');
       _pendingDownloadId = item.id;
       return;
     }
