@@ -90,6 +90,13 @@ def api_reset():
     return jsonify({"status": "reset"})
 
 
+@app.route("/api/reviews/clear", methods=["POST"])
+def api_reviews_clear():
+    if os.path.exists(REVIEWS_FILE):
+        os.remove(REVIEWS_FILE)
+    return jsonify({"ok": True})
+
+
 @app.route("/api/screenshot")
 def api_screenshot():
     """가장 최근 스크린샷 반환 (디버그용)"""
