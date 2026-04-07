@@ -74,8 +74,18 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     collectBtn.disabled = true;
-    resultDiv.textContent = '쿠키 전송 중...';
+    resultDiv.textContent = '수집 준비 중...';
     resultDiv.className = 'result';
+
+    // 웹 UI를 즉시 열어 사용자가 바로 진행 화면을 보게 함 (?collecting=1 → 즉시 모달 표시)
+    const collectUrl = serverUrl + '/?collecting=1';
+    const existingTabs = await chrome.tabs.query({ url: serverUrl + '/*' });
+    if (existingTabs.length > 0) {
+      chrome.tabs.update(existingTabs[0].id, { active: true, url: collectUrl });
+      chrome.windows.update(existingTabs[0].windowId, { focused: true });
+    } else {
+      chrome.tabs.create({ url: collectUrl });
+    }
 
     try {
       const seen = new Set();
@@ -116,15 +126,6 @@ document.addEventListener('DOMContentLoaded', async () => {
 
       resultDiv.textContent = '수집 중... 잠시 기다려주세요.';
       resultDiv.className = 'result';
-
-      // 웹 UI 열기 (이미 열려있으면 포커스)
-      const tabs = await chrome.tabs.query({ url: serverUrl + '/*' });
-      if (tabs.length > 0) {
-        chrome.tabs.update(tabs[0].id, { active: true });
-        chrome.windows.update(tabs[0].windowId, { focused: true });
-      } else {
-        chrome.tabs.create({ url: serverUrl });
-      }
 
       // 팝업에서 수집 완료까지 상태 폴링
       await pollStatus(serverUrl);

@@ -1516,6 +1516,12 @@ if (IS_SERVER) {
   const collectBtn = document.getElementById('btn-collect');
   if (collectBtn) { collectBtn.style.display = 'none'; }
 
+  // 확장프로그램이 ?collecting=1 파라미터로 열었으면 즉시 모달 표시
+  if (new URLSearchParams(location.search).get('collecting') === '1') {
+    showProgress('수집 준비 중...');
+    history.replaceState(null, '', location.pathname);
+  }
+
   // 페이지 로드 시 수집 중 상태 복원
   fetch('/api/status').then(r => r.json()).then(data => {
     const dot = document.getElementById('cookie-dot');
