@@ -170,10 +170,9 @@ async function handleCollect(serverUrl) {
   let tab;
   if (existing.length > 0) {
     tab = existing[0];
-    await chrome.tabs.update(tab.id, { active: true, url: reviewUrl });
-    await chrome.windows.update(tab.windowId, { focused: true });
+    await chrome.tabs.update(tab.id, { active: false, url: reviewUrl });
   } else {
-    tab = await chrome.tabs.create({ url: reviewUrl });
+    tab = await chrome.tabs.create({ url: reviewUrl, active: false });
   }
 
   await waitForTabLoad(tab.id);
