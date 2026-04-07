@@ -5,9 +5,9 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
   }
 });
 
-// Naver 다운로드 감지 — JS 몽키패칭 대신 브라우저 레벨에서 인터셉트
+// Naver 다운로드 감지 — 브라우저 레벨 인터셉트 후 MAIN world에서 재요청
 chrome.downloads.onCreated.addListener(async (item) => {
-  if (!_serverUrl) return; // 수집 진행 중일 때만
+  if (!_serverUrl) return;
   const url = item.url || '';
   const filename = item.filename || '';
   if (!url.includes('naver.com') && !url.includes('smartstore')) return;
@@ -16,7 +16,6 @@ chrome.downloads.onCreated.addListener(async (item) => {
   // Downloads 폴더 저장 취소
   chrome.downloads.cancel(item.id, () => {});
 
-  // 셀러센터 탭에 fetch_and_upload 전달
   const tabs = await chrome.tabs.query({});
   const naverTab = tabs.find(t => t.url?.includes('sell.smartstore.naver.com'));
   if (!naverTab) {
@@ -24,10 +23,37 @@ chrome.downloads.onCreated.addListener(async (item) => {
     return;
   }
 
-  chrome.tabs.sendMessage(naverTab.id, {
-    type: 'fetch_and_upload',
-    url,
-    serverUrl: _serverUrl
+  const sv = _serverUrl;
+  reportProgress(sv, '파일 수신 중...');
+
+  // MAIN world에서 실행 → sell.smartstore.naver.com origin으로 fetch (CORS 없음)
+  chrome.scripting.executeScript({
+    target: { tabId: naverTab.id },
+    world: 'MAIN',
+    func: async (downloadUrl, serverUrl) => {
+      try {
+        const res = await fetch(downloadUrl, { credentials: 'include' });
+        if (!res.ok) {
+          document.dispatchEvent(new CustomEvent('__minbest_progress', { detail: `실패: 파일 요청 실패 (${res.status})` }));
+          return;
+        }
+        const buf = await res.arrayBuffer();
+        const blob = new Blob([buf], {
+          type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        });
+        document.dispatchEvent(new CustomEvent('__minbest_progress', { detail: '서버로 파일 전송 중...' }));
+        const form = new FormData();
+        form.append('file', blob, 'reviews.xlsx');
+        const r = await fetch(`${serverUrl}/api/upload-excel`, { method: 'POST', body: form });
+        const data = await r.json();
+        document.dispatchEvent(new CustomEvent('__minbest_progress', {
+          detail: r.ok ? '완료' : `실패: ${data.error || '업로드 실패'}`
+        }));
+      } catch (e) {
+        document.dispatchEvent(new CustomEvent('__minbest_progress', { detail: `실패: ${e.message}` }));
+      }
+    },
+    args: [url, sv]
   });
 });
 

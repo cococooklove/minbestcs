@@ -1,5 +1,10 @@
 function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 
+// MAIN world executeScript에서 보내는 진행 상황 수신
+document.addEventListener('__minbest_progress', e => {
+  sendProgress(e.detail);
+});
+
 async function clickByText(text, timeoutMs = 8000) {
   const end = Date.now() + timeoutMs;
   while (Date.now() < end) {
@@ -17,31 +22,6 @@ function sendProgress(step) {
 }
 
 chrome.runtime.onMessage.addListener((msg, sender, respond) => {
-
-  // background.js가 다운로드 URL을 감지해서 전달 → 직접 fetch + 서버 업로드
-  if (msg.type === 'fetch_and_upload') {
-    (async () => {
-      try {
-        sendProgress('파일 수신 중...');
-        const res = await fetch(msg.url, { credentials: 'include' });
-        if (!res.ok) throw new Error(`파일 요청 실패 (${res.status})`);
-        const buf = await res.arrayBuffer();
-        const blob = new Blob([buf], {
-          type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-        });
-        const form = new FormData();
-        form.append('file', blob, 'reviews.xlsx');
-        sendProgress('서버로 파일 전송 중...');
-        const r = await fetch(`${msg.serverUrl}/api/upload-excel`, { method: 'POST', body: form });
-        const data = await r.json();
-        if (!r.ok) throw new Error(data.error || '서버 업로드 실패');
-        sendProgress('완료');
-      } catch (e) {
-        sendProgress(`실패: ${e.message}`);
-      }
-    })();
-    return false;
-  }
 
   // background.js로부터 수집 시작 명령 → 버튼 클릭 자동화
   if (msg.type === 'start_collect') {
