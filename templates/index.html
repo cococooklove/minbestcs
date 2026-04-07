@@ -1105,6 +1105,7 @@ function rejectReply(idx) {
 let _popupTimer = null;
 let _popupLocked = false;
 let _popupCloseCallback = null;
+let _collectDone = false; // showResult(성공) 호출 후 showProgress 무시용
 
 // 진행 단계 매핑
 const _STEP_MAP = [
@@ -1147,6 +1148,7 @@ function _openPopup(isError) {
 // 수집 진행 중: 단계 업데이트, 확인 버튼 숨김
 let _progressTimeout = null;
 function showProgress(msg) {
+  if (_collectDone) return; // 수집 완료 후 늦게 도착한 progress 무시
   if (_popupTimer) { clearTimeout(_popupTimer); _popupTimer = null; }
   if (_progressTimeout) { clearTimeout(_progressTimeout); _progressTimeout = null; }
   _popupLocked = true;
@@ -1175,6 +1177,8 @@ function showProgress(msg) {
 // 수집 완료/실패: 단계 완료 표시, 확인 버튼 표시
 function showResult(msg, isError = false) {
   if (_popupTimer) { clearTimeout(_popupTimer); _popupTimer = null; }
+  if (_progressTimeout) { clearTimeout(_progressTimeout); _progressTimeout = null; }
+  if (!isError) _collectDone = true;
   _popupLocked = false;
   _openPopup(isError);
   const stepsEl = document.getElementById('popup-steps');
@@ -1206,6 +1210,7 @@ function overlayClick() {
 
 function closePopup() {
   if (_popupLocked) return;
+  _collectDone = false;
   document.getElementById('naver-popup').style.display = 'none';
   document.getElementById('popup-overlay').style.display = 'none';
   _resetSteps();
