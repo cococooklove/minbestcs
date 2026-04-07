@@ -242,60 +242,64 @@ def main(progress_cb=None, existing_page=None, cookies=None, headless=False):
             except Exception:
                 return None
 
+        # context 레벨 download 이벤트 수신 (asyncio 충돌 없는 threading.Event 방식)
+        import threading
+        _download_event = threading.Event()
+        _download_holder = [None]
+
+        def _on_download(dl):
+            _download_holder[0] = dl
+            _download_event.set()
+
+        _dl_target = context if context is not None else page
+        _dl_target.on("download", _on_download)
+
+        btn.click()
+        time.sleep(3)
+
+        # 버튼 클릭 직후 화면 캡처
+        _save_screenshot("after_excel_click")
+
+        # 현재 페이지에 보이는 모든 버튼 텍스트 로그
         try:
-            with page.expect_download(timeout=120000) as dl_info:
-                btn.click()
-                time.sleep(3)
+            visible_btns = page.locator("button:visible").all_text_contents()
+            progress(f"[디버그] 감지된 버튼들: {', '.join(visible_btns[:10])}")
+        except Exception:
+            pass
 
-                # 버튼 클릭 직후 화면 캡처
-                _save_screenshot("after_excel_click")
-
-                # 현재 페이지에 보이는 모든 버튼 텍스트 로그
-                try:
-                    visible_btns = page.locator("button:visible").all_text_contents()
-                    progress(f"[디버그] 감지된 버튼들: {', '.join(visible_btns[:10])}")
-                except Exception:
-                    pass
-
-                for sel in POPUP_SELS:
+        # Locator API 사용 — ElementHandle 대비 stale element 문제 없음
+        for sel in POPUP_SELS:
+            try:
+                loc = page.locator(sel).first
+                loc.wait_for(state="visible", timeout=2000)
+                progress(f"팝업 감지됨 — 확인 클릭 중... ({sel})")
+                _save_screenshot("popup_found")
+                loc.click()
+                _popup_clicked = True
+                _save_screenshot("after_popup_click")
+                time.sleep(2)
+                # 2차 팝업 대응
+                for sel2 in POPUP_SELS:
                     try:
-                        confirm = page.wait_for_selector(sel, timeout=2000, state="visible")
-                        if confirm:
-                            progress(f"팝업 감지됨 — 확인 클릭 중... ({sel})")
-                            _save_screenshot("popup_found")
-                            try:
-                                confirm.click()
-                            except Exception:
-                                confirm.evaluate("el => el.click()")
-                            _popup_clicked = True
-                            _save_screenshot("after_popup_click")
-                            time.sleep(2)
-                            # 2차 팝업 대응
-                            for sel2 in POPUP_SELS:
-                                try:
-                                    confirm2 = page.wait_for_selector(sel2, timeout=2000, state="visible")
-                                    if confirm2:
-                                        progress(f"2차 팝업 감지됨 — 확인 클릭 중... ({sel2})")
-                                        _save_screenshot("second_popup_found")
-                                        try:
-                                            confirm2.click()
-                                        except Exception:
-                                            confirm2.evaluate("el => el.click()")
-                                        time.sleep(2)
-                                        break
-                                except Exception:
-                                    continue
-                            break
+                        loc2 = page.locator(sel2).first
+                        loc2.wait_for(state="visible", timeout=2000)
+                        progress(f"2차 팝업 감지됨 — 확인 클릭 중... ({sel2})")
+                        _save_screenshot("second_popup_found")
+                        loc2.click()
+                        time.sleep(2)
+                        break
                     except Exception:
                         continue
+                break
+            except Exception:
+                continue
 
-                if not _popup_clicked:
-                    progress("[디버그] 팝업 버튼을 찾지 못함 — 다운로드 이벤트 대기 중...")
-                    _save_screenshot("no_popup_found")
+        if not _popup_clicked:
+            progress("[디버그] 팝업 버튼을 찾지 못함 — 다운로드 이벤트 대기 중...")
+            _save_screenshot("no_popup_found")
 
-                progress("다운로드 시작 대기 중...")
-
-        except Exception:
+        progress("다운로드 시작 대기 중...")
+        if not _download_event.wait(timeout=120):
             _save_screenshot("download_timeout")
             try:
                 cur_url = page.url
@@ -315,7 +319,7 @@ def main(progress_cb=None, existing_page=None, cookies=None, headless=False):
                     "(/api/screenshot 에서 캡처 확인 가능)"
                 )
 
-        download = dl_info.value
+        download = _download_holder[0]
         progress(f"다운로드 완료: {download.suggested_filename}")
 
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
