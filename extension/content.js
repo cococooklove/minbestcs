@@ -16,7 +16,7 @@ async function waitForExcel(ms = 35000) {
     _excelReject = reject;
     setTimeout(() => {
       if (_excelReject) {
-        _excelReject(new Error('Excel 다운로드 타임아웃 (35초). 팝업 구조 확인 필요.'));
+        _excelReject(new Error('Excel 다운로드 타임아웃 (35초)'));
         _excelResolve = null;
         _excelReject = null;
       }
@@ -38,6 +38,12 @@ async function clickByText(text, timeoutMs = 8000) {
 
 chrome.runtime.onMessage.addListener((msg, sender, respond) => {
   if (msg.type !== 'start_collect') return;
+
+  const serverUrl = msg.serverUrl;
+
+  // 즉시 응답 (background 서비스워커 블로킹 방지)
+  respond({ ok: true });
+
   (async () => {
     try {
       sendProgress('리뷰 페이지 준비 중...');
@@ -77,11 +83,29 @@ chrome.runtime.onMessage.addListener((msg, sender, respond) => {
 
       sendProgress('파일 수신 중...');
       const data = await excelPromise;
-      respond({ success: true, data });
+
+      // background 경유 없이 content script에서 직접 서버로 업로드
+      sendProgress('서버로 파일 전송 중...');
+      const bytes = new Uint8Array(data);
+      const blob = new Blob([bytes], {
+        type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+      });
+      const formData = new FormData();
+      formData.append('file', blob, 'reviews.xlsx');
+
+      const res = await fetch(`${serverUrl}/api/upload-excel`, {
+        method: 'POST',
+        body: formData
+      });
+      const result = await res.json();
+      if (!res.ok) throw new Error(result.error || '서버 업로드 실패');
+
+      sendProgress('완료');
     } catch (e) {
-      respond({ success: false, error: e.message });
+      sendProgress(`실패: ${e.message}`);
     }
   })();
+
   return true;
 });
 

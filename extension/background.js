@@ -60,26 +60,6 @@ async function handleCollect(serverUrl) {
 
   await waitForTabLoad(tab.id);
 
-  const result = await chrome.tabs.sendMessage(tab.id, { type: 'start_collect' });
-
-  if (!result?.success) {
-    throw new Error(result?.error || '수집 실패');
-  }
-
-  await reportProgress(serverUrl, '서버로 파일 전송 중...');
-  const bytes = new Uint8Array(result.data);
-  const blob = new Blob([bytes], {
-    type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-  });
-  const formData = new FormData();
-  formData.append('file', blob, 'reviews.xlsx');
-
-  const res = await fetch(`${serverUrl}/api/upload-excel`, {
-    method: 'POST',
-    body: formData
-  });
-  const data = await res.json();
-  if (!res.ok) throw new Error(data.error || '서버 업로드 실패');
-
-  await reportProgress(serverUrl, '완료');
+  // serverUrl을 content script에 전달, 이후 업로드는 content script가 직접 처리
+  chrome.tabs.sendMessage(tab.id, { type: 'start_collect', serverUrl });
 }
