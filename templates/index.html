@@ -893,7 +893,14 @@ function renderStats(stats) {
 
 function fetchReviews() {
   const container = document.getElementById('reviews-container');
-  container.innerHTML = '<div class="loading">불러오는 중...</div>';
+  let elapsed = 0;
+  container.innerHTML = '<div class="loading" id="loading-msg">불러오는 중... (0초)</div>';
+  const timer = setInterval(() => {
+    elapsed++;
+    const el = document.getElementById('loading-msg');
+    if (el) el.textContent = `불러오는 중... (${elapsed}초)`;
+  }, 1000);
+
   const params = new URLSearchParams({
     q: document.getElementById('search').value,
     rating: document.getElementById('filter-rating').value,
@@ -903,16 +910,24 @@ function fetchReviews() {
     reportable: document.getElementById('filter-reportable').value,
     sort: document.getElementById('sort').value,
   });
-  fetch('/api/reviews?' + params)
+
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 20000);
+
+  fetch('/api/reviews?' + params, { signal: controller.signal })
     .then(r => r.json())
     .then(data => {
+      clearInterval(timer);
+      clearTimeout(timeout);
       renderStats(data.stats);
       renderReviews(data.reviews);
       document.getElementById('last-updated').textContent = new Date().toLocaleTimeString('ko-KR');
     })
-    .catch(() => {
-      container.innerHTML =
-        '<div class="empty-state"><div class="icon">⚠️</div><p>데이터를 불러오지 못했습니다</p></div>';
+    .catch(e => {
+      clearInterval(timer);
+      clearTimeout(timeout);
+      const msg = e.name === 'AbortError' ? '응답 시간 초과 (20초) — 서버 상태를 확인해주세요' : '데이터를 불러오지 못했습니다';
+      container.innerHTML = `<div class="empty-state"><div class="icon">⚠️</div><p>${msg}</p></div>`;
     });
 }
 
