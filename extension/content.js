@@ -67,17 +67,27 @@ chrome.runtime.onMessage.addListener((msg, sender, respond) => {
         await sleep(2500);
 
         // 모달 확인 버튼 클릭
-        const confirmBtn = [...document.querySelectorAll('button')]
-          .filter(b => b.offsetParent !== null)
-          .find(b => {
-            const t = b.textContent.trim();
-            const inModal = b.closest('[role="dialog"], [class*="Modal"], [class*="modal"], [class*="Popup"], [class*="popup"]');
-            return inModal && (t === '확인' || t === '다운로드' || t === '예');
-          });
+        function findModalConfirmBtn() {
+          return [...document.querySelectorAll('button')]
+            .filter(b => b.offsetParent !== null)
+            .find(b => {
+              const t = b.textContent.trim();
+              const inModal = b.closest('[role="dialog"], [class*="Modal"], [class*="modal"], [class*="Popup"], [class*="popup"]');
+              return inModal && (t === '확인' || t === '다운로드' || t === '예');
+            });
+        }
 
+        const confirmBtn = findModalConfirmBtn();
         if (confirmBtn) {
-          sendProgress(`팝업 확인 클릭 (${confirmBtn.textContent.trim()})`);
+          sendProgress(`팝업 감지됨 — 확인 클릭 중... (${confirmBtn.textContent.trim()})`);
           confirmBtn.click();
+          await sleep(2000);
+          // 2차 팝업 대응
+          const confirmBtn2 = findModalConfirmBtn();
+          if (confirmBtn2) {
+            sendProgress(`2차 팝업 감지됨 — 확인 클릭 중... (${confirmBtn2.textContent.trim()})`);
+            confirmBtn2.click();
+          }
         } else {
           sendProgress('다운로드 진행 중...');
         }

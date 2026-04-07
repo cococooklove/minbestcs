@@ -274,19 +274,40 @@ def main(progress_cb=None, existing_page=None, cookies=None, headless=False):
                 if confirm:
                     progress(f"팝업 감지됨 — 확인 클릭 중... ({sel})")
                     _save_screenshot("popup_found")
-                    confirm.click()
+                    try:
+                        confirm.click()
+                    except Exception:
+                        confirm.evaluate("el => el.click()")
                     _popup_clicked = True
-                    time.sleep(1)
+                    _save_screenshot("after_popup_click")
+                    time.sleep(2)
                     break
             except Exception:
                 continue
+
+        # 1차 팝업 클릭 후 2차 팝업 대응
+        if _popup_clicked:
+            for sel in POPUP_SELS:
+                try:
+                    confirm2 = page.wait_for_selector(sel, timeout=2000, state="visible")
+                    if confirm2:
+                        progress(f"2차 팝업 감지됨 — 확인 클릭 중... ({sel})")
+                        _save_screenshot("second_popup_found")
+                        try:
+                            confirm2.click()
+                        except Exception:
+                            confirm2.evaluate("el => el.click()")
+                        time.sleep(2)
+                        break
+                except Exception:
+                    continue
 
         if not _popup_clicked:
             progress("[디버그] 팝업 버튼을 찾지 못함 — 다운로드 이벤트 대기 중...")
             _save_screenshot("no_popup_found")
 
         progress("다운로드 시작 대기 중...")
-        if not _download_event.wait(timeout=30):
+        if not _download_event.wait(timeout=120):
             _save_screenshot("download_timeout")
             try:
                 cur_url = page.url
