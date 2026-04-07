@@ -23,39 +23,19 @@ document.addEventListener('DOMContentLoaded', async () => {
   });
 
   async function checkNaverLogin() {
-    const seen = new Set();
-    const allCookies = [];
-    for (const domain of NAVER_DOMAINS) {
-      const cookies = await chrome.cookies.getAll({ domain });
-      for (const c of cookies) {
-        const key = c.name + '|' + c.domain;
-        if (!seen.has(key)) { seen.add(key); allCookies.push(c); }
-      }
-    }
+    // NID_AUT 쿠키 존재 여부만 확인 (Naver 로그인 토큰, 서브도메인 포함)
+    const cookies = await chrome.cookies.getAll({ domain: 'naver.com' });
+    const hasLogin = cookies.some(c => c.name === 'NID_AUT');
 
-    // 네이버 로그인 여부 (NID_AUT = 실제 로그인 토큰)
-    const hasNaverLogin = allCookies.some(c => c.name === 'NID_AUT');
-
-    // 셀러센터 탭이 열려 있고 로그인 페이지가 아닌지 — URL 패턴 대신 직접 필터
-    const allTabs = await chrome.tabs.query({});
-    const hasSellerTab = allTabs.some(t =>
-      t.url && t.url.includes('sell.smartstore.naver.com') &&
-      !t.url.includes('login') && !t.url.includes('nidlogin')
-    );
-
-    let loggedIn = false;
-    if (!hasNaverLogin) {
+    if (!hasLogin) {
       naverDot.className = 'dot red';
       naverStatus.innerHTML = '네이버 로그인 필요 &nbsp;<a href="https://nid.naver.com/nidlogin.login" target="_blank" style="color:#03c75a;font-weight:600;">로그인하기 →</a>';
-    } else if (!hasSellerTab) {
-      naverDot.className = 'dot red';
-      naverStatus.innerHTML = '셀러센터를 열고 로그인해주세요 &nbsp;<a href="https://sell.smartstore.naver.com/" target="_blank" style="color:#03c75a;font-weight:600;">열기 →</a>';
-    } else {
-      naverDot.className = 'dot green';
-      naverStatus.textContent = '셀러센터 로그인됨 ✓';
-      loggedIn = true;
+      return { loggedIn: false };
     }
-    return { loggedIn, allCookies };
+
+    naverDot.className = 'dot green';
+    naverStatus.textContent = '셀러센터 로그인됨 ✓';
+    return { loggedIn: true };
   }
 
   async function checkAll() {
