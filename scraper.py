@@ -216,22 +216,30 @@ def main(progress_cb=None, existing_page=None, cookies=None, headless=False):
         btn = page.get_by_text("엑셀다운").first
         btn.wait_for(state="visible", timeout=60000)
         progress("엑셀다운 버튼 클릭 중...")
-        with page.expect_download(timeout=60000) as dl_info:
+
+        # 팝업 확인 + 다운로드를 분리해서 처리
+        with page.expect_download(timeout=90000) as dl_info:
             btn.click()
-            time.sleep(2)
-            for sel in [
-                "button:has-text('확인')",
-                "button:has-text('다운로드')",
-                "button:has-text('예')",
+            time.sleep(3)
+            # 모달/다이얼로그 내부 버튼만 대상으로 한정
+            POPUP_SELS = [
+                "[role='dialog'] button:has-text('확인')",
+                "[role='dialog'] button:has-text('다운로드')",
+                "[role='dialog'] button:has-text('예')",
+                "[class*='Modal'] button:has-text('확인')",
+                "[class*='modal'] button:has-text('확인')",
+                "[class*='Popup'] button:has-text('확인')",
+                "[class*='popup'] button:has-text('확인')",
                 "[class*='Modal'] button[class*='primary']",
                 "[class*='modal'] button[class*='confirm']",
-                "[role='dialog'] button",
-            ]:
+            ]
+            for sel in POPUP_SELS:
                 try:
                     confirm = page.wait_for_selector(sel, timeout=2000, state="visible")
                     if confirm:
                         progress("팝업 확인 클릭 중...")
                         confirm.click()
+                        time.sleep(1)
                         break
                 except Exception:
                     continue
