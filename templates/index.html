@@ -209,6 +209,17 @@
   .btn-classify-main:hover { background: #02b350; box-shadow: 0 3px 10px rgba(3,199,90,0.35); }
   .btn-classify-main:disabled { background: #a8e6c5; box-shadow: none; cursor: not-allowed; }
 
+  .btn-unanalyzed {
+    padding: 7px 14px;
+    background: #fff; color: #03c75a;
+    border: 1.5px solid #03c75a;
+    border-radius: 6px; cursor: pointer;
+    font-size: 13px; font-weight: 700; white-space: nowrap;
+    transition: background 0.15s, color 0.15s;
+  }
+  .btn-unanalyzed:hover { background: #f0faf4; }
+  .btn-unanalyzed:disabled { color: #aaa; border-color: #ddd; cursor: not-allowed; background: #fafafa; }
+
   .controls {
     padding: 12px 24px; display: flex; gap: 8px; flex-wrap: wrap; align-items: center;
     background: white; border-bottom: 1px solid #e8e8e8;
@@ -226,11 +237,9 @@
   .filter-count { font-size: 13px; color: #666; margin-left: auto; }
 
   .coupon-approve-box { margin-top: 6px; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
-  .manual-coupon-input {
-    border: 1px solid #ddd; border-radius: 5px; padding: 3px 7px;
-    font-size: 12px; width: 110px; outline: none;
-  }
-  .manual-coupon-input:focus { border-color: #1a73e8; }
+  .coupon-dropdown { position:absolute; top:100%; left:0; z-index:100; background:#fff; border:1px solid #ddd; border-radius:5px; box-shadow:0 2px 8px rgba(0,0,0,.15); min-width:230px; }
+  .coupon-dropdown-item { padding:7px 12px; cursor:pointer; font-size:12px; white-space:nowrap; }
+  .coupon-dropdown-item:hover { background:#f0f4ff; }
 
   .date-filter-group { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; }
   .date-quick-btn {
@@ -563,6 +572,7 @@
     <option value="rating_low">별점 낮은순</option>
   </select>
   <span class="filter-count" id="filter-count"></span>
+  <button id="btn-run-unanalyzed" class="btn-unanalyzed" onclick="openClassifyModal()" disabled>미분석 확인 중...</button>
   <button class="btn-classify-main" onclick="openClassifyModal()">✦ AI 분석</button>
 </div>
 
@@ -722,6 +732,58 @@
     <div class="admin-footer">
       <button class="btn-save" id="btn-save-sensitive" onclick="saveSensitiveExprs(this)" disabled>저장됨</button>
     </div>
+  </div>
+
+  <!-- AI 분석 · 답변 동작 안내 -->
+  <div class="admin-section">
+    <div class="admin-section-title">📋 AI 분석 · 답변 동작 안내</div>
+
+    <div class="admin-label" style="margin-bottom:8px">AI 분석 재실행 시 기존 답변 변경 여부</div>
+    <table style="width:100%;border-collapse:collapse;font-size:13px;margin-bottom:20px">
+      <thead>
+        <tr style="background:#f7f7f7">
+          <th style="padding:9px 12px;text-align:left;border:1px solid #e8e8e8;font-weight:600;color:#555">동작</th>
+          <th style="padding:9px 12px;text-align:left;border:1px solid #e8e8e8;font-weight:600;color:#555">기존 답변 변경</th>
+          <th style="padding:9px 12px;text-align:left;border:1px solid #e8e8e8;font-weight:600;color:#555">설명</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td style="padding:9px 12px;border:1px solid #e8e8e8">일괄 AI 분석 재실행</td>
+          <td style="padding:9px 12px;border:1px solid #e8e8e8"><span style="color:#03c75a;font-weight:600">변경 없음</span></td>
+          <td style="padding:9px 12px;border:1px solid #e8e8e8;color:#666">이미 분석된 항목(감성 분류 완료)은 건너뜀</td>
+        </tr>
+        <tr style="background:#fafafa">
+          <td style="padding:9px 12px;border:1px solid #e8e8e8">개별 "답변 재생성" 클릭</td>
+          <td style="padding:9px 12px;border:1px solid #e8e8e8"><span style="color:#e67e22;font-weight:600">덮어씀</span></td>
+          <td style="padding:9px 12px;border:1px solid #e8e8e8;color:#666">기존 답변은 히스토리에 자동 보존 (최대 5개)</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div class="admin-label" style="margin-bottom:8px">이전 답변 복원 방법</div>
+    <table style="width:100%;border-collapse:collapse;font-size:13px">
+      <thead>
+        <tr style="background:#f7f7f7">
+          <th style="padding:9px 12px;text-align:left;border:1px solid #e8e8e8;font-weight:600;color:#555">단계</th>
+          <th style="padding:9px 12px;text-align:left;border:1px solid #e8e8e8;font-weight:600;color:#555">방법</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td style="padding:9px 12px;border:1px solid #e8e8e8">1</td>
+          <td style="padding:9px 12px;border:1px solid #e8e8e8;color:#666">리뷰 카드 답변 영역의 <b>▶ 이전 답변 기록 N개</b> 토글 클릭</td>
+        </tr>
+        <tr style="background:#fafafa">
+          <td style="padding:9px 12px;border:1px solid #e8e8e8">2</td>
+          <td style="padding:9px 12px;border:1px solid #e8e8e8;color:#666">원하는 이전 답변 옆 <b>복원</b> 버튼 클릭 → 텍스트가 입력창에 채워짐</td>
+        </tr>
+        <tr>
+          <td style="padding:9px 12px;border:1px solid #e8e8e8">3</td>
+          <td style="padding:9px 12px;border:1px solid #e8e8e8;color:#666"><b>답변 승인</b> 버튼을 눌러야 최종 저장됨</td>
+        </tr>
+      </tbody>
+    </table>
   </div>
 
 </div>
@@ -937,15 +999,25 @@ function renderReviews(reviews) {
         <div class="coupon-approve-box">
           <button class="btn-sm btn-green" onclick="approveCoupon(${idx})">쿠폰 승인</button>
           <span style="color:#ccc;font-size:11px">|</span>
-          <input class="manual-coupon-input" id="mc-input-${idx}" placeholder="쿠폰명 직접 입력">
-          <button class="btn-sm btn-light-blue" onclick="manualCoupon(${idx})">수동 발급</button>
+          <div style="position:relative;display:inline-block">
+            <button class="btn-sm btn-light-blue" onclick="toggleCouponDropdown(${idx}, event)">수동 발급 ▼</button>
+            <div id="cd-${idx}" class="coupon-dropdown" style="display:none">
+              <div class="coupon-dropdown-item" onclick="manualCoupon(${idx}, '10만 원 이상 구매 시 1만 원')">10만 원 이상 구매 시 1만 원</div>
+              <div class="coupon-dropdown-item" onclick="manualCoupon(${idx}, '20만 원 이상 구매 시 2만 원 할인 쿠폰')">20만 원 이상 구매 시 2만 원 할인 쿠폰</div>
+            </div>
+          </div>
         </div>`;
     } else {
       couponBody = `
         <div class="coupon-approve-box">
           <span class="no-analysis" style="margin-right:4px">해당 없음</span>
-          <input class="manual-coupon-input" id="mc-input-${idx}" placeholder="쿠폰명 직접 입력">
-          <button class="btn-sm btn-light-blue" onclick="manualCoupon(${idx})">수동 발급</button>
+          <div style="position:relative;display:inline-block">
+            <button class="btn-sm btn-light-blue" onclick="toggleCouponDropdown(${idx}, event)">수동 발급 ▼</button>
+            <div id="cd-${idx}" class="coupon-dropdown" style="display:none">
+              <div class="coupon-dropdown-item" onclick="manualCoupon(${idx}, '10만 원 이상 구매 시 1만 원')">10만 원 이상 구매 시 1만 원</div>
+              <div class="coupon-dropdown-item" onclick="manualCoupon(${idx}, '20만 원 이상 구매 시 2만 원 할인 쿠폰')">20만 원 이상 구매 시 2만 원 할인 쿠폰</div>
+            </div>
+          </div>
         </div>`;
     }
     const couponSection = `
@@ -1204,6 +1276,16 @@ function closeClassifyModal() {
   document.getElementById('classify-modal').style.display = 'none';
 }
 
+function loadUnanalyzedCount() {
+  const btn = document.getElementById('btn-run-unanalyzed');
+  if (!btn) return;
+  fetch('/api/classify/count').then(r => r.json()).then(counts => {
+    const cnt = counts['0'] ?? 0;
+    btn.textContent = cnt > 0 ? `⚡ 미분석 ${cnt}건 분석` : '✓ 모두 분석됨';
+    btn.disabled = cnt === 0;
+  }).catch(() => { btn.textContent = '미분석 분석'; btn.disabled = false; });
+}
+
 function runClassify(days = 365) {
   const btn = document.querySelector('.btn-classify-main');
   if (btn) { btn.disabled = true; btn.textContent = '⏳ 분류 중...'; }
@@ -1234,6 +1316,7 @@ function runClassify(days = 365) {
             if (btn) { btn.disabled = false; btn.textContent = '✦ AI 분석'; }
             fetch('/api/admin/config').then(r => r.json()).then(cfg => {
               window.adminSettings = cfg;
+              loadUnanalyzedCount();
               _popupCloseCallback = fetchReviews;
               showResult('AI 분석 완료! 확인을 눌러 결과를 반영하세요.');
             });
@@ -1266,14 +1349,28 @@ function approveCoupon(idx) {
     .then(() => fetchReviews());
 }
 
-function manualCoupon(idx) {
-  const coupon = (document.getElementById(`mc-input-${idx}`)?.value || '').trim();
-  if (!coupon) { alert('쿠폰명을 입력하세요'); return; }
+function toggleCouponDropdown(idx, e) {
+  e.stopPropagation();
+  document.querySelectorAll('.coupon-dropdown').forEach(d => {
+    if (d.id !== `cd-${idx}`) d.style.display = 'none';
+  });
+  const d = document.getElementById(`cd-${idx}`);
+  d.style.display = d.style.display === 'block' ? 'none' : 'block';
+}
+document.addEventListener('click', () => {
+  document.querySelectorAll('.coupon-dropdown').forEach(d => d.style.display = 'none');
+});
+
+function manualCoupon(idx, coupon) {
   fetch(`/api/coupon/manual/${idx}`, {
     method: 'POST',
     headers: {'Content-Type': 'application/json'},
     body: JSON.stringify({coupon}),
-  }).then(() => fetchReviews());
+  }).then(() => {
+    const d = document.getElementById(`cd-${idx}`);
+    if (d) d.style.display = 'none';
+    fetchReviews();
+  });
 }
 
 function revokeCoupon(idx) {
@@ -1796,9 +1893,11 @@ window.adminSettings = {};
 fetch('/api/admin/config').then(r => r.json()).then(cfg => {
   window.adminSettings = cfg;
   fetchReviews();
+  loadUnanalyzedCount();
   setInterval(fetchReviews, 5 * 60 * 1000);
 }).catch(() => {
   fetchReviews();
+  loadUnanalyzedCount();
   setInterval(fetchReviews, 5 * 60 * 1000);
 });
 
