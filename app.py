@@ -5,7 +5,8 @@
 """
 from flask import Flask, render_template, jsonify, request
 from flask_socketio import SocketIO
-import json, os, threading, webbrowser, sys, subprocess
+import json, os, threading, webbrowser, sys, subprocess, math
+from datetime import datetime
 from pathlib import Path
 from dotenv import load_dotenv
 
@@ -28,6 +29,10 @@ def add_cors(response):
     response.headers["Access-Control-Allow-Headers"] = "Content-Type"
     return response
 REVIEWS_FILE = os.path.join(_base_dir, "data", "reviews.json")
+
+_reviews_cache = None
+_reviews_cache_mtime = 0.0
+_reviews_cache_lock = threading.Lock()
 
 _login_pw = None
 _login_context = None
@@ -81,15 +86,32 @@ def ensure_chromium():
 
 
 def load_reviews():
+    global _reviews_cache, _reviews_cache_mtime
     if not os.path.exists(REVIEWS_FILE):
         return []
-    with open(REVIEWS_FILE, encoding="utf-8") as f:
-        return json.load(f)
+    with _reviews_cache_lock:
+        try:
+            mtime = os.path.getmtime(REVIEWS_FILE)
+        except OSError:
+            return _reviews_cache or []
+        if _reviews_cache is not None and mtime == _reviews_cache_mtime:
+            return _reviews_cache
+        with open(REVIEWS_FILE, encoding="utf-8") as f:
+            _reviews_cache = json.load(f)
+        _reviews_cache_mtime = mtime
+        return _reviews_cache
 
 
 def save_reviews(reviews):
     with open(REVIEWS_FILE, "w", encoding="utf-8") as f:
         json.dump(reviews, f, ensure_ascii=False, indent=2)
+
+
+def invalidate_reviews_cache():
+    global _reviews_cache, _reviews_cache_mtime
+    with _reviews_cache_lock:
+        _reviews_cache = None
+        _reviews_cache_mtime = 0.0
 
 
 @app.route("/api/status")
@@ -280,26 +302,37 @@ def api_reviews():
     topic = request.args.get("topic", "")
     reportable = request.args.get("reportable", "")
     sort = request.args.get("sort", "newest")
+    date_from = request.args.get("date_from", "")  # YYYY-MM-DD
+    date_to   = request.args.get("date_to",   "")  # YYYY-MM-DD
+    page     = max(1, int(request.args.get("page", 1)))
+    per_page = max(10, min(200, int(request.args.get("per_page", 50))))
 
-    # 필터
-    reviews_idx = list(range(len(all_r)))
-    if q:
-        reviews_idx = [i for i in reviews_idx if
-                       q in all_r[i].get("content", "").lower()
-                       or q in all_r[i].get("product", "").lower()
-                       or q in all_r[i].get("reviewer", "").lower()]
-    if rating:
-        reviews_idx = [i for i in reviews_idx if str(all_r[i].get("rating", "")).startswith(rating)]
-    if replied == "yes":
-        reviews_idx = [i for i in reviews_idx if all_r[i].get("replied")]
-    elif replied == "no":
-        reviews_idx = [i for i in reviews_idx if not all_r[i].get("replied")]
-    if sentiment:
-        reviews_idx = [i for i in reviews_idx if all_r[i].get("sentiment") == sentiment]
-    if topic:
-        reviews_idx = [i for i in reviews_idx if topic in (all_r[i].get("topics") or [])]
-    if reportable == "yes":
-        reviews_idx = [i for i in reviews_idx if all_r[i].get("reportable")]
+    # 단일 패스 필터
+    def _matches(i):
+        r = all_r[i]
+        if q and not (q in (r.get("content") or "").lower()
+                      or q in (r.get("product") or "").lower()
+                      or q in (r.get("reviewer") or "").lower()):
+            return False
+        if rating and not str(r.get("rating", "")).startswith(rating):
+            return False
+        if replied == "yes" and not r.get("replied"):
+            return False
+        if replied == "no" and r.get("replied"):
+            return False
+        if sentiment and r.get("sentiment") != sentiment:
+            return False
+        if topic and topic not in (r.get("topics") or []):
+            return False
+        if reportable == "yes" and not r.get("reportable"):
+            return False
+        if date_from and (r.get("date") or "") < date_from:
+            return False
+        if date_to and (r.get("date") or "") > date_to:
+            return False
+        return True
+
+    reviews_idx = [i for i in range(len(all_r)) if _matches(i)]
 
     sort_key = {
         "oldest":      lambda i: all_r[i].get("date", ""),
@@ -310,11 +343,16 @@ def api_reviews():
     reviews_idx = sorted(reviews_idx, key=sort_key.get(sort, sort_key["newest"]),
                          reverse=sort not in ("oldest", "rating_low"))
 
+    # 페이지네이션 슬라이싱
+    total_filtered = len(reviews_idx)
+    start = (page - 1) * per_page
+    reviews_idx_page = reviews_idx[start: start + per_page]
+
     # 통계
     ratings = [float(r.get("rating", 0) or 0) for r in all_r if r.get("rating")]
     stats = {
         "total": len(all_r),
-        "filtered": len(reviews_idx),
+        "filtered": total_filtered,
         "avg_rating": round(sum(ratings) / len(ratings), 1) if ratings else 0,
         "replied_count": sum(1 for r in all_r if r.get("replied")),
         "rating_dist": {str(i): sum(1 for r in ratings if int(r) == i) for i in range(1, 6)},
@@ -340,7 +378,7 @@ def api_reviews():
     manual_tags   = load_manual_tags()
 
     indexed_reviews = []
-    for i in reviews_idx:
+    for i in reviews_idx_page:
         r = all_r[i]
         history = [
             {
@@ -353,10 +391,20 @@ def api_reviews():
             for j in reviewer_map.get(r.get("reviewer", ""), [])
             if j != i
         ]
+        history.sort(key=lambda h: h.get("date") or "", reverse=True)
         customer_type = calculate_customer_type(history, manual_tags, r.get("reviewer", ""), settings_data)
         indexed_reviews.append({"_idx": i, **r, "reviewer_history": history, "customer_type": customer_type})
 
-    return jsonify({"reviews": indexed_reviews, "stats": stats})
+    return jsonify({
+        "reviews": indexed_reviews,
+        "stats": stats,
+        "pagination": {
+            "page": page,
+            "per_page": per_page,
+            "total_filtered": total_filtered,
+            "total_pages": math.ceil(total_filtered / per_page) if total_filtered else 1,
+        }
+    })
 
 
 PROFILE_DIR = os.path.join(_base_dir, "data", "browser_profile")
@@ -556,11 +604,13 @@ def api_generate_reply(idx):
         from classifier import generate_reply, load_brand_tone
         client = anthropic.Anthropic(api_key=api_key)
         brand_tone = load_brand_tone()
-        reply = generate_reply(reviews[idx], brand_tone, client)
-        auto_reply = load_settings().get("auto_reply", False)
+        settings_data = load_settings()
+        reply = generate_reply(reviews[idx], brand_tone, client, settings=settings_data)
+        auto_reply = settings_data.get("auto_reply", False)
         reviews[idx]["ai_reply"] = reply
         reviews[idx]["reply_status"] = "approved" if auto_reply else "draft"
         save_reviews(reviews)
+        invalidate_reviews_cache()
         return jsonify({"reply": reply, "status": reviews[idx]["reply_status"]})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
@@ -574,11 +624,17 @@ def api_approve_reply(idx):
         return jsonify({"error": "not found"}), 404
 
     data = request.get_json() or {}
-    # 수정된 답변 내용 반영 가능
     if "reply" in data:
-        reviews[idx]["ai_reply"] = data["reply"]
+        old_reply = reviews[idx].get("ai_reply", "")
+        new_reply = data["reply"]
+        if old_reply and old_reply != new_reply:
+            history = reviews[idx].get("reply_history", [])
+            history.insert(0, {"text": old_reply, "saved_at": datetime.now().strftime("%Y-%m-%d %H:%M")})
+            reviews[idx]["reply_history"] = history[:5]
+        reviews[idx]["ai_reply"] = new_reply
     reviews[idx]["reply_status"] = "approved"
     save_reviews(reviews)
+    invalidate_reviews_cache()
     return jsonify({"status": "approved"})
 
 
@@ -588,10 +644,78 @@ def api_reject_reply(idx):
     reviews = load_reviews()
     if idx >= len(reviews):
         return jsonify({"error": "not found"}), 404
+    old_reply = reviews[idx].get("ai_reply", "")
+    if old_reply:
+        history = reviews[idx].get("reply_history", [])
+        history.insert(0, {"text": old_reply, "saved_at": datetime.now().strftime("%Y-%m-%d %H:%M")})
+        reviews[idx]["reply_history"] = history[:5]
     reviews[idx]["ai_reply"] = ""
     reviews[idx]["reply_status"] = "none"
     save_reviews(reviews)
+    invalidate_reviews_cache()
     return jsonify({"status": "rejected"})
+
+
+@app.route("/api/coupon/approve/<int:idx>", methods=["POST"])
+def api_coupon_approve(idx):
+    """쿠폰 승인"""
+    reviews = load_reviews()
+    if idx >= len(reviews):
+        return jsonify({"error": "not found"}), 404
+    reviews[idx]["coupon_status"] = "approved"
+    save_reviews(reviews)
+    invalidate_reviews_cache()
+    return jsonify({"status": "approved"})
+
+
+@app.route("/api/coupon/manual/<int:idx>", methods=["POST"])
+def api_coupon_manual(idx):
+    """수동 쿠폰 발급"""
+    reviews = load_reviews()
+    if idx >= len(reviews):
+        return jsonify({"error": "not found"}), 404
+    data = request.get_json() or {}
+    coupon = (data.get("coupon") or "").strip()
+    if not coupon:
+        return jsonify({"error": "쿠폰명 필요"}), 400
+    reviews[idx]["coupon_status"] = "manual"
+    reviews[idx]["manual_coupon"] = coupon
+    save_reviews(reviews)
+    invalidate_reviews_cache()
+    return jsonify({"status": "manual", "coupon": coupon})
+
+
+@app.route("/api/coupon/revoke/<int:idx>", methods=["POST"])
+def api_coupon_revoke(idx):
+    """쿠폰 승인 취소"""
+    reviews = load_reviews()
+    if idx >= len(reviews):
+        return jsonify({"error": "not found"}), 404
+    reviews[idx]["coupon_status"] = "none"
+    reviews[idx]["manual_coupon"] = ""
+    save_reviews(reviews)
+    invalidate_reviews_cache()
+    return jsonify({"status": "none"})
+
+
+@app.route("/api/approve/all/<int:idx>", methods=["POST"])
+def api_approve_all(idx):
+    """쿠폰 + 답변 동시 승인"""
+    reviews = load_reviews()
+    if idx >= len(reviews):
+        return jsonify({"error": "not found"}), 404
+    data = request.get_json() or {}
+    approve_reply  = data.get("approve_reply",  True)
+    approve_coupon = data.get("approve_coupon", True)
+    if approve_reply:
+        if "reply" in data:
+            reviews[idx]["ai_reply"] = data["reply"]
+        reviews[idx]["reply_status"] = "approved"
+    if approve_coupon:
+        reviews[idx]["coupon_status"] = "approved"
+    save_reviews(reviews)
+    invalidate_reviews_cache()
+    return jsonify({"status": "ok"})
 
 
 @app.route("/api/review/tag/<int:idx>", methods=["POST"])
@@ -691,6 +815,10 @@ def admin_config_post():
         os.environ["ANTHROPIC_API_KEY"] = data["anthropic_api_key"]
     if "coupon_rules" in data:
         s["coupon_rules"] = data["coupon_rules"]
+    if "reply_coupon_template" in data:
+        s["reply_coupon_template"] = data["reply_coupon_template"]
+    if "sensitive_expressions" in data:
+        s["sensitive_expressions"] = data["sensitive_expressions"]
     if "loyal_threshold" in data:
         s["loyal_threshold"] = int(data["loyal_threshold"])
     if "customer_type_hints" in data:

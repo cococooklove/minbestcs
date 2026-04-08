@@ -9,16 +9,38 @@
   ],
   "anthropic_api_key": "",
   "loyal_threshold": 3,
+  "reply_coupon_template": "감사의 마음을 담아 {coupon}({amount})을 발급해드렸으니 다음 구매에 꼭 활용해 주세요.",
   "customer_type_hints": {
     "first":  "이 고객은 첫 구매 고객입니다. 브랜드의 첫 인상을 심어주는 따뜻한 환영 메시지를 포함하세요.",
     "repeat": "이 고객은 재구매 고객입니다. 재방문에 감사를 표하고 신뢰를 강조하세요.",
     "loyal":  "이 고객은 단골 고객입니다. VIP 고객처럼 특별한 감사와 친근함을 담아 답변하세요.",
     "gift":   "이 고객은 선물 구매자로 표시되었습니다. 선물 받는 분도 만족할 수 있도록 배려 어린 답변을 작성하세요."
   },
+  "sensitive_expressions": [
+    "치료",
+    "예방",
+    "효능",
+    "효과가 있",
+    "증상이 개선",
+    "증상 완화",
+    "혈압",
+    "혈당",
+    "콜레스테롤",
+    "당뇨",
+    "고혈압",
+    "암에",
+    "면역력 향상",
+    "체중 감량",
+    "다이어트 효과",
+    "항산화 효과",
+    "통증이 사라"
+  ],
   "coupon_rules": [
     {
       "condition": "rating_5_photo",
       "coupon": "재구매 할인 쿠폰",
+      "coupon_amount": "",
+      "min_purchase_amount": "",
       "enabled": true,
       "id": 1,
       "label": "별점 5점 + 포토리뷰"
@@ -26,6 +48,8 @@
     {
       "condition": "repurchase",
       "coupon": "VIP 감사 쿠폰",
+      "coupon_amount": "",
+      "min_purchase_amount": "",
       "enabled": true,
       "id": 2,
       "label": "재구매 고객 리뷰"
@@ -33,6 +57,8 @@
     {
       "condition": "content_100",
       "coupon": "소액 적립금",
+      "coupon_amount": "",
+      "min_purchase_amount": "",
       "enabled": true,
       "id": 3,
       "label": "리뷰 100자 이상"
@@ -40,6 +66,8 @@
     {
       "condition": "negative_manual",
       "coupon": "사과 쿠폰",
+      "coupon_amount": "",
+      "min_purchase_amount": "",
       "enabled": true,
       "id": 4,
       "label": "부정 리뷰 (수동 발급)"

@@ -225,6 +225,26 @@
   }
   .filter-count { font-size: 13px; color: #666; margin-left: auto; }
 
+  .coupon-approve-box { margin-top: 6px; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+  .manual-coupon-input {
+    border: 1px solid #ddd; border-radius: 5px; padding: 3px 7px;
+    font-size: 12px; width: 110px; outline: none;
+  }
+  .manual-coupon-input:focus { border-color: #1a73e8; }
+
+  .date-filter-group { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; }
+  .date-quick-btn {
+    padding: 5px 10px; border: 1px solid #ddd; border-radius: 6px;
+    background: #fff; font-size: 12px; cursor: pointer; color: #555; line-height: 1;
+  }
+  .date-quick-btn.active { background: #1a73e8; color: #fff; border-color: #1a73e8; }
+  .date-quick-btn:hover:not(.active) { border-color: #aaa; }
+  #date-from, #date-to {
+    border: 1px solid #ddd; border-radius: 6px; padding: 4px 6px;
+    font-size: 12px; color: #333; outline: none;
+  }
+  #date-from:focus, #date-to:focus { border-color: #1a73e8; }
+
   .reviews-container { padding: 14px 24px; }
 
   .review-card {
@@ -300,10 +320,17 @@
   }
   .ai-reply-text {
     width: 100%; border: none; background: transparent; font-size: 13px;
-    font-family: inherit; color: #333; resize: vertical; min-height: 64px;
-    outline: none; line-height: 1.65;
+    font-family: inherit; color: #333; resize: none; min-height: 120px;
+    outline: none; line-height: 1.8; padding: 4px 2px; overflow-y: hidden;
   }
   .ai-reply-text[readonly] { background: #f5f5f5; color: #666; border-radius: 4px; padding: 4px; }
+  .reply-history-wrap { margin-top: 10px; border-top: 1px solid #eee; padding-top: 8px; }
+  .reply-history-toggle { font-size: 12px; color: #888; cursor: pointer; user-select: none; }
+  .reply-history-toggle:hover { color: #555; }
+  .reply-history-list { margin-top: 6px; display: flex; flex-direction: column; gap: 8px; }
+  .reply-history-item { background: #f9f9f9; border: 1px solid #eee; border-radius: 5px; padding: 8px 10px; }
+  .reply-history-meta { font-size: 11px; color: #aaa; margin-bottom: 4px; }
+  .reply-history-text { font-size: 12px; color: #555; line-height: 1.6; white-space: pre-wrap; }
   .ai-reply-actions { display: flex; gap: 6px; margin-top: 8px; flex-wrap: wrap; align-items: center; }
 
   /* 버튼 통일 */
@@ -521,6 +548,14 @@
     <option value="">신고 전체</option>
     <option value="yes">신고 가능</option>
   </select>
+  <div class="date-filter-group" id="date-filter-group">
+    <button class="date-quick-btn active" id="dq-all" onclick="setDateQuick('all')">전체</button>
+    <button class="date-quick-btn" id="dq-30" onclick="setDateQuick('30')">30일</button>
+    <button class="date-quick-btn" id="dq-7" onclick="setDateQuick('7')">7일</button>
+    <input type="date" id="date-from" onchange="setDateCustom()">
+    <span style="color:#888;font-size:12px">~</span>
+    <input type="date" id="date-to" onchange="setDateCustom()">
+  </div>
   <select id="sort">
     <option value="newest">최신순</option>
     <option value="oldest">오래된순</option>
@@ -661,8 +696,31 @@
   <div class="admin-section">
     <div class="admin-section-title">🎟️ 쿠폰 발급 기준</div>
     <div id="coupon-rules-list"></div>
+    <div style="margin-top:16px">
+      <label class="admin-label">쿠폰 안내 문구 템플릿 <span style="font-weight:400;color:#aaa;font-size:11px">({coupon} = 쿠폰명, {amount} = 금액/혜택)</span></label>
+      <input type="text" id="coupon-reply-template"
+        placeholder="감사의 마음을 담아 {coupon}({amount})을 발급해드렸으니 다음 구매에 꼭 활용해 주세요."
+        oninput="enableSave('btn-save-coupon')"
+        style="width:100%;padding:7px 10px;border:1px solid #e0e0e0;border-radius:6px;font-size:13px;outline:none;margin-top:4px">
+    </div>
     <div class="admin-footer">
       <button class="btn-save" id="btn-save-coupon" onclick="saveCouponRules(this)" disabled>저장됨</button>
+    </div>
+  </div>
+
+  <!-- 민감 표현 관리 -->
+  <div class="admin-section">
+    <div class="admin-section-title">🚫 민감 표현 관리</div>
+    <div style="font-size:12px;color:#888;margin-bottom:10px">AI 답변에 포함되면 안 되는 표현을 관리합니다. 고객 리뷰에 해당 표현이 있어도 답글에서 반복하지 않습니다.</div>
+    <div id="sensitive-tags" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px"></div>
+    <div style="display:flex;gap:6px">
+      <input type="text" id="sensitive-input" placeholder="추가할 표현 입력 후 Enter"
+        style="flex:1;padding:6px 10px;border:1px solid #e0e0e0;border-radius:6px;font-size:13px;outline:none"
+        onkeydown="if(event.key==='Enter')addSensitiveExpr()">
+      <button class="btn-sm btn-light-blue" onclick="addSensitiveExpr()">추가</button>
+    </div>
+    <div class="admin-footer">
+      <button class="btn-save" id="btn-save-sensitive" onclick="saveSensitiveExprs(this)" disabled>저장됨</button>
     </div>
   </div>
 
@@ -674,6 +732,64 @@
 
 <script>
 let debounceTimer;
+let currentPage = 1;
+let _lastFetchTime = 0;
+const STALE_MS = 30000;
+let _dateFrom = '';
+let _dateTo   = '';
+
+function autoResize(el) {
+  el.style.height = 'auto';
+  el.style.height = Math.max(120, el.scrollHeight) + 'px';
+  const counter = document.getElementById('reply-counter-' + el.dataset.idx);
+  if (counter) counter.textContent = el.value.length + '자';
+}
+
+function toggleReplyHistory(el) {
+  const list = el.nextElementSibling;
+  const open = list.style.display !== 'none';
+  list.style.display = open ? 'none' : '';
+  el.textContent = el.textContent.replace(open ? '▼' : '▶', open ? '▶' : '▼');
+}
+
+function restoreReply(idx, historyIdx) {
+  const ta = document.getElementById(`reply-text-${idx}`);
+  if (!ta) return;
+  const histItems = ta.closest('.ai-reply-box').querySelectorAll('.reply-history-text');
+  if (histItems[historyIdx]) {
+    ta.removeAttribute('readonly');
+    ta.value = histItems[historyIdx].textContent;
+    autoResize(ta);
+  }
+}
+
+function setDateQuick(period) {
+  ['all','30','7'].forEach(k => document.getElementById('dq-'+k).classList.remove('active'));
+  document.getElementById('dq-'+period).classList.add('active');
+  const today = new Date();
+  const fmt = d => d.toISOString().slice(0, 10);
+  if (period === 'all') {
+    _dateFrom = '';
+    _dateTo   = '';
+  } else {
+    const from = new Date(today);
+    from.setDate(today.getDate() - parseInt(period) + 1);
+    _dateFrom = fmt(from);
+    _dateTo   = fmt(today);
+  }
+  document.getElementById('date-from').value = _dateFrom;
+  document.getElementById('date-to').value   = _dateTo;
+  currentPage = 1;
+  fetchReviews();
+}
+
+function setDateCustom() {
+  _dateFrom = document.getElementById('date-from').value;
+  _dateTo   = document.getElementById('date-to').value;
+  ['all','30','7'].forEach(k => document.getElementById('dq-'+k).classList.remove('active'));
+  currentPage = 1;
+  fetchReviews();
+}
 
 function starsHTML(rating) {
   const n = parseFloat(rating) || 0;
@@ -766,7 +882,7 @@ function renderReviews(reviews) {
           ▶ 이 고객의 다른 리뷰 ${r.reviewer_history.length}건
         </div>
         <div class="reviewer-history-list" style="display:none">
-          ${[...r.reviewer_history].sort((a,b)=>(b.date||'')>(a.date||'')?1:-1).map(h=>`
+          ${r.reviewer_history.map(h=>`
             <div class="history-item">
               <div class="history-item-meta">
                 ${starsHTML(h.rating)} ${h.date||''} · ${h.replied?'✓ 답글완료':'미답글'}
@@ -794,15 +910,65 @@ function renderReviews(reviews) {
 
     // ── 우측: 쿠폰 발급 ──
     const coupons = checkCoupon(r);
+    const couponStatus = r.coupon_status || 'none';
+    const manualCouponName = r.manual_coupon || '';
+    let couponBody = '';
+    if (couponStatus === 'approved') {
+      const badges = coupons.map(c => `<span class="badge-coupon">${c.coupon}</span>`).join('');
+      couponBody = `
+        <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
+          <span style="font-size:12px;color:#2e7d32">✓ 승인됨</span>
+          ${badges}
+          <button class="btn-sm btn-ghost" style="font-size:11px" onclick="revokeCoupon(${idx})">취소</button>
+        </div>`;
+    } else if (couponStatus === 'manual') {
+      couponBody = `
+        <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
+          <span class="badge-coupon badge-coupon-manual">✋ ${manualCouponName}</span>
+          <span style="font-size:11px;color:#888">수동발급</span>
+          <button class="btn-sm btn-ghost" style="font-size:11px" onclick="revokeCoupon(${idx})">취소</button>
+        </div>`;
+    } else if (coupons.length) {
+      const badges = coupons.map(c =>
+        `<span class="badge-coupon${c.manual?' badge-coupon-manual':''}">${c.manual?'✋ ':' '}${c.coupon}</span>`
+      ).join('');
+      couponBody = `
+        <div class="coupon-list">${badges}</div>
+        <div class="coupon-approve-box">
+          <button class="btn-sm btn-green" onclick="approveCoupon(${idx})">쿠폰 승인</button>
+          <span style="color:#ccc;font-size:11px">|</span>
+          <input class="manual-coupon-input" id="mc-input-${idx}" placeholder="쿠폰명 직접 입력">
+          <button class="btn-sm btn-light-blue" onclick="manualCoupon(${idx})">수동 발급</button>
+        </div>`;
+    } else {
+      couponBody = `
+        <div class="coupon-approve-box">
+          <span class="no-analysis" style="margin-right:4px">해당 없음</span>
+          <input class="manual-coupon-input" id="mc-input-${idx}" placeholder="쿠폰명 직접 입력">
+          <button class="btn-sm btn-light-blue" onclick="manualCoupon(${idx})">수동 발급</button>
+        </div>`;
+    }
     const couponSection = `
       <div class="card-right-section">
         <div class="card-right-label">쿠폰 발급</div>
-        ${coupons.length
-          ? `<div class="coupon-list">${coupons.map(c=>`<span class="badge-coupon${c.manual?' badge-coupon-manual':''}">${c.manual?'✋ ':' '}${c.coupon}</span>`).join('')}</div>`
-          : '<span class="no-analysis">해당 없음</span>'}
+        ${couponBody}
       </div>`;
 
     // ── 우측: 답변 ──
+    const replyHistoryHTML = (r.reply_history && r.reply_history.length)
+      ? `<div class="reply-history-wrap">
+          <div class="reply-history-toggle" onclick="toggleReplyHistory(this)">▶ 이전 답변 기록 ${r.reply_history.length}개</div>
+          <div class="reply-history-list" style="display:none">
+            ${r.reply_history.map((h, hi) => `
+              <div class="reply-history-item">
+                <div class="reply-history-meta">${h.saved_at}</div>
+                <div class="reply-history-text">${h.text}</div>
+                <button class="btn-sm btn-ghost" style="font-size:11px;margin-top:4px" onclick="restoreReply(${idx},${hi})">복원</button>
+              </div>`).join('')}
+          </div>
+        </div>`
+      : '';
+
     let aiSection = '';
     if (r.replied) {
       aiSection = `
@@ -811,15 +977,22 @@ function renderReviews(reviews) {
           <span class="badge badge-replied">✓ 답변완료</span>
         </div>`;
     } else if (r.reply_status === 'draft') {
+      const hasPendingCoupon = (coupons.length > 0) && couponStatus === 'none';
+      const allApproveBtn = hasPendingCoupon
+        ? `<button class="btn-sm btn-orange" onclick="approveAll(${idx})">쿠폰 + 답변 모두 승인</button>`
+        : '';
       aiSection = `
         <div class="card-right-section">
           <div class="card-right-label">AI 답변 <span class="badge badge-draft">초안</span></div>
           <div class="ai-reply-box">
-            <textarea class="ai-reply-text" id="reply-text-${idx}">${r.ai_reply || ''}</textarea>
+            <textarea class="ai-reply-text" id="reply-text-${idx}" data-idx="${idx}" oninput="autoResize(this)">${r.ai_reply || ''}</textarea>
+            <div style="text-align:right;font-size:11px;color:#aaa;margin-top:2px"><span id="reply-counter-${idx}">${(r.ai_reply||'').length}자</span></div>
             <div class="ai-reply-actions">
-              <button class="btn-sm btn-green" onclick="approveReply(${idx})">승인</button>
+              <button class="btn-sm btn-green" onclick="approveReply(${idx})">답변만 승인</button>
+              ${allApproveBtn}
               <button class="btn-sm btn-ghost" onclick="rejectReply(${idx})">삭제</button>
             </div>
+            ${replyHistoryHTML}
           </div>
         </div>`;
     } else if (r.reply_status === 'approved') {
@@ -827,7 +1000,8 @@ function renderReviews(reviews) {
         <div class="card-right-section">
           <div class="card-right-label">AI 답변 <span class="badge badge-approved">승인됨</span></div>
           <div class="ai-reply-box">
-            <textarea class="ai-reply-text" id="reply-text-${idx}" readonly>${r.ai_reply || ''}</textarea>
+            <textarea class="ai-reply-text" id="reply-text-${idx}" data-idx="${idx}" readonly oninput="autoResize(this)">${r.ai_reply || ''}</textarea>
+            <div style="text-align:right;font-size:11px;color:#aaa;margin-top:2px"><span id="reply-counter-${idx}">${(r.ai_reply||'').length}자</span></div>
             <div class="ai-reply-actions">
               <span class="approved-status">✓ 승인 완료</span>
               <button class="btn-sm btn-gray" id="enable-edit-btn-${idx}" onclick="enableEditReply(${idx})">수정</button>
@@ -835,6 +1009,7 @@ function renderReviews(reviews) {
               <button class="btn-sm btn-ghost" id="del-btn-${idx}" onclick="rejectReply(${idx})" style="display:none">삭제</button>
               <button class="btn-sm btn-orange" disabled style="opacity:.4;cursor:not-allowed">스토어에 댓글 등록 (개발중)</button>
             </div>
+            ${replyHistoryHTML}
           </div>
         </div>`;
     } else {
@@ -871,6 +1046,10 @@ function renderReviews(reviews) {
       </div>
     </div>`;
   }).join('');
+
+  requestAnimationFrame(() => {
+    document.querySelectorAll('.ai-reply-text').forEach(autoResize);
+  });
 }
 
 function renderStats(stats) {
@@ -893,6 +1072,25 @@ function renderStats(stats) {
   `;
 }
 
+function renderPagination(p) {
+  let el = document.getElementById('pagination-controls');
+  if (!el) {
+    el = document.createElement('div');
+    el.id = 'pagination-controls';
+    el.style.cssText = 'display:flex;align-items:center;gap:8px;padding:12px 0;justify-content:center;';
+    document.getElementById('reviews-container').after(el);
+  }
+  if (!p || p.total_pages <= 1) { el.innerHTML = ''; return; }
+  const pd = p.page <= 1 ? 'disabled' : '';
+  const nd = p.page >= p.total_pages ? 'disabled' : '';
+  el.innerHTML = `
+    <button ${pd} onclick="goPage(${p.page-1})" style="padding:4px 10px;cursor:pointer">◀</button>
+    <span style="font-size:13px;color:#666">${p.page} / ${p.total_pages}페이지 (${(p.total_filtered||0).toLocaleString()}건)</span>
+    <button ${nd} onclick="goPage(${p.page+1})" style="padding:4px 10px;cursor:pointer">▶</button>
+  `;
+}
+function goPage(p) { currentPage = p; fetchReviews(); }
+
 function fetchReviews() {
   const container = document.getElementById('reviews-container');
   let elapsed = 0;
@@ -911,6 +1109,10 @@ function fetchReviews() {
     topic: document.getElementById('filter-topic').value,
     reportable: document.getElementById('filter-reportable').value,
     sort: document.getElementById('sort').value,
+    date_from: _dateFrom,
+    date_to:   _dateTo,
+    page: currentPage,
+    per_page: 50,
   });
 
   const controller = new AbortController();
@@ -923,7 +1125,9 @@ function fetchReviews() {
       clearTimeout(timeout);
       renderStats(data.stats);
       renderReviews(data.reviews);
+      renderPagination(data.pagination);
       document.getElementById('last-updated').textContent = new Date().toLocaleTimeString('ko-KR');
+      _lastFetchTime = Date.now();
     })
     .catch(e => {
       clearInterval(timer);
@@ -1055,6 +1259,35 @@ function generateReply(idx, btn) {
       else fetchReviews();
     })
     .catch(() => { btn.disabled = false; btn.textContent = 'AI 답변 생성'; });
+}
+
+function approveCoupon(idx) {
+  fetch(`/api/coupon/approve/${idx}`, {method: 'POST'})
+    .then(() => fetchReviews());
+}
+
+function manualCoupon(idx) {
+  const coupon = (document.getElementById(`mc-input-${idx}`)?.value || '').trim();
+  if (!coupon) { alert('쿠폰명을 입력하세요'); return; }
+  fetch(`/api/coupon/manual/${idx}`, {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({coupon}),
+  }).then(() => fetchReviews());
+}
+
+function revokeCoupon(idx) {
+  fetch(`/api/coupon/revoke/${idx}`, {method: 'POST'})
+    .then(() => fetchReviews());
+}
+
+function approveAll(idx) {
+  const text = document.getElementById(`reply-text-${idx}`)?.value || '';
+  fetch(`/api/approve/all/${idx}`, {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({reply: text, approve_reply: true, approve_coupon: true}),
+  }).then(() => fetchReviews());
 }
 
 function approveReply(idx) {
@@ -1265,6 +1498,12 @@ function loadAdminData() {
     toggle.classList.toggle('on', cfg.auto_generate_reply);
     document.getElementById('auto-generate-label').textContent = cfg.auto_generate_reply ? 'ON' : 'OFF';
     if (cfg.coupon_rules) renderCouponRules(cfg.coupon_rules);
+    if (cfg.reply_coupon_template) {
+      const el = document.getElementById('coupon-reply-template');
+      if (el) el.value = cfg.reply_coupon_template;
+    }
+    _sensitiveExprs = cfg.sensitive_expressions || [];
+    renderSensitiveTags();
     // 초개인화 CS 설정
     document.getElementById('loyal-threshold').value = cfg.loyal_threshold || 3;
     const hints = cfg.customer_type_hints || {};
@@ -1297,7 +1536,13 @@ function renderCouponRules(rules) {
       <div class="toggle ${r.enabled ? 'on' : ''}" onclick="toggleCoupon(${i})" title="활성화/비활성화"></div>
       <div class="coupon-rule-label">${r.label}</div>
       <input class="coupon-rule-input" id="coupon-name-${i}" type="text"
-        value="${r.coupon}" placeholder="쿠폰명 또는 혜택" oninput="onCouponChange()" ${r.enabled ? '' : 'disabled'}>
+        value="${r.coupon}" placeholder="쿠폰명" oninput="onCouponChange()" ${r.enabled ? '' : 'disabled'}>
+      <input class="coupon-rule-input" id="coupon-amount-${i}" type="text"
+        value="${r.coupon_amount || ''}" placeholder="할인 금액 (예: 1만원 할인)" oninput="onCouponChange()"
+        ${r.enabled ? '' : 'disabled'} style="width:140px">
+      <input class="coupon-rule-input" id="coupon-min-${i}" type="text"
+        value="${r.min_purchase_amount || ''}" placeholder="최소 구매 금액 (예: 10만원 이상)" oninput="onCouponChange()"
+        ${r.enabled ? '' : 'disabled'} style="width:170px">
     </div>
   `).join('');
 }
@@ -1325,14 +1570,59 @@ function flashSaved(btn) {
 // 쿠폰 토글/입력 변경 시 버튼 활성화
 function onCouponChange() { enableSave('btn-save-coupon'); }
 
-function saveCouponRules(btn) {
-  adminConfig.coupon_rules.forEach((r, i) => {
-    r.coupon = document.getElementById(`coupon-name-${i}`)?.value || r.coupon;
-  });
+let _sensitiveExprs = [];
+
+function renderSensitiveTags() {
+  const container = document.getElementById('sensitive-tags');
+  if (!container) return;
+  container.innerHTML = _sensitiveExprs.map((e, i) => `
+    <span style="display:inline-flex;align-items:center;gap:4px;background:#fce4ec;color:#c62828;
+      border:1px solid #ef9a9a;border-radius:12px;padding:3px 10px;font-size:12px">
+      ${e}
+      <button onclick="removeSensitiveExpr(${i})"
+        style="background:none;border:none;cursor:pointer;color:#c62828;font-size:14px;line-height:1;padding:0">×</button>
+    </span>
+  `).join('');
+}
+
+function addSensitiveExpr() {
+  const input = document.getElementById('sensitive-input');
+  const val = (input.value || '').trim();
+  if (!val || _sensitiveExprs.includes(val)) { input.value = ''; return; }
+  _sensitiveExprs.push(val);
+  input.value = '';
+  renderSensitiveTags();
+  enableSave('btn-save-sensitive');
+}
+
+function removeSensitiveExpr(i) {
+  _sensitiveExprs.splice(i, 1);
+  renderSensitiveTags();
+  enableSave('btn-save-sensitive');
+}
+
+function saveSensitiveExprs(btn) {
   fetch('/api/admin/config', {
     method: 'POST',
     headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify({coupon_rules: adminConfig.coupon_rules}),
+    body: JSON.stringify({sensitive_expressions: _sensitiveExprs}),
+  }).then(() => flashSaved(btn));
+}
+
+function saveCouponRules(btn) {
+  adminConfig.coupon_rules.forEach((r, i) => {
+    r.coupon               = document.getElementById(`coupon-name-${i}`)?.value || r.coupon;
+    r.coupon_amount        = document.getElementById(`coupon-amount-${i}`)?.value || '';
+    r.min_purchase_amount  = document.getElementById(`coupon-min-${i}`)?.value || '';
+  });
+  const template = document.getElementById('coupon-reply-template')?.value || '';
+  fetch('/api/admin/config', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({
+      coupon_rules: adminConfig.coupon_rules,
+      reply_coupon_template: template,
+    }),
   }).then(() => flashSaved(btn));
 }
 
@@ -1433,6 +1723,7 @@ function saveApiKey(btn) {
 ['search','filter-rating','filter-sentiment','filter-topic','filter-replied','filter-reportable','sort']
   .forEach(id => document.getElementById(id).addEventListener('input', () => {
     clearTimeout(debounceTimer);
+    currentPage = 1;
     debounceTimer = setTimeout(fetchReviews, 250);
   }));
 
@@ -1633,6 +1924,12 @@ socket.on('collect_status', data => {
     } else {
       showResult('수집 실패: ' + (data.error || '알 수 없는 오류'), true);
     }
+  }
+});
+
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible') {
+    if ((Date.now() - _lastFetchTime) > STALE_MS) fetchReviews();
   }
 });
 
