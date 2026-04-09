@@ -697,6 +697,64 @@
 <!-- 관리자 패널 -->
 <div class="admin-panel" id="admin-panel">
 
+  <!-- 파인튜닝 관리 -->
+  <div class="admin-section">
+    <div class="admin-section-title">🤖 파인튜닝 관리</div>
+    <div style="font-size:12px;color:#888;margin-bottom:16px">승인된 답변이 N개 누적될 때마다 자동으로 AI를 재학습합니다. 완료 시 자동으로 새 버전으로 전환됩니다.</div>
+
+    <!-- 개인화 리뷰 AI 상태 카드 -->
+    <div class="ft-ai-card" id="ft-ai-card">
+      <div class="ft-ai-inner">
+        <div class="ft-ai-header">
+          <div class="ft-ai-icon">🧠</div>
+          <div>
+            <div class="ft-ai-name">개인화 리뷰 AI</div>
+            <div class="ft-ai-subtitle" id="ft-ai-subtitle">대기 중</div>
+          </div>
+          <div class="ft-ai-badge ft-badge-ready" id="ft-ai-badge">준비 완료</div>
+        </div>
+
+        <!-- 학습 중 애니메이션 (기본 숨김) -->
+        <div id="ft-training-anim" style="display:none">
+          <div style="display:flex;align-items:center;gap:14px">
+            <div class="ft-wave">
+              <span class="bar"></span><span class="bar"></span><span class="bar"></span>
+              <span class="bar"></span><span class="bar"></span><span class="bar"></span>
+              <span class="bar"></span><span class="bar"></span>
+            </div>
+            <div style="color:#ccc;font-size:12px;line-height:1.5">
+              리뷰 패턴을 학습하는 중입니다<span class="ft-loading-dots"><span>.</span><span>.</span><span>.</span></span><br>
+              <span id="ft-job-status" style="font-size:11px;color:#8899aa"></span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div style="display:flex;flex-direction:column;gap:10px">
+      <div style="display:flex;align-items:center;gap:12px;font-size:13px">
+        <span style="color:#555;width:120px;flex-shrink:0">자동 학습 주기</span>
+        <input type="number" id="ft-threshold" min="0" step="10"
+          style="width:70px;padding:4px 8px;border:1px solid #e0e0e0;border-radius:5px;font-size:13px"
+          oninput="enableSave('btn-ft-save')">
+        <span style="color:#888">개마다 자동 실행 (0 = 비활성)</span>
+      </div>
+      <div style="display:flex;align-items:center;gap:12px;font-size:13px">
+        <span style="color:#555;width:120px;flex-shrink:0">학습 데이터</span>
+        <span id="ft-training-count" style="font-weight:600">-</span>
+        <span style="color:#888">개 승인 완료 &nbsp;|&nbsp; 이전 학습 후 <span id="ft-new-count" style="font-weight:600;color:#1565c0">-</span>개 추가됨</span>
+      </div>
+    </div>
+
+    <div class="admin-footer" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+      <button class="btn-save" id="btn-ft-save" onclick="saveFinetuneThreshold(this)" disabled>저장됨</button>
+      <button class="btn-save" id="btn-ft-refresh" onclick="refreshFinetuneStatus()"
+        style="background:#555;color:#fff;opacity:1;cursor:pointer">상태 새로고침</button>
+      <button class="btn-save" id="btn-ft-start" onclick="startFinetune(this)"
+        style="background:#1565c0;color:#fff;opacity:1;cursor:pointer">지금 바로 학습</button>
+    </div>
+  </div>
+
   <!-- API 설정 -->
 
   <!-- 답변 설정 -->
@@ -801,69 +859,6 @@
     </div>
     <div class="admin-footer">
       <button class="btn-save" id="btn-save-sensitive" onclick="saveSensitiveExprs(this)" disabled>저장됨</button>
-    </div>
-  </div>
-
-  <!-- 파인튜닝 관리 -->
-  <div class="admin-section">
-    <div class="admin-section-title">🤖 파인튜닝 관리</div>
-    <div style="font-size:12px;color:#888;margin-bottom:16px">승인된 답변이 N개 누적될 때마다 자동으로 AI를 재학습합니다. 완료 시 자동으로 새 버전으로 전환됩니다.</div>
-
-    <!-- 개인화 리뷰 AI 상태 카드 -->
-    <div class="ft-ai-card" id="ft-ai-card">
-      <div class="ft-ai-inner">
-        <div class="ft-ai-header">
-          <div class="ft-ai-icon">🧠</div>
-          <div>
-            <div class="ft-ai-name">개인화 리뷰 AI</div>
-            <div class="ft-ai-subtitle" id="ft-ai-subtitle">대기 중</div>
-          </div>
-          <div class="ft-ai-badge ft-badge-ready" id="ft-ai-badge">준비 완료</div>
-        </div>
-
-        <!-- 학습 중 애니메이션 (기본 숨김) -->
-        <div id="ft-training-anim" style="display:none">
-          <div style="display:flex;align-items:center;gap:14px">
-            <div class="ft-wave">
-              <span class="bar"></span><span class="bar"></span><span class="bar"></span>
-              <span class="bar"></span><span class="bar"></span><span class="bar"></span>
-              <span class="bar"></span><span class="bar"></span>
-            </div>
-            <div style="color:#ccc;font-size:12px;line-height:1.5">
-              리뷰 패턴을 학습하는 중입니다<span class="ft-loading-dots"><span>.</span><span>.</span><span>.</span></span><br>
-              <span id="ft-job-status" style="font-size:11px;color:#8899aa"></span>
-            </div>
-          </div>
-        </div>
-
-        <div class="ft-model-line">
-          <span style="font-size:11px;color:#667788">현재 모델</span>
-          <span id="ft-active-model" style="font-weight:600;color:#03c75a;font-family:monospace;font-size:11px">-</span>
-        </div>
-      </div>
-    </div>
-
-    <div style="display:flex;flex-direction:column;gap:10px">
-      <div style="display:flex;align-items:center;gap:12px;font-size:13px">
-        <span style="color:#555;width:120px;flex-shrink:0">자동 학습 주기</span>
-        <input type="number" id="ft-threshold" min="0" step="10"
-          style="width:70px;padding:4px 8px;border:1px solid #e0e0e0;border-radius:5px;font-size:13px"
-          oninput="enableSave('btn-ft-save')">
-        <span style="color:#888">개마다 자동 실행 (0 = 비활성)</span>
-      </div>
-      <div style="display:flex;align-items:center;gap:12px;font-size:13px">
-        <span style="color:#555;width:120px;flex-shrink:0">학습 데이터</span>
-        <span id="ft-training-count" style="font-weight:600">-</span>
-        <span style="color:#888">개 승인 완료 &nbsp;|&nbsp; 이전 학습 후 <span id="ft-new-count" style="font-weight:600;color:#1565c0">-</span>개 추가됨</span>
-      </div>
-    </div>
-
-    <div class="admin-footer" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-      <button class="btn-save" id="btn-ft-save" onclick="saveFinetuneThreshold(this)" disabled>저장됨</button>
-      <button class="btn-save" id="btn-ft-refresh" onclick="refreshFinetuneStatus()"
-        style="background:#555;color:#fff;opacity:1;cursor:pointer">상태 새로고침</button>
-      <button class="btn-save" id="btn-ft-start" onclick="startFinetune(this)"
-        style="background:#1565c0;color:#fff;opacity:1;cursor:pointer">지금 바로 학습</button>
     </div>
   </div>
 
@@ -1708,8 +1703,6 @@ function toggleAdmin() {
 function loadFinetuneStatus() {
   fetch('/api/admin/finetune/status').then(r => r.json()).then(d => {
     document.getElementById('ft-training-count').textContent = d.training_count ?? '-';
-    const modelLabel = (d.version > 0) ? `review_v${d.version}` : (d.active_model || '-');
-    document.getElementById('ft-active-model').textContent = modelLabel;
 
     const newCount = (d.training_count ?? 0) - (d.last_count ?? 0);
     document.getElementById('ft-new-count').textContent = Math.max(0, newCount);
