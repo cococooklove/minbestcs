@@ -1040,6 +1040,7 @@ def finetune_status():
     }
     result["auto_threshold"] = settings.get("finetune_auto_threshold", 0)
     result["last_count"] = settings.get("finetune_last_count", 0)
+    result["version"] = settings.get("finetune_version", 0)
     job_id = settings.get("finetune_job_id", "")
     if job_id:
         try:
@@ -1048,16 +1049,18 @@ def finetune_status():
             job = client.fine_tuning.jobs.retrieve(job_id)
             result["job_status"] = job.status
             result["fine_tuned_model"] = job.fine_tuned_model or ""
-            # 완료 시 자동 활성화
+            # 완료 시 자동 활성화 + 버전 증가
             if job.status == "succeeded" and job.fine_tuned_model:
                 s = load_settings()
                 if s.get("active_model") != job.fine_tuned_model:
                     s["active_model"] = job.fine_tuned_model
                     s["finetune_job_id"] = ""
+                    s["finetune_version"] = s.get("finetune_version", 0) + 1
                     save_settings(s)
                     result["active_model"] = job.fine_tuned_model
                     result["job_id"] = ""
-                    _log(f"파인튜닝 완료 — 자동 전환: {job.fine_tuned_model}")
+                    result["version"] = s["finetune_version"]
+                    _log(f"파인튜닝 완료 — 자동 전환: {job.fine_tuned_model} (review_v{s['finetune_version']})")
         except Exception as e:
             result["job_status"] = f"error: {e}"
     return jsonify(result)

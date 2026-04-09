@@ -807,7 +807,7 @@
   <!-- 파인튜닝 관리 -->
   <div class="admin-section">
     <div class="admin-section-title">🤖 파인튜닝 관리</div>
-    <div style="font-size:12px;color:#888;margin-bottom:16px">승인된 답변이 N개 누적될 때마다 자동으로 재학습합니다. 완료 시 자동으로 새 모델로 전환됩니다.</div>
+    <div style="font-size:12px;color:#888;margin-bottom:16px">승인된 답변이 N개 누적될 때마다 자동으로 AI를 재학습합니다. 완료 시 자동으로 새 버전으로 전환됩니다.</div>
 
     <!-- 개인화 리뷰 AI 상태 카드 -->
     <div class="ft-ai-card" id="ft-ai-card">
@@ -1708,7 +1708,8 @@ function toggleAdmin() {
 function loadFinetuneStatus() {
   fetch('/api/admin/finetune/status').then(r => r.json()).then(d => {
     document.getElementById('ft-training-count').textContent = d.training_count ?? '-';
-    document.getElementById('ft-active-model').textContent = d.active_model || '-';
+    const modelLabel = (d.version > 0) ? `review_v${d.version}` : (d.active_model || '-');
+    document.getElementById('ft-active-model').textContent = modelLabel;
 
     const newCount = (d.training_count ?? 0) - (d.last_count ?? 0);
     document.getElementById('ft-new-count').textContent = Math.max(0, newCount);
