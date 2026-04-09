@@ -33,7 +33,14 @@
     "체중 감량",
     "다이어트 효과",
     "항산화 효과",
-    "통증이 사라"
+    "통증이 사라",
+    "머리 빠짐",
+    "탈모",
+    "무릎",
+    "머리카락",
+    "효과를 보장",
+    "피부 개선",
+    "피부 트러블 완화"
   ],
   "coupon_rules": [
     {
@@ -64,13 +71,20 @@
       "label": "리뷰 100자 이상"
     },
     {
-      "condition": "negative_manual",
-      "coupon": "사과 쿠폰",
-      "coupon_amount": "",
-      "min_purchase_amount": "",
-      "enabled": true,
-      "id": 4,
-      "label": "부정 리뷰 (수동 발급)"
+      "condition": "manual_amount",
+      "label": "10만원 이상 구매",
+      "min_amount": 100000,
+      "coupon": "1만원 할인 쿠폰",
+      "coupon_amount": "1만원",
+      "enabled": true
+    },
+    {
+      "condition": "manual_amount",
+      "label": "20만원 이상 구매",
+      "min_amount": 200000,
+      "coupon": "2만원 할인 쿠폰",
+      "coupon_amount": "2만원",
+      "enabled": true
     }
   ]
 }

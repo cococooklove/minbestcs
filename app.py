@@ -690,8 +690,6 @@ def api_coupon_approve(idx):
             matched_coupon = rule; break
         elif cond == "content_100" and len(review.get("content") or "") >= 100:
             matched_coupon = rule; break
-        elif cond == "negative_manual" and review.get("sentiment") == "negative":
-            matched_coupon = rule; break
         elif cond == "repurchase" and len(review.get("reviewer_history") or []) >= 1:
             matched_coupon = rule; break
 
@@ -726,14 +724,37 @@ def api_coupon_manual(idx):
     if idx >= len(reviews):
         return jsonify({"error": "not found"}), 404
     data = request.get_json() or {}
+    purchase_amount = data.get("purchase_amount")
     coupon = (data.get("coupon") or "").strip()
+    coupon_amount_text = ""
+
+    if purchase_amount is not None:
+        settings = load_settings()
+        amount_rules = [
+            r for r in settings.get("coupon_rules", [])
+            if r.get("condition") == "manual_amount" and r.get("enabled") and r.get("min_amount")
+        ]
+        amount_rules.sort(key=lambda r: r.get("min_amount", 0), reverse=True)
+        matched = next((r for r in amount_rules if purchase_amount >= r["min_amount"]), None)
+        if not matched:
+            return jsonify({"status": "no_match"})
+        coupon = matched.get("coupon", "")
+        coupon_amount_text = matched.get("coupon_amount", "")
+
     if not coupon:
         return jsonify({"error": "쿠폰명 필요"}), 400
+
     review = reviews[idx]
     reviews[idx]["coupon_status"] = "manual"
     reviews[idx]["manual_coupon"] = coupon
 
-    coupon_text = f"감사의 마음을 담아 {coupon}을 발급해드렸으니 다음 구매에 꼭 활용해 주세요."
+    if coupon_amount_text:
+        settings = load_settings()
+        tmpl = settings.get("reply_coupon_template", "감사의 마음을 담아 {coupon}({amount})을 발급해드렸으니 다음 구매에 꼭 활용해 주세요.")
+        coupon_text = tmpl.replace("{coupon}", coupon).replace("{amount}", coupon_amount_text)
+    else:
+        coupon_text = f"감사의 마음을 담아 {coupon}을 발급해드렸으니 다음 구매에 꼭 활용해 주세요."
+
     existing = review.get("ai_reply") or ""
     prev = review.get("coupon_appended_text", "")
     if prev and prev in existing:

@@ -264,6 +264,10 @@
   }
   .review-card:hover { box-shadow: 0 3px 12px rgba(0,0,0,0.08); }
   .review-card.reportable { border-left: 3px solid #e53935; }
+  .review-card.negative-review {
+    border-left: 4px solid #e53935;
+    background: linear-gradient(to right, #fff5f5 0%, white 120px);
+  }
 
   .review-header { display: flex; align-items: flex-start; gap: 10px; margin-bottom: 8px; }
   .reviewer-avatar {
@@ -292,7 +296,7 @@
   .btn-gift-tag { background: none; border: none; font-size: 14px; cursor: pointer; opacity: .35; padding: 0 2px; line-height: 1; vertical-align: middle; }
   .btn-gift-tag.active { opacity: 1; }
   .badge-positive { background: #e8f9f0; color: #03c75a; }
-  .badge-negative { background: #fff3f3; color: #e53935; }
+  .badge-negative { background: #ffebee; color: #b71c1c; font-size: 13px; font-weight: 800; border: 1px solid #ef9a9a; padding: 3px 9px; }
   .badge-mixed { background: #fff8e1; color: #f57c00; }
   .badge-report { background: #fce4ec; color: #c62828; }
   .badge-draft { background: #e3f2fd; color: #1565c0; }
@@ -864,7 +868,7 @@ function starsHTML(rating) {
 }
 
 function sentimentBadge(s) {
-  const map = { positive: ['긍정', 'positive'], negative: ['부정', 'negative'], mixed: ['혼합', 'mixed'] };
+  const map = { positive: ['긍정', 'positive'], negative: ['🚨 부정', 'negative'], mixed: ['혼합', 'mixed'] };
   if (!s || !map[s]) return '';
   const [label, cls] = map[s];
   return `<span class="badge badge-${cls}">${label}</span>`;
@@ -917,7 +921,6 @@ function checkCoupon(r) {
     if (!rule.enabled) continue;
     if (rule.condition === 'rating_5_photo' && parseFloat(r.rating) >= 5) return [{...rule}];
     if (rule.condition === 'content_100' && (r.content || '').length >= 100) return [{...rule}];
-    if (rule.condition === 'negative_manual' && r.sentiment === 'negative') return [{...rule, manual: true}];
   }
   return [];
 }
@@ -1000,25 +1003,13 @@ function renderReviews(reviews) {
         <div class="coupon-approve-box">
           <button class="btn-sm btn-green" onclick="approveCoupon(${idx})">쿠폰 승인</button>
           <span style="color:#ccc;font-size:11px">|</span>
-          <div style="position:relative;display:inline-block">
-            <button class="btn-sm btn-light-blue" onclick="toggleCouponDropdown(${idx}, event)">수동 발급 ▼</button>
-            <div id="cd-${idx}" class="coupon-dropdown" style="display:none">
-              <div class="coupon-dropdown-item" onclick="manualCoupon(${idx}, '10만 원 이상 구매 시 1만 원')">10만 원 이상 구매 시 1만 원</div>
-              <div class="coupon-dropdown-item" onclick="manualCoupon(${idx}, '20만 원 이상 구매 시 2만 원 할인 쿠폰')">20만 원 이상 구매 시 2만 원 할인 쿠폰</div>
-            </div>
-          </div>
+          <button class="btn-sm btn-light-blue" onclick="manualCouponByAmount(${idx})">수동 발급</button>
         </div>`;
     } else {
       couponBody = `
         <div class="coupon-approve-box">
           <span class="no-analysis" style="margin-right:4px">해당 없음</span>
-          <div style="position:relative;display:inline-block">
-            <button class="btn-sm btn-light-blue" onclick="toggleCouponDropdown(${idx}, event)">수동 발급 ▼</button>
-            <div id="cd-${idx}" class="coupon-dropdown" style="display:none">
-              <div class="coupon-dropdown-item" onclick="manualCoupon(${idx}, '10만 원 이상 구매 시 1만 원')">10만 원 이상 구매 시 1만 원</div>
-              <div class="coupon-dropdown-item" onclick="manualCoupon(${idx}, '20만 원 이상 구매 시 2만 원 할인 쿠폰')">20만 원 이상 구매 시 2만 원 할인 쿠폰</div>
-            </div>
-          </div>
+          <button class="btn-sm btn-light-blue" onclick="manualCouponByAmount(${idx})">수동 발급</button>
         </div>`;
     }
     const couponSection = `
@@ -1093,7 +1084,7 @@ function renderReviews(reviews) {
         </div>`;
     }
 
-    return `<div class="review-card${r.reportable ? ' reportable' : ''}" id="card-${idx}">
+    return `<div class="review-card${r.reportable ? ' reportable' : ''}${r.sentiment === 'negative' ? ' negative-review' : ''}" id="card-${idx}">
       <div class="review-header">
         <div class="reviewer-avatar">${r.reviewer ? r.reviewer[0].toUpperCase() : '?'}</div>
         <div class="reviewer-info">
@@ -1361,27 +1352,18 @@ function approveCoupon(idx) {
     .then(() => fetchReviews(() => { window.scrollTo(0, scrollY); flashReplyTextarea(idx); }));
 }
 
-function toggleCouponDropdown(idx, e) {
-  e.stopPropagation();
-  document.querySelectorAll('.coupon-dropdown').forEach(d => {
-    if (d.id !== `cd-${idx}`) d.style.display = 'none';
-  });
-  const d = document.getElementById(`cd-${idx}`);
-  d.style.display = d.style.display === 'block' ? 'none' : 'block';
-}
-document.addEventListener('click', () => {
-  document.querySelectorAll('.coupon-dropdown').forEach(d => d.style.display = 'none');
-});
-
-function manualCoupon(idx, coupon) {
+function manualCouponByAmount(idx) {
+  const amtStr = prompt('구매 금액을 입력하세요 (원 단위, 숫자만)');
+  if (!amtStr) return;
+  const amount = parseInt(amtStr.replace(/[^0-9]/g, ''), 10);
+  if (isNaN(amount) || amount <= 0) { alert('올바른 금액을 입력해주세요.'); return; }
   const scrollY = window.scrollY;
   fetch(`/api/coupon/manual/${idx}`, {
     method: 'POST',
     headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify({coupon}),
-  }).then(() => {
-    const d = document.getElementById(`cd-${idx}`);
-    if (d) d.style.display = 'none';
+    body: JSON.stringify({purchase_amount: amount}),
+  }).then(r => r.json()).then(data => {
+    if (data.status === 'no_match') { alert('해당 금액에 적용 가능한 쿠폰이 없습니다.'); return; }
     fetchReviews(() => { window.scrollTo(0, scrollY); flashReplyTextarea(idx); });
   });
 }
@@ -1642,20 +1624,43 @@ function toggleAutoGenerate() {
 
 function renderCouponRules(rules) {
   const list = document.getElementById('coupon-rules-list');
-  list.innerHTML = rules.map((r, i) => `
+  const autoRules = rules.filter(r => r.condition !== 'manual_amount');
+  const amountRules = rules.filter(r => r.condition === 'manual_amount');
+  list.innerHTML =
+    autoRules.map((r, i) => {
+      const gi = rules.indexOf(r);
+      return `
     <div class="coupon-rule">
-      <div class="toggle ${r.enabled ? 'on' : ''}" onclick="toggleCoupon(${i})" title="활성화/비활성화"></div>
+      <div class="toggle ${r.enabled ? 'on' : ''}" onclick="toggleCoupon(${gi})" title="활성화/비활성화"></div>
       <div class="coupon-rule-label">${r.label}</div>
-      <input class="coupon-rule-input" id="coupon-name-${i}" type="text"
+      <input class="coupon-rule-input" id="coupon-name-${gi}" type="text"
         value="${r.coupon}" placeholder="쿠폰명" oninput="onCouponChange()" ${r.enabled ? '' : 'disabled'}>
-      <input class="coupon-rule-input" id="coupon-amount-${i}" type="text"
+      <input class="coupon-rule-input" id="coupon-amount-${gi}" type="text"
         value="${r.coupon_amount || ''}" placeholder="할인 금액 (예: 1만원 할인)" oninput="onCouponChange()"
         ${r.enabled ? '' : 'disabled'} style="width:140px">
-      <input class="coupon-rule-input" id="coupon-min-${i}" type="text"
+      <input class="coupon-rule-input" id="coupon-min-${gi}" type="text"
         value="${r.min_purchase_amount || ''}" placeholder="최소 구매 금액 (예: 10만원 이상)" oninput="onCouponChange()"
         ${r.enabled ? '' : 'disabled'} style="width:170px">
-    </div>
-  `).join('');
+    </div>`;
+    }).join('') +
+    (amountRules.length ? `
+    <div style="margin:14px 0 6px;font-size:12px;color:#888;font-weight:600;letter-spacing:.3px">구매금액 기반 수동 발급</div>` : '') +
+    amountRules.map(r => {
+      const gi = rules.indexOf(r);
+      return `
+    <div class="coupon-rule">
+      <div class="toggle ${r.enabled ? 'on' : ''}" onclick="toggleCoupon(${gi})" title="활성화/비활성화"></div>
+      <div class="coupon-rule-label">${r.label}</div>
+      <input class="coupon-rule-input" id="coupon-name-${gi}" type="text"
+        value="${r.coupon}" placeholder="쿠폰명" oninput="onCouponChange()" ${r.enabled ? '' : 'disabled'}>
+      <input class="coupon-rule-input" id="coupon-amount-${gi}" type="text"
+        value="${r.coupon_amount || ''}" placeholder="할인 금액 (예: 1만원)" oninput="onCouponChange()"
+        ${r.enabled ? '' : 'disabled'} style="width:120px">
+      <input class="coupon-rule-input" id="coupon-minamount-${gi}" type="number"
+        value="${r.min_amount || ''}" placeholder="최소금액 (원)" oninput="onCouponChange()"
+        ${r.enabled ? '' : 'disabled'} style="width:140px">
+    </div>`;
+    }).join('');
 }
 
 function toggleCoupon(i) {
@@ -1722,9 +1727,14 @@ function saveSensitiveExprs(btn) {
 
 function saveCouponRules(btn) {
   adminConfig.coupon_rules.forEach((r, i) => {
-    r.coupon               = document.getElementById(`coupon-name-${i}`)?.value || r.coupon;
-    r.coupon_amount        = document.getElementById(`coupon-amount-${i}`)?.value || '';
-    r.min_purchase_amount  = document.getElementById(`coupon-min-${i}`)?.value || '';
+    r.coupon        = document.getElementById(`coupon-name-${i}`)?.value || r.coupon;
+    r.coupon_amount = document.getElementById(`coupon-amount-${i}`)?.value || '';
+    if (r.condition === 'manual_amount') {
+      const v = document.getElementById(`coupon-minamount-${i}`)?.value;
+      r.min_amount = v ? parseInt(v, 10) : (r.min_amount || 0);
+    } else {
+      r.min_purchase_amount = document.getElementById(`coupon-min-${i}`)?.value || '';
+    }
   });
   const template = document.getElementById('coupon-reply-template')?.value || '';
   fetch('/api/admin/config', {
