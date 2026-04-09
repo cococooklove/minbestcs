@@ -414,7 +414,7 @@ BRAND_TONE_FILE = os.path.join(_base_dir, "config", "brand_tone.txt")
 
 def load_settings():
     if not os.path.exists(SETTINGS_FILE):
-        return {"auto_reply": False, "report_criteria": ["욕설", "경쟁사 언급", "광고성", "반복 내용"], "anthropic_api_key": ""}
+        return {"auto_reply": False, "report_criteria": ["욕설", "경쟁사 언급", "광고성", "반복 내용"], "openai_api_key": ""}
     with open(SETTINGS_FILE, encoding="utf-8") as f:
         return json.load(f)
 
@@ -595,14 +595,14 @@ def api_generate_reply(idx):
     if idx >= len(reviews):
         return jsonify({"error": "not found"}), 404
 
-    api_key = os.environ.get("ANTHROPIC_API_KEY")
+    api_key = os.environ.get("OPENAI_API_KEY")
     if not api_key:
-        return jsonify({"error": "ANTHROPIC_API_KEY 환경변수가 없습니다. export ANTHROPIC_API_KEY=sk-ant-... 후 재실행하세요."}), 400
+        return jsonify({"error": "OPENAI_API_KEY 환경변수가 없습니다. export OPENAI_API_KEY=sk-... 후 재실행하세요."}), 400
 
     try:
-        import anthropic
+        from openai import OpenAI
         from classifier import generate_reply, load_brand_tone
-        client = anthropic.Anthropic(api_key=api_key)
+        client = OpenAI(api_key=api_key)
         brand_tone = load_brand_tone()
         settings_data = load_settings()
         reply = generate_reply(reviews[idx], brand_tone, client, settings=settings_data)
@@ -885,8 +885,8 @@ def _sentiment_by_product(reviews):
 @app.route("/api/admin/config", methods=["GET"])
 def admin_config_get():
     s = load_settings()
-    s["anthropic_api_key_set"] = bool(s.get("anthropic_api_key") or os.environ.get("ANTHROPIC_API_KEY"))
-    s["anthropic_api_key"] = ""  # 키 값 자체는 노출 안 함
+    s["openai_api_key_set"] = bool(s.get("openai_api_key") or os.environ.get("OPENAI_API_KEY"))
+    s["openai_api_key"] = ""  # 키 값 자체는 노출 안 함
     return jsonify(s)
 
 
@@ -900,9 +900,9 @@ def admin_config_post():
         s["auto_generate_reply"] = bool(data["auto_generate_reply"])
     if "report_criteria" in data:
         s["report_criteria"] = data["report_criteria"]
-    if data.get("anthropic_api_key"):
-        s["anthropic_api_key"] = data["anthropic_api_key"]
-        os.environ["ANTHROPIC_API_KEY"] = data["anthropic_api_key"]
+    if data.get("openai_api_key"):
+        s["openai_api_key"] = data["openai_api_key"]
+        os.environ["OPENAI_API_KEY"] = data["openai_api_key"]
     if "coupon_rules" in data:
         s["coupon_rules"] = data["coupon_rules"]
     if "reply_coupon_template" in data:

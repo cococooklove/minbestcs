@@ -1605,7 +1605,7 @@ function loadAdminData() {
       if (el) el.value = hints[t] || '';
     });
     const status = document.getElementById('api-status');
-    if (cfg.anthropic_api_key_set) {
+    if (cfg.openai_api_key_set) {
       status.textContent = '● API 키 설정됨';
       status.className = 'api-status set';
     } else {
@@ -1832,7 +1832,7 @@ function saveApiKey(btn) {
   fetch('/api/admin/config', {
     method: 'POST',
     headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify({anthropic_api_key: key}),
+    body: JSON.stringify({openai_api_key: key}),
   }).then(() => {
     document.getElementById('api-key-input').value = '';
     flashSaved(btn);

@@ -7,7 +7,7 @@
     "광고성",
     "반복 내용"
   ],
-  "anthropic_api_key": "",
+  "openai_api_key": "",
   "loyal_threshold": 3,
   "reply_coupon_template": "감사의 마음을 담아 {coupon}({amount})을 발급해드렸으니 다음 구매에 꼭 활용해 주세요.",
   "customer_type_hints": {

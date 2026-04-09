@@ -1,7 +1,7 @@
 """
 리뷰 분류 및 AI 답변 생성 (Claude API 전용)
 - 실행: python3 classifier.py  (미분류 리뷰 일괄 처리)
-- ANTHROPIC_API_KEY 환경변수 필요
+- OPENAI_API_KEY 환경변수 필요
 """
 import json, os, time, re, threading, argparse
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -66,12 +66,12 @@ def api_classify(review: dict, client, report_criteria: list = None,
     max_tokens = 768 if include_reply else 150
     for attempt in range(2):
         try:
-            resp = client.messages.create(
-                model="claude-haiku-4-5-20251001",
+            resp = client.chat.completions.create(
+                model="gpt-4o-mini",
                 max_tokens=max_tokens,
                 messages=[{"role": "user", "content": prompt}],
             )
-            text = resp.content[0].text.strip()
+            text = resp.choices[0].message.content.strip()
             match = re.search(r'\{.*\}', text, re.DOTALL)
             if match:
                 return json.loads(match.group())
@@ -180,13 +180,15 @@ def generate_reply(review: dict, brand_tone: str, client, settings: dict = None)
     reply_text = ""
     for attempt in range(2):
         try:
-            resp = client.messages.create(
-                model="claude-haiku-4-5-20251001",
+            resp = client.chat.completions.create(
+                model="gpt-4o-mini",
                 max_tokens=512,
-                system=system,
-                messages=[{"role": "user", "content": user}],
+                messages=[
+                    {"role": "system", "content": system},
+                    {"role": "user", "content": user},
+                ],
             )
-            reply_text = resp.content[0].text.strip()
+            reply_text = resp.choices[0].message.content.strip()
             break
         except Exception as e:
             if "rate_limit" in str(e).lower() or "429" in str(e) and attempt == 0:
@@ -199,13 +201,15 @@ def generate_reply(review: dict, brand_tone: str, client, settings: dict = None)
         if found:
             retry_system = system + f"\n\n[재생성 요청] 이전 답변에 금지 표현({', '.join(found)})이 포함되었습니다. 이 표현 없이 다시 작성하세요."
             try:
-                retry_resp = client.messages.create(
-                    model="claude-haiku-4-5-20251001",
+                retry_resp = client.chat.completions.create(
+                    model="gpt-4o-mini",
                     max_tokens=512,
-                    system=retry_system,
-                    messages=[{"role": "user", "content": user}],
+                    messages=[
+                        {"role": "system", "content": retry_system},
+                        {"role": "user", "content": user},
+                    ],
                 )
-                reply_text = retry_resp.content[0].text.strip()
+                reply_text = retry_resp.choices[0].message.content.strip()
             except Exception:
                 pass
 
@@ -226,19 +230,19 @@ def process_batch():
     with open(REVIEWS_FILE, encoding="utf-8") as f:
         reviews = json.load(f)
 
-    api_key = os.environ.get("ANTHROPIC_API_KEY")
+    api_key = os.environ.get("OPENAI_API_KEY")
     if not api_key:
-        print("오류: ANTHROPIC_API_KEY 환경변수가 없습니다.")
+        print("오류: OPENAI_API_KEY 환경변수가 없습니다.")
         return
 
     try:
-        import anthropic
+        from openai import OpenAI
     except ImportError:
-        print("오류: anthropic 패키지 없음. pip install anthropic")
+        print("오류: openai 패키지 없음. pip install openai")
         return
 
-    client = anthropic.Anthropic(api_key=api_key)
-    print("Claude API로 분류 실행 (병렬 10개)")
+    client = OpenAI(api_key=api_key)
+    print("OpenAI API로 분류 실행 (병렬 10개)")
 
     brand_tone = load_brand_tone()
     settings = load_settings()
