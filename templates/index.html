@@ -89,33 +89,74 @@
   /* ── 개인화 리뷰 AI 카드 ── */
   .ft-ai-card {
     border-radius: 14px; padding: 2px; margin-bottom: 18px;
-    background: #e8e8e8; transition: background 1s ease;
+    /* 상시: 은은한 그라디언트 회전 */
+    background: linear-gradient(270deg, #1a3a2a, #1a2a3a, #2a1a3a, #1a3a2a);
+    background-size: 400% 400%;
+    animation: ft-grad-idle 8s ease infinite;
+    transition: animation 0.5s;
   }
   .ft-ai-card.training {
     background: linear-gradient(270deg, #03c75a, #1565c0, #6a1b9a, #03c75a);
     background-size: 600% 600%;
-    animation: ft-grad 3s ease infinite;
+    animation: ft-grad-train 2.5s ease infinite;
   }
-  @keyframes ft-grad {
+  @keyframes ft-grad-idle {
+    0%   { background-position: 0% 50%; }
+    50%  { background-position: 100% 50%; }
+    100% { background-position: 0% 50%; }
+  }
+  @keyframes ft-grad-train {
     0%   { background-position: 0% 50%; }
     50%  { background-position: 100% 50%; }
     100% { background-position: 0% 50%; }
   }
   .ft-ai-inner {
-    background: #16213e; border-radius: 12px;
-    padding: 16px 20px; display: flex; flex-direction: column; gap: 12px;
+    background: #0d1b2a; border-radius: 12px;
+    padding: 16px 20px; display: flex; flex-direction: column; gap: 14px;
+    position: relative; overflow: hidden;
   }
-  .ft-ai-header { display: flex; align-items: center; gap: 12px; }
+  /* 상시: 배경 파티클 흐름 */
+  .ft-ai-inner::before {
+    content: '';
+    position: absolute; inset: 0;
+    background: radial-gradient(ellipse 60% 40% at 20% 50%, rgba(3,199,90,.06) 0%, transparent 70%),
+                radial-gradient(ellipse 40% 60% at 80% 50%, rgba(21,101,192,.06) 0%, transparent 70%);
+    animation: ft-glow-shift 6s ease-in-out infinite alternate;
+    pointer-events: none;
+  }
+  .ft-ai-card.training .ft-ai-inner::before {
+    background: radial-gradient(ellipse 70% 50% at 20% 50%, rgba(3,199,90,.15) 0%, transparent 70%),
+                radial-gradient(ellipse 50% 70% at 80% 50%, rgba(106,27,154,.15) 0%, transparent 70%);
+    animation: ft-glow-shift 2s ease-in-out infinite alternate;
+  }
+  @keyframes ft-glow-shift {
+    from { opacity: 0.6; transform: scale(1); }
+    to   { opacity: 1;   transform: scale(1.05); }
+  }
+  .ft-ai-header { display: flex; align-items: center; gap: 12px; position: relative; }
   .ft-ai-icon {
     width: 42px; height: 42px; border-radius: 11px; flex-shrink: 0;
     background: linear-gradient(135deg, #03c75a 0%, #1565c0 100%);
     display: flex; align-items: center; justify-content: center;
     font-size: 22px; position: relative;
+    /* 상시: 아이콘 은은한 펄스 */
+    animation: ft-icon-idle 3s ease-in-out infinite;
+  }
+  @keyframes ft-icon-idle {
+    0%,100% { box-shadow: 0 0 0 0 rgba(3,199,90,0); }
+    50%     { box-shadow: 0 0 12px 4px rgba(3,199,90,.25); }
+  }
+  .ft-ai-card.training .ft-ai-icon {
+    animation: ft-icon-train 1.2s ease-in-out infinite;
+  }
+  @keyframes ft-icon-train {
+    0%,100% { box-shadow: 0 0 0 0 rgba(3,199,90,0); transform: scale(1); }
+    50%     { box-shadow: 0 0 20px 8px rgba(3,199,90,.4); transform: scale(1.06); }
   }
   .ft-ai-card.training .ft-ai-icon::after {
-    content: ''; position: absolute; inset: -3px; border-radius: 14px; z-index: -1;
+    content: ''; position: absolute; inset: -4px; border-radius: 15px; z-index: -1;
     background: conic-gradient(#03c75a, #1565c0, #6a1b9a, #03c75a);
-    animation: ft-spin 1.5s linear infinite;
+    animation: ft-spin 1.2s linear infinite;
   }
   @keyframes ft-spin { to { transform: rotate(360deg); } }
   .ft-ai-name { font-size: 14px; font-weight: 700; color: #fff; letter-spacing: -0.01em; }
@@ -124,12 +165,34 @@
     margin-left: auto; padding: 4px 11px; border-radius: 20px;
     font-size: 11px; font-weight: 700; flex-shrink: 0; letter-spacing: 0.02em;
   }
-  .ft-badge-ready  { background: rgba(3,199,90,.15); color: #03c75a; border: 1px solid rgba(3,199,90,.3); }
+  .ft-badge-ready {
+    background: rgba(3,199,90,.12); color: #03c75a; border: 1px solid rgba(3,199,90,.25);
+    animation: ft-badge-idle 3s ease-in-out infinite;
+  }
+  @keyframes ft-badge-idle { 0%,100%{opacity:.8} 50%{opacity:1} }
   .ft-badge-training {
     background: rgba(255,193,7,.15); color: #ffc107; border: 1px solid rgba(255,193,7,.3);
-    animation: ft-badge-blink 1.6s ease-in-out infinite;
+    animation: ft-badge-blink 1s ease-in-out infinite;
   }
-  @keyframes ft-badge-blink { 0%,100%{opacity:1} 50%{opacity:.4} }
+  @keyframes ft-badge-blink { 0%,100%{opacity:1} 50%{opacity:.3} }
+  /* 상시: 하단 스캔라인 */
+  .ft-ai-inner::after {
+    content: '';
+    position: absolute; left: 0; right: 0; height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(3,199,90,.4), transparent);
+    animation: ft-scan 4s linear infinite;
+    pointer-events: none;
+  }
+  .ft-ai-card.training .ft-ai-inner::after {
+    background: linear-gradient(90deg, transparent, rgba(3,199,90,.8), rgba(21,101,192,.8), transparent);
+    animation: ft-scan 1.5s linear infinite;
+  }
+  @keyframes ft-scan {
+    0%   { top: -1px; opacity: 0; }
+    10%  { opacity: 1; }
+    90%  { opacity: 1; }
+    100% { top: 100%; opacity: 0; }
+  }
   /* wave bars */
   .ft-wave { display: flex; align-items: flex-end; gap: 3px; height: 28px; }
   .ft-wave .bar {
@@ -153,11 +216,6 @@
   .ft-loading-dots span:nth-child(2){animation-delay:.25s}
   .ft-loading-dots span:nth-child(3){animation-delay:.5s}
   @keyframes ft-dot-blink { 0%,80%,100%{opacity:0} 40%{opacity:1} }
-  /* model line */
-  .ft-model-line {
-    display: flex; align-items: center; gap: 8px; padding-top: 10px;
-    border-top: 1px solid rgba(255,255,255,.07);
-  }
   /* 힌트 그리드 */
   .hint-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 16px; }
   .hint-item label { font-size: 12px; font-weight: 600; margin-bottom: 5px; display: block; }
