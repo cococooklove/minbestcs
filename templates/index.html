@@ -85,6 +85,79 @@
   .api-status { font-size: 12px; }
   .api-status.set { color: #03c75a; }
   .api-status.unset { color: #e53935; }
+
+  /* ── 개인화 리뷰 AI 카드 ── */
+  .ft-ai-card {
+    border-radius: 14px; padding: 2px; margin-bottom: 18px;
+    background: #e8e8e8; transition: background 1s ease;
+  }
+  .ft-ai-card.training {
+    background: linear-gradient(270deg, #03c75a, #1565c0, #6a1b9a, #03c75a);
+    background-size: 600% 600%;
+    animation: ft-grad 3s ease infinite;
+  }
+  @keyframes ft-grad {
+    0%   { background-position: 0% 50%; }
+    50%  { background-position: 100% 50%; }
+    100% { background-position: 0% 50%; }
+  }
+  .ft-ai-inner {
+    background: #16213e; border-radius: 12px;
+    padding: 16px 20px; display: flex; flex-direction: column; gap: 12px;
+  }
+  .ft-ai-header { display: flex; align-items: center; gap: 12px; }
+  .ft-ai-icon {
+    width: 42px; height: 42px; border-radius: 11px; flex-shrink: 0;
+    background: linear-gradient(135deg, #03c75a 0%, #1565c0 100%);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 22px; position: relative;
+  }
+  .ft-ai-card.training .ft-ai-icon::after {
+    content: ''; position: absolute; inset: -3px; border-radius: 14px; z-index: -1;
+    background: conic-gradient(#03c75a, #1565c0, #6a1b9a, #03c75a);
+    animation: ft-spin 1.5s linear infinite;
+  }
+  @keyframes ft-spin { to { transform: rotate(360deg); } }
+  .ft-ai-name { font-size: 14px; font-weight: 700; color: #fff; letter-spacing: -0.01em; }
+  .ft-ai-subtitle { font-size: 11px; color: #8899aa; margin-top: 2px; }
+  .ft-ai-badge {
+    margin-left: auto; padding: 4px 11px; border-radius: 20px;
+    font-size: 11px; font-weight: 700; flex-shrink: 0; letter-spacing: 0.02em;
+  }
+  .ft-badge-ready  { background: rgba(3,199,90,.15); color: #03c75a; border: 1px solid rgba(3,199,90,.3); }
+  .ft-badge-training {
+    background: rgba(255,193,7,.15); color: #ffc107; border: 1px solid rgba(255,193,7,.3);
+    animation: ft-badge-blink 1.6s ease-in-out infinite;
+  }
+  @keyframes ft-badge-blink { 0%,100%{opacity:1} 50%{opacity:.4} }
+  /* wave bars */
+  .ft-wave { display: flex; align-items: flex-end; gap: 3px; height: 28px; }
+  .ft-wave .bar {
+    width: 4px; border-radius: 3px 3px 0 0;
+    background: linear-gradient(180deg, #03c75a, #1565c0);
+    animation: ft-wave-bar 1.1s ease-in-out infinite;
+    height: 4px;
+  }
+  .ft-wave .bar:nth-child(1){animation-delay:0s}
+  .ft-wave .bar:nth-child(2){animation-delay:.1s}
+  .ft-wave .bar:nth-child(3){animation-delay:.2s}
+  .ft-wave .bar:nth-child(4){animation-delay:.3s}
+  .ft-wave .bar:nth-child(5){animation-delay:.4s}
+  .ft-wave .bar:nth-child(6){animation-delay:.3s}
+  .ft-wave .bar:nth-child(7){animation-delay:.2s}
+  .ft-wave .bar:nth-child(8){animation-delay:.1s}
+  @keyframes ft-wave-bar { 0%,100%{height:4px} 50%{height:26px} }
+  /* loading dots */
+  .ft-loading-dots span { animation: ft-dot-blink 1.4s infinite; opacity: 0; }
+  .ft-loading-dots span:nth-child(1){animation-delay:0s}
+  .ft-loading-dots span:nth-child(2){animation-delay:.25s}
+  .ft-loading-dots span:nth-child(3){animation-delay:.5s}
+  @keyframes ft-dot-blink { 0%,80%,100%{opacity:0} 40%{opacity:1} }
+  /* model line */
+  .ft-model-line {
+    display: flex; align-items: center; gap: 8px; padding-top: 10px;
+    border-top: 1px solid rgba(255,255,255,.07);
+  }
   /* 힌트 그리드 */
   .hint-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 16px; }
   .hint-item label { font-size: 12px; font-weight: 600; margin-bottom: 5px; display: block; }
@@ -734,7 +807,41 @@
   <!-- 파인튜닝 관리 -->
   <div class="admin-section">
     <div class="admin-section-title">🤖 파인튜닝 관리</div>
-    <div style="font-size:12px;color:#888;margin-bottom:16px">승인된 답변이 N개 누적될 때마다 자동으로 GPT를 재학습합니다. 완료 시 자동으로 새 모델로 전환됩니다.</div>
+    <div style="font-size:12px;color:#888;margin-bottom:16px">승인된 답변이 N개 누적될 때마다 자동으로 재학습합니다. 완료 시 자동으로 새 모델로 전환됩니다.</div>
+
+    <!-- 개인화 리뷰 AI 상태 카드 -->
+    <div class="ft-ai-card" id="ft-ai-card">
+      <div class="ft-ai-inner">
+        <div class="ft-ai-header">
+          <div class="ft-ai-icon">🧠</div>
+          <div>
+            <div class="ft-ai-name">개인화 리뷰 AI</div>
+            <div class="ft-ai-subtitle" id="ft-ai-subtitle">대기 중</div>
+          </div>
+          <div class="ft-ai-badge ft-badge-ready" id="ft-ai-badge">준비 완료</div>
+        </div>
+
+        <!-- 학습 중 애니메이션 (기본 숨김) -->
+        <div id="ft-training-anim" style="display:none">
+          <div style="display:flex;align-items:center;gap:14px">
+            <div class="ft-wave">
+              <span class="bar"></span><span class="bar"></span><span class="bar"></span>
+              <span class="bar"></span><span class="bar"></span><span class="bar"></span>
+              <span class="bar"></span><span class="bar"></span>
+            </div>
+            <div style="color:#ccc;font-size:12px;line-height:1.5">
+              리뷰 패턴을 학습하는 중입니다<span class="ft-loading-dots"><span>.</span><span>.</span><span>.</span></span><br>
+              <span id="ft-job-status" style="font-size:11px;color:#8899aa"></span>
+            </div>
+          </div>
+        </div>
+
+        <div class="ft-model-line">
+          <span style="font-size:11px;color:#667788">현재 모델</span>
+          <span id="ft-active-model" style="font-weight:600;color:#03c75a;font-family:monospace;font-size:11px">-</span>
+        </div>
+      </div>
+    </div>
 
     <div style="display:flex;flex-direction:column;gap:10px">
       <div style="display:flex;align-items:center;gap:12px;font-size:13px">
@@ -748,14 +855,6 @@
         <span style="color:#555;width:120px;flex-shrink:0">학습 데이터</span>
         <span id="ft-training-count" style="font-weight:600">-</span>
         <span style="color:#888">개 승인 완료 &nbsp;|&nbsp; 이전 학습 후 <span id="ft-new-count" style="font-weight:600;color:#1565c0">-</span>개 추가됨</span>
-      </div>
-      <div style="display:flex;align-items:center;gap:12px;font-size:13px">
-        <span style="color:#555;width:120px;flex-shrink:0">현재 모델</span>
-        <span id="ft-active-model" style="font-weight:600;color:#03c75a;font-family:monospace;font-size:12px">-</span>
-      </div>
-      <div style="display:none;align-items:center;gap:12px;font-size:13px" id="ft-job-row">
-        <span style="color:#555;width:120px;flex-shrink:0">학습 상태</span>
-        <span id="ft-job-status" style="font-weight:600">-</span>
       </div>
     </div>
 
@@ -1620,14 +1719,27 @@ function loadFinetuneStatus() {
       thresholdEl.dataset.loaded = '1';
     }
 
-    const jobRow = document.getElementById('ft-job-row');
-    const statusMap = {running:'학습 중...', succeeded:'완료 (자동 전환됨)', failed:'실패', cancelled:'취소'};
-    if (d.job_id && d.job_status && d.job_status !== 'none') {
-      jobRow.style.display = 'flex';
-      document.getElementById('ft-job-status').textContent =
-        (statusMap[d.job_status] || d.job_status) + (d.job_id ? ` (${d.job_id})` : '');
+    const isTraining = !!(d.job_id && d.job_status === 'running');
+    const card    = document.getElementById('ft-ai-card');
+    const badge   = document.getElementById('ft-ai-badge');
+    const subtitle = document.getElementById('ft-ai-subtitle');
+    const animEl  = document.getElementById('ft-training-anim');
+    const jobEl   = document.getElementById('ft-job-status');
+
+    if (isTraining) {
+      card.classList.add('training');
+      badge.className = 'ft-ai-badge ft-badge-training';
+      badge.textContent = '학습 중';
+      subtitle.textContent = '패턴 학습 진행 중';
+      animEl.style.display = '';
+      if (jobEl) jobEl.textContent = d.job_id ? `Job ID: ${d.job_id}` : '';
     } else {
-      jobRow.style.display = 'none';
+      card.classList.remove('training');
+      badge.className = 'ft-ai-badge ft-badge-ready';
+      badge.textContent = '준비 완료';
+      const subtitleMap = {succeeded:'최근 학습 완료 ✓', failed:'학습 실패 — 재시도 필요', cancelled:'학습 취소됨'};
+      subtitle.textContent = (d.job_status && subtitleMap[d.job_status]) || '대기 중';
+      animEl.style.display = 'none';
     }
   });
 }
