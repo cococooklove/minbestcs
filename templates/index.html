@@ -1356,8 +1356,9 @@ function flashReplyTextarea(idx) {
 }
 
 function approveCoupon(idx) {
+  const scrollY = window.scrollY;
   fetch(`/api/coupon/approve/${idx}`, {method: 'POST'})
-    .then(() => fetchReviews(() => flashReplyTextarea(idx)));
+    .then(() => fetchReviews(() => { window.scrollTo(0, scrollY); flashReplyTextarea(idx); }));
 }
 
 function toggleCouponDropdown(idx, e) {
@@ -1373,6 +1374,7 @@ document.addEventListener('click', () => {
 });
 
 function manualCoupon(idx, coupon) {
+  const scrollY = window.scrollY;
   fetch(`/api/coupon/manual/${idx}`, {
     method: 'POST',
     headers: {'Content-Type': 'application/json'},
@@ -1380,13 +1382,14 @@ function manualCoupon(idx, coupon) {
   }).then(() => {
     const d = document.getElementById(`cd-${idx}`);
     if (d) d.style.display = 'none';
-    fetchReviews(() => flashReplyTextarea(idx));
+    fetchReviews(() => { window.scrollTo(0, scrollY); flashReplyTextarea(idx); });
   });
 }
 
 function revokeCoupon(idx) {
+  const scrollY = window.scrollY;
   fetch(`/api/coupon/revoke/${idx}`, {method: 'POST'})
-    .then(() => fetchReviews());
+    .then(() => fetchReviews(() => window.scrollTo(0, scrollY)));
 }
 
 function approveAll(idx) {
