@@ -656,13 +656,64 @@ def api_reject_reply(idx):
     return jsonify({"status": "rejected"})
 
 
+def _insert_coupon_text(ai_reply, coupon_text):
+    """쿠폰 문구를 AI 답변의 적절한 위치(마지막 단락 앞)에 삽입. 삽입된 블록 텍스트도 반환."""
+    block = "\n\n" + coupon_text
+    if not ai_reply:
+        return coupon_text, coupon_text
+    paragraphs = ai_reply.split("\n\n")
+    if len(paragraphs) >= 2:
+        paragraphs.insert(-1, coupon_text)
+    else:
+        paragraphs.append(coupon_text)
+    return "\n\n".join(paragraphs), block
+
+
 @app.route("/api/coupon/approve/<int:idx>", methods=["POST"])
 def api_coupon_approve(idx):
     """쿠폰 승인"""
     reviews = load_reviews()
     if idx >= len(reviews):
         return jsonify({"error": "not found"}), 404
+    review = reviews[idx]
     reviews[idx]["coupon_status"] = "approved"
+
+    settings = load_settings()
+    coupon_rules = settings.get("coupon_rules", [])
+    coupon_tmpl = settings.get("reply_coupon_template", "감사의 마음을 담아 {coupon}({amount})을 발급해드렸으니 다음 구매에 꼭 활용해 주세요.")
+    matched_coupon = None
+    for rule in coupon_rules:
+        if not rule.get("enabled"):
+            continue
+        cond = rule.get("condition", "")
+        if cond == "rating_5_photo" and float(review.get("rating") or 0) >= 5:
+            matched_coupon = rule; break
+        elif cond == "content_100" and len(review.get("content") or "") >= 100:
+            matched_coupon = rule; break
+        elif cond == "negative_manual" and review.get("sentiment") == "negative":
+            matched_coupon = rule; break
+        elif cond == "repurchase" and len(review.get("reviewer_history") or []) >= 1:
+            matched_coupon = rule; break
+
+    if matched_coupon:
+        name = matched_coupon.get("coupon", "")
+        amount = (matched_coupon.get("coupon_amount") or "").strip()
+        min_purchase = (matched_coupon.get("min_purchase_amount") or "").strip()
+        if amount:
+            coupon_text = coupon_tmpl.replace("{coupon}", name).replace("{amount}", amount)
+        else:
+            coupon_text = coupon_tmpl.replace("{coupon}", name).replace("({amount})", "").replace("{amount}", "").strip()
+        if min_purchase:
+            coupon_text += f" (사용 조건: {min_purchase} 구매 시)"
+
+        existing = review.get("ai_reply") or ""
+        prev = review.get("coupon_appended_text", "")
+        if prev and prev in existing:
+            existing = existing.replace(prev, "", 1).strip("\n")
+        new_reply, block = _insert_coupon_text(existing, coupon_text)
+        reviews[idx]["ai_reply"] = new_reply
+        reviews[idx]["coupon_appended_text"] = block
+
     save_reviews(reviews)
     invalidate_reviews_cache()
     return jsonify({"status": "approved"})
@@ -678,8 +729,19 @@ def api_coupon_manual(idx):
     coupon = (data.get("coupon") or "").strip()
     if not coupon:
         return jsonify({"error": "쿠폰명 필요"}), 400
+    review = reviews[idx]
     reviews[idx]["coupon_status"] = "manual"
     reviews[idx]["manual_coupon"] = coupon
+
+    coupon_text = f"감사의 마음을 담아 {coupon}을 발급해드렸으니 다음 구매에 꼭 활용해 주세요."
+    existing = review.get("ai_reply") or ""
+    prev = review.get("coupon_appended_text", "")
+    if prev and prev in existing:
+        existing = existing.replace(prev, "", 1).strip("\n")
+    new_reply, block = _insert_coupon_text(existing, coupon_text)
+    reviews[idx]["ai_reply"] = new_reply
+    reviews[idx]["coupon_appended_text"] = block
+
     save_reviews(reviews)
     invalidate_reviews_cache()
     return jsonify({"status": "manual", "coupon": coupon})
@@ -691,6 +753,13 @@ def api_coupon_revoke(idx):
     reviews = load_reviews()
     if idx >= len(reviews):
         return jsonify({"error": "not found"}), 404
+    review = reviews[idx]
+    prev = review.get("coupon_appended_text", "")
+    if prev:
+        existing = review.get("ai_reply") or ""
+        if prev in existing:
+            reviews[idx]["ai_reply"] = existing.replace(prev, "", 1).strip("\n")
+        reviews[idx]["coupon_appended_text"] = ""
     reviews[idx]["coupon_status"] = "none"
     reviews[idx]["manual_coupon"] = ""
     save_reviews(reviews)

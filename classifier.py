@@ -142,12 +142,16 @@ def generate_reply(review: dict, brand_tone: str, client, settings: dict = None)
         cond = rule.get("condition", "")
         if cond == "rating_5_photo" and float(review.get("rating") or 0) >= 5:
             matched_coupons.append(rule)
+            break
         elif cond == "content_100" and len(review.get("content") or "") >= 100:
             matched_coupons.append(rule)
+            break
         elif cond == "negative_manual" and review.get("sentiment") == "negative":
             matched_coupons.append(rule)
+            break
         elif cond == "repurchase" and len(review.get("reviewer_history") or []) >= 1:
             matched_coupons.append(rule)
+            break
     if matched_coupons:
         coupon_lines = []
         for c in matched_coupons:

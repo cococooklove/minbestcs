@@ -180,6 +180,8 @@
   .naver-popup.error .popup-close:not(:disabled):hover { background: #c0392b; }
   @keyframes fadeIn { from { opacity:0 } to { opacity:1 } }
   @keyframes popIn { from { opacity:0; transform:translate(-50%,-48%) scale(.96) } to { opacity:1; transform:translate(-50%,-50%) scale(1) } }
+  @keyframes couponFlash { 0% { background:#fff9c4; } 60% { background:#fff176; } 100% { background:transparent; } }
+  .coupon-flash { animation: couponFlash 1.4s ease-out; }
 
   .stats-bar {
     background: white; border-bottom: 1px solid #e8e8e8;
@@ -911,14 +913,13 @@ function startResize(e) {
 
 function checkCoupon(r) {
   const rules = (window.adminSettings && window.adminSettings.coupon_rules) || [];
-  const matched = [];
   for (const rule of rules) {
     if (!rule.enabled) continue;
-    if (rule.condition === 'rating_5_photo' && parseFloat(r.rating) >= 5) matched.push({...rule});
-    if (rule.condition === 'content_100' && (r.content || '').length >= 100) matched.push({...rule});
-    if (rule.condition === 'negative_manual' && r.sentiment === 'negative') matched.push({...rule, manual: true});
+    if (rule.condition === 'rating_5_photo' && parseFloat(r.rating) >= 5) return [{...rule}];
+    if (rule.condition === 'content_100' && (r.content || '').length >= 100) return [{...rule}];
+    if (rule.condition === 'negative_manual' && r.sentiment === 'negative') return [{...rule, manual: true}];
   }
-  return matched;
+  return [];
 }
 
 function renderReviews(reviews) {
@@ -1163,7 +1164,7 @@ function renderPagination(p) {
 }
 function goPage(p) { currentPage = p; fetchReviews(); }
 
-function fetchReviews() {
+function fetchReviews(onRendered) {
   const container = document.getElementById('reviews-container');
   let elapsed = 0;
   container.innerHTML = '<div class="loading" id="loading-msg">불러오는 중... (0초)</div>';
@@ -1200,6 +1201,7 @@ function fetchReviews() {
       renderPagination(data.pagination);
       document.getElementById('last-updated').textContent = new Date().toLocaleTimeString('ko-KR');
       _lastFetchTime = Date.now();
+      if (onRendered) onRendered();
     })
     .catch(e => {
       clearInterval(timer);
@@ -1344,9 +1346,18 @@ function generateReply(idx, btn) {
     .catch(() => { btn.disabled = false; btn.textContent = 'AI 답변 생성'; });
 }
 
+function flashReplyTextarea(idx) {
+  const ta = document.getElementById(`reply-text-${idx}`);
+  if (!ta) return;
+  ta.classList.remove('coupon-flash');
+  void ta.offsetWidth; // reflow
+  ta.classList.add('coupon-flash');
+  setTimeout(() => ta.classList.remove('coupon-flash'), 1400);
+}
+
 function approveCoupon(idx) {
   fetch(`/api/coupon/approve/${idx}`, {method: 'POST'})
-    .then(() => fetchReviews());
+    .then(() => fetchReviews(() => flashReplyTextarea(idx)));
 }
 
 function toggleCouponDropdown(idx, e) {
@@ -1369,7 +1380,7 @@ function manualCoupon(idx, coupon) {
   }).then(() => {
     const d = document.getElementById(`cd-${idx}`);
     if (d) d.style.display = 'none';
-    fetchReviews();
+    fetchReviews(() => flashReplyTextarea(idx));
   });
 }
 
