@@ -1,6 +1,8 @@
 {
   "auto_reply": false,
   "auto_generate_reply": true,
+  "active_model": "gpt-4o-mini",
+  "finetune_job_id": "",
   "report_criteria": [
     "욕설",
     "경쟁사 언급",

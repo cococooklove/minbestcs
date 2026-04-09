@@ -95,7 +95,7 @@ def _contains_sensitive(text: str, expressions: list) -> list:
 
 
 def generate_reply(review: dict, brand_tone: str, client, settings: dict = None) -> str:
-    """Claude API 기반 답변 생성 (단독 호출용 fallback)"""
+    """OpenAI API 기반 답변 생성"""
     system = f"""당신은 건강기능식품 브랜드의 고객 담당자입니다.
 아래 브랜드 톤 가이드에 따라 리뷰에 답변하세요.
 
@@ -104,6 +104,7 @@ def generate_reply(review: dict, brand_tone: str, client, settings: dict = None)
 답변만 출력하세요. 따옴표나 설명 없이 답변 텍스트만."""
 
     settings = settings or load_settings()
+    model = settings.get("active_model", "gpt-4o-mini")
     sensitive = settings.get("sensitive_expressions", [])
     if sensitive:
         forbidden_block = "\n\n[절대 사용 금지 표현 — 아래 표현은 어떤 형태로도 답변에 포함하지 마세요]\n"
@@ -181,7 +182,7 @@ def generate_reply(review: dict, brand_tone: str, client, settings: dict = None)
     for attempt in range(2):
         try:
             resp = client.chat.completions.create(
-                model="gpt-4o-mini",
+                model=model,
                 max_tokens=512,
                 messages=[
                     {"role": "system", "content": system},
@@ -202,7 +203,7 @@ def generate_reply(review: dict, brand_tone: str, client, settings: dict = None)
             retry_system = system + f"\n\n[재생성 요청] 이전 답변에 금지 표현({', '.join(found)})이 포함되었습니다. 이 표현 없이 다시 작성하세요."
             try:
                 retry_resp = client.chat.completions.create(
-                    model="gpt-4o-mini",
+                    model=model,
                     max_tokens=512,
                     messages=[
                         {"role": "system", "content": retry_system},

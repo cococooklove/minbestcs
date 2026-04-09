@@ -934,6 +934,98 @@ def admin_brand_tone_post():
     return jsonify({"status": "ok"})
 
 
+@app.route("/api/admin/finetune/status", methods=["GET"])
+def finetune_status():
+    """파인튜닝 상태 조회"""
+    settings = load_settings()
+    reviews = load_reviews()
+    training_count = sum(
+        1 for r in reviews
+        if r.get("reply_status") == "approved" and r.get("ai_reply")
+    )
+    result = {
+        "training_count": training_count,
+        "active_model": settings.get("active_model", "gpt-4o-mini"),
+        "job_id": settings.get("finetune_job_id", ""),
+        "job_status": "none",
+        "fine_tuned_model": "",
+    }
+    job_id = settings.get("finetune_job_id", "")
+    if job_id:
+        try:
+            from openai import OpenAI
+            client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY", settings.get("openai_api_key", "")))
+            job = client.fine_tuning.jobs.retrieve(job_id)
+            result["job_status"] = job.status
+            result["fine_tuned_model"] = job.fine_tuned_model or ""
+        except Exception as e:
+            result["job_status"] = f"error: {e}"
+    return jsonify(result)
+
+
+@app.route("/api/admin/finetune/start", methods=["POST"])
+def finetune_start():
+    """파인튜닝 시작 — 승인 답변 JSONL 업로드 후 job 생성"""
+    import io
+    settings = load_settings()
+    reviews = load_reviews()
+    approved = [
+        r for r in reviews
+        if r.get("reply_status") == "approved" and r.get("ai_reply")
+    ]
+    if len(approved) < 10:
+        return jsonify({"error": f"승인된 답변이 {len(approved)}개입니다. 최소 10개 필요합니다."}), 400
+
+    brand_tone = ""
+    if os.path.exists(BRAND_TONE_FILE):
+        with open(BRAND_TONE_FILE, encoding="utf-8") as f:
+            brand_tone = f.read()
+
+    lines = []
+    for r in approved:
+        user_msg = f"리뷰 내용: {r.get('content', '')}\n별점: {r.get('rating', '')}점\n상품: {r.get('product', '')}"
+        entry = {
+            "messages": [
+                {"role": "system", "content": f"당신은 건강기능식품 브랜드의 고객 담당자입니다.\n{brand_tone}\n답변만 출력하세요."},
+                {"role": "user", "content": user_msg},
+                {"role": "assistant", "content": r["ai_reply"]},
+            ]
+        }
+        lines.append(json.dumps(entry, ensure_ascii=False))
+    jsonl_bytes = "\n".join(lines).encode("utf-8")
+
+    try:
+        from openai import OpenAI
+        api_key = os.environ.get("OPENAI_API_KEY", settings.get("openai_api_key", ""))
+        client = OpenAI(api_key=api_key)
+        file_obj = client.files.create(
+            file=("finetune_data.jsonl", io.BytesIO(jsonl_bytes), "application/json"),
+            purpose="fine-tune",
+        )
+        job = client.fine_tuning.jobs.create(
+            training_file=file_obj.id,
+            model="gpt-4o-mini",
+        )
+        settings["finetune_job_id"] = job.id
+        save_settings(settings)
+        return jsonify({"status": "started", "job_id": job.id, "training_count": len(approved)})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/admin/finetune/activate", methods=["POST"])
+def finetune_activate():
+    """파인튜닝 완료된 모델을 활성 모델로 전환"""
+    data = request.get_json() or {}
+    model_id = (data.get("model_id") or "").strip()
+    if not model_id:
+        return jsonify({"error": "model_id 필요"}), 400
+    settings = load_settings()
+    settings["active_model"] = model_id
+    save_settings(settings)
+    return jsonify({"status": "ok", "active_model": model_id})
+
+
 @app.route("/api/reply/post/<int:idx>", methods=["POST"])
 def api_post_reply(idx):
     """셀러센터에 답글 게시 (Playwright 비동기 실행)"""

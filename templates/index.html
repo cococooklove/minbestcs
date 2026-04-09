@@ -731,6 +731,41 @@
     </div>
   </div>
 
+  <!-- 파인튜닝 관리 -->
+  <div class="admin-section">
+    <div class="admin-section-title">🤖 파인튜닝 관리</div>
+    <div style="font-size:12px;color:#888;margin-bottom:16px">승인 완료된 답변으로 GPT를 학습시켜 브랜드 맞춤 모델을 만듭니다. 최소 10개 이상의 승인 답변이 필요합니다.</div>
+
+    <div style="display:flex;flex-direction:column;gap:10px">
+      <div style="display:flex;align-items:center;gap:12px;font-size:13px">
+        <span style="color:#555;width:100px;flex-shrink:0">학습 데이터</span>
+        <span id="ft-training-count" style="font-weight:600">-</span>
+        <span style="color:#888">개 (승인 완료 답변)</span>
+      </div>
+      <div style="display:flex;align-items:center;gap:12px;font-size:13px">
+        <span style="color:#555;width:100px;flex-shrink:0">현재 모델</span>
+        <span id="ft-active-model" style="font-weight:600;color:#03c75a;font-family:monospace;font-size:12px">-</span>
+      </div>
+      <div style="display:flex;align-items:center;gap:12px;font-size:13px" id="ft-job-row" style="display:none">
+        <span style="color:#555;width:100px;flex-shrink:0">학습 상태</span>
+        <span id="ft-job-status" style="font-weight:600">-</span>
+      </div>
+      <div style="display:flex;align-items:center;gap:12px;font-size:13px" id="ft-result-row" style="display:none">
+        <span style="color:#555;width:100px;flex-shrink:0">완료 모델</span>
+        <span id="ft-fine-tuned-model" style="font-family:monospace;font-size:12px;color:#1565c0">-</span>
+      </div>
+    </div>
+
+    <div class="admin-footer" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+      <button class="btn-save" id="btn-ft-start" onclick="startFinetune(this)"
+        style="background:#1565c0;color:#fff;opacity:1;cursor:pointer">파인튜닝 시작</button>
+      <button class="btn-save" id="btn-ft-refresh" onclick="refreshFinetuneStatus()"
+        style="background:#555;color:#fff;opacity:1;cursor:pointer;display:none">상태 새로고침</button>
+      <button class="btn-save" id="btn-ft-activate" onclick="activateFinetuned()"
+        style="background:#03c75a;color:#fff;opacity:1;cursor:pointer;display:none">이 모델로 전환</button>
+    </div>
+  </div>
+
   <!-- AI 분석 · 답변 동작 안내 -->
   <div class="admin-section">
     <div class="admin-section-title">📋 AI 분석 · 답변 동작 안내</div>
@@ -1569,6 +1604,59 @@ function toggleAdmin() {
   if (adminOpen) loadAdminData();
 }
 
+let _ftFineTunedModel = '';
+
+function loadFinetuneStatus() {
+  fetch('/api/admin/finetune/status').then(r => r.json()).then(d => {
+    document.getElementById('ft-training-count').textContent = d.training_count;
+    document.getElementById('ft-active-model').textContent = d.active_model;
+    _ftFineTunedModel = d.fine_tuned_model || '';
+
+    const jobRow = document.getElementById('ft-job-row');
+    const resultRow = document.getElementById('ft-result-row');
+    const btnRefresh = document.getElementById('btn-ft-refresh');
+    const btnActivate = document.getElementById('btn-ft-activate');
+
+    if (d.job_id && d.job_status !== 'none') {
+      jobRow.style.display = 'flex';
+      const statusMap = {running:'학습 중...', succeeded:'완료', failed:'실패', cancelled:'취소'};
+      document.getElementById('ft-job-status').textContent =
+        (statusMap[d.job_status] || d.job_status) + (d.job_id ? ` (${d.job_id})` : '');
+      btnRefresh.style.display = '';
+    }
+    if (d.job_status === 'succeeded' && d.fine_tuned_model) {
+      resultRow.style.display = 'flex';
+      document.getElementById('ft-fine-tuned-model').textContent = d.fine_tuned_model;
+      btnActivate.style.display = '';
+    }
+  });
+}
+
+function startFinetune(btn) {
+  if (!confirm('승인된 답변 데이터로 파인튜닝을 시작합니다. 수십 분 소요될 수 있습니다.')) return;
+  btn.disabled = true; btn.textContent = '시작 중...';
+  fetch('/api/admin/finetune/start', {method:'POST'})
+    .then(r => r.json()).then(d => {
+      if (d.error) { alert(d.error); btn.disabled = false; btn.textContent = '파인튜닝 시작'; return; }
+      alert(`파인튜닝 시작! (Job ID: ${d.job_id}, 학습 데이터: ${d.training_count}개)`);
+      loadFinetuneStatus();
+    });
+}
+
+function refreshFinetuneStatus() { loadFinetuneStatus(); }
+
+function activateFinetuned() {
+  if (!_ftFineTunedModel) return;
+  if (!confirm(`"${_ftFineTunedModel}" 모델로 전환합니다.`)) return;
+  fetch('/api/admin/finetune/activate', {
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({model_id: _ftFineTunedModel}),
+  }).then(r => r.json()).then(d => {
+    if (d.status === 'ok') { alert('모델 전환 완료!'); loadFinetuneStatus(); }
+  });
+}
+
 function loadAdminData() {
   Promise.all([
     fetch('/api/admin/config').then(r => r.json()),
@@ -1596,6 +1684,7 @@ function loadAdminData() {
       if (el) el.value = hints[t] || '';
     });
   });
+  loadFinetuneStatus();
 }
 
 function toggleAutoGenerate() {
