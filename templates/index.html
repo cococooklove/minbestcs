@@ -625,15 +625,6 @@
 <div class="admin-panel" id="admin-panel">
 
   <!-- API 설정 -->
-  <div class="admin-section">
-    <div class="admin-section-title">🔑 API 설정</div>
-    <label class="admin-label">Anthropic API 키</label>
-    <input class="admin-input" id="api-key-input" type="password" oninput="enableSave('btn-save-api')" placeholder="sk-ant-...">
-    <div class="admin-footer">
-      <button class="btn-save" id="btn-save-api" onclick="saveApiKey(this)" disabled>저장됨</button>
-      <span class="api-status" id="api-status"></span>
-    </div>
-  </div>
 
   <!-- 답변 설정 -->
   <div class="admin-section">
@@ -1604,14 +1595,6 @@ function loadAdminData() {
       const el = document.getElementById(`hint-${t}`);
       if (el) el.value = hints[t] || '';
     });
-    const status = document.getElementById('api-status');
-    if (cfg.openai_api_key_set) {
-      status.textContent = '● API 키 설정됨';
-      status.className = 'api-status set';
-    } else {
-      status.textContent = '● API 키 미설정 (AI 기능 사용 불가)';
-      status.className = 'api-status unset';
-    }
   });
 }
 
@@ -1826,19 +1809,6 @@ function saveSettings(btn) {
   }).then(() => flashSaved(btn));
 }
 
-function saveApiKey(btn) {
-  const key = document.getElementById('api-key-input').value.trim();
-  if (!key) { showToast('API 키를 입력해주세요'); return; }
-  fetch('/api/admin/config', {
-    method: 'POST',
-    headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify({openai_api_key: key}),
-  }).then(() => {
-    document.getElementById('api-key-input').value = '';
-    flashSaved(btn);
-    loadAdminData();
-  });
-}
 
 
 ['search','filter-rating','filter-sentiment','filter-topic','filter-replied','filter-reportable','sort']
