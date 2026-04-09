@@ -772,8 +772,8 @@
           <div class="ft-ai-badge ft-badge-ready" id="ft-ai-badge">준비 완료</div>
         </div>
 
-        <!-- 학습 중 애니메이션 (기본 숨김) -->
-        <div id="ft-training-anim" style="display:none">
+        <!-- 학습 중 애니메이션 -->
+        <div id="ft-training-anim">
           <div style="display:flex;align-items:center;gap:14px">
             <div class="ft-wave">
               <span class="bar"></span><span class="bar"></span><span class="bar"></span>
@@ -1783,7 +1783,6 @@ function loadFinetuneStatus() {
       badge.className = 'ft-ai-badge ft-badge-training';
       badge.textContent = '학습 중';
       subtitle.textContent = '패턴 학습 진행 중';
-      animEl.style.display = '';
       if (jobEl) jobEl.textContent = d.job_id ? `Job ID: ${d.job_id}` : '';
     } else {
       card.classList.remove('training');
@@ -1791,7 +1790,7 @@ function loadFinetuneStatus() {
       badge.textContent = '준비 완료';
       const subtitleMap = {succeeded:'최근 학습 완료 ✓', failed:'학습 실패 — 재시도 필요', cancelled:'학습 취소됨'};
       subtitle.textContent = (d.job_status && subtitleMap[d.job_status]) || '대기 중';
-      animEl.style.display = 'none';
+      if (jobEl) jobEl.textContent = '';
     }
   });
 }
