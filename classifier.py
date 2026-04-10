@@ -263,16 +263,14 @@ def process_batch():
 
     def process_one(idx):
         r = reviews[idx]
-        result = api_classify(r, client, report_criteria,
-                              include_reply=auto_generate, brand_tone=brand_tone)
+        result = api_classify(r, client, report_criteria)
 
-        existing_reply = result.get("reply", "") or reviews[idx].get("ai_reply", "")
+        existing_reply = reviews[idx].get("ai_reply", "")
         existing_status = reviews[idx].get("reply_status", "none")
 
-        # include_reply 실패 시 fallback
         if auto_generate and not existing_reply and not reviews[idx].get("replied"):
             try:
-                existing_reply = generate_reply(r, brand_tone, client)
+                existing_reply = generate_reply(r, brand_tone, client, settings=settings)
                 if existing_reply:
                     existing_status = "draft"
             except Exception:
