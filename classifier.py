@@ -243,7 +243,7 @@ def process_batch():
         return
 
     client = OpenAI(api_key=api_key)
-    print("OpenAI API로 분류 실행 (병렬 10개)")
+    print("OpenAI API로 분류 실행 (병렬 25개)")
 
     brand_tone = load_brand_tone()
     settings = load_settings()
@@ -291,9 +291,10 @@ def process_batch():
                 "reply_status": existing_status,
             })
             done_count[0] += 1
-            write_progress(done_count[0], total, f"처리 중 ({done_count[0]}/{total})")
+            _done = done_count[0]
+        write_progress(_done, total, f"처리 중 ({_done}/{total})")
 
-    with ThreadPoolExecutor(max_workers=10) as executor:
+    with ThreadPoolExecutor(max_workers=25) as executor:
         futures = [executor.submit(process_one, i) for i in unclassified]
         for f in as_completed(futures):
             try:
