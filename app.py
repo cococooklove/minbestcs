@@ -597,7 +597,7 @@ def api_generate_reply(idx):
 
     api_key = os.environ.get("OPENAI_API_KEY")
     if not api_key:
-        return jsonify({"error": "OPENAI_API_KEY 환경변수가 없습니다. export OPENAI_API_KEY=sk-... 후 재실행하세요."}), 400
+        return jsonify({"error": "AI 서비스가 설정되지 않았습니다. 서버 관리자에게 문의하세요."}), 400
 
     try:
         from openai import OpenAI
@@ -606,14 +606,16 @@ def api_generate_reply(idx):
         brand_tone = load_brand_tone()
         settings_data = load_settings()
         reply = generate_reply(reviews[idx], brand_tone, client, settings=settings_data)
+        if not reply:
+            return jsonify({"error": "AI 답변 생성에 실패했습니다. API 키와 크레딧을 확인해주세요."}), 500
         auto_reply = settings_data.get("auto_reply", False)
         reviews[idx]["ai_reply"] = reply
         reviews[idx]["reply_status"] = "approved" if auto_reply else "draft"
         save_reviews(reviews)
         invalidate_reviews_cache()
         return jsonify({"reply": reply, "status": reviews[idx]["reply_status"]})
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
+    except Exception:
+        return jsonify({"error": "AI 답변 생성 중 오류가 발생했습니다."}), 500
 
 
 @app.route("/api/reply/approve/<int:idx>", methods=["POST"])
@@ -1033,7 +1035,7 @@ def finetune_status():
     )
     result = {
         "training_count": training_count,
-        "active_model": settings.get("active_model", "gpt-4o-mini"),
+        "active_model": f"review_v{settings.get('finetune_version', 0)}",
         "job_id": settings.get("finetune_job_id", ""),
         "job_status": "none",
         "fine_tuned_model": "",
@@ -1057,12 +1059,12 @@ def finetune_status():
                     s["finetune_job_id"] = ""
                     s["finetune_version"] = s.get("finetune_version", 0) + 1
                     save_settings(s)
-                    result["active_model"] = job.fine_tuned_model
+                    result["active_model"] = f"review_v{s['finetune_version']}"
                     result["job_id"] = ""
                     result["version"] = s["finetune_version"]
                     _log(f"파인튜닝 완료 — 자동 전환: {job.fine_tuned_model} (review_v{s['finetune_version']})")
-        except Exception as e:
-            result["job_status"] = f"error: {e}"
+        except Exception:
+            result["job_status"] = "error"
     return jsonify(result)
 
 

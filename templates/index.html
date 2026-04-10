@@ -1491,7 +1491,8 @@ function runClassify(days = 365) {
               window.adminSettings = cfg;
               loadUnanalyzedCount();
               _popupCloseCallback = fetchReviews;
-              showResult('AI 분석 완료! 확인을 눌러 결과를 반영하세요.');
+              _collectDone = false;
+              showResult('AI 분석 완료! 확인을 눌러 결과를 반영하세요.', false, true);
             });
           }
         });
@@ -1686,7 +1687,7 @@ function showProgress(msg) {
 }
 
 // 수집 완료/실패: 단계 완료 표시, 확인 버튼 표시
-function showResult(msg, isError = false) {
+function showResult(msg, isError = false, hideSteps = false) {
   if (!isError && _collectDone) return; // 성공 팝업 중복 방지
   if (_popupTimer) { clearTimeout(_popupTimer); _popupTimer = null; }
   if (_progressTimeout) { clearTimeout(_progressTimeout); _progressTimeout = null; }
@@ -1695,7 +1696,10 @@ function showResult(msg, isError = false) {
   _openPopup(isError);
   const stepsEl = document.getElementById('popup-steps');
   const closeBtn = document.getElementById('popup-close-btn');
-  if (!isError && stepsEl) { stepsEl.style.display = 'flex'; _setStep(5); }
+  if (!isError && stepsEl) {
+    if (hideSteps) { stepsEl.style.display = 'none'; _resetSteps(); }
+    else { stepsEl.style.display = 'flex'; _setStep(5); }
+  }
   else if (stepsEl) stepsEl.style.display = 'none';
   document.getElementById('popup-msg').textContent = msg;
   if (closeBtn) { closeBtn.style.display = 'block'; closeBtn.disabled = false; closeBtn.style.opacity = '1'; closeBtn.style.cursor = 'pointer'; }
@@ -1783,7 +1787,7 @@ function loadFinetuneStatus() {
       badge.className = 'ft-ai-badge ft-badge-training';
       badge.textContent = '학습 중';
       subtitle.textContent = '패턴 학습 진행 중';
-      if (jobEl) jobEl.textContent = d.job_id ? `Job ID: ${d.job_id}` : '';
+      if (jobEl) jobEl.textContent = '';
     } else {
       card.classList.remove('training');
       badge.className = 'ft-ai-badge ft-badge-ready';

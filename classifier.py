@@ -273,7 +273,8 @@ def process_batch():
         if auto_generate and not existing_reply and not reviews[idx].get("replied"):
             try:
                 existing_reply = generate_reply(r, brand_tone, client)
-                existing_status = "draft"
+                if existing_reply:
+                    existing_status = "draft"
             except Exception:
                 pass
 
