@@ -132,49 +132,9 @@ def generate_reply(review: dict, brand_tone: str, client, settings: dict = None)
         if history_lines:
             customer_context += f"\n\n[최근 구매 이력]\n{history_lines}"
 
-    # 쿠폰 컨텍스트 생성
-    coupon_context = ""
-    coupon_rules = settings.get("coupon_rules", [])
-    coupon_tmpl  = settings.get("reply_coupon_template", "감사의 마음을 담아 {coupon}({amount})을 발급해드렸으니 다음 구매에 꼭 활용해 주세요.")
-    matched_coupons = []
-    for rule in coupon_rules:
-        if not rule.get("enabled"):
-            continue
-        cond = rule.get("condition", "")
-        if cond == "rating_5_photo" and float(review.get("rating") or 0) >= 5:
-            matched_coupons.append(rule)
-            break
-        elif cond == "content_100" and len(review.get("content") or "") >= 100:
-            matched_coupons.append(rule)
-            break
-        elif cond == "negative_manual" and review.get("sentiment") == "negative":
-            matched_coupons.append(rule)
-            break
-        elif cond == "repurchase" and len(review.get("reviewer_history") or []) >= 1:
-            matched_coupons.append(rule)
-            break
-    if matched_coupons:
-        coupon_lines = []
-        for c in matched_coupons:
-            name         = c.get("coupon", "")
-            amount       = (c.get("coupon_amount") or "").strip()
-            min_purchase = (c.get("min_purchase_amount") or "").strip()
-            if amount:
-                line = coupon_tmpl.replace("{coupon}", name).replace("{amount}", amount)
-            else:
-                line = coupon_tmpl.replace("{coupon}", name).replace("({amount})", "").replace("{amount}", "").strip()
-            if min_purchase:
-                line += f" (사용 조건: {min_purchase} 구매 시)"
-            coupon_lines.append(line)
-        coupon_context = (
-            "\n\n[쿠폰 안내] 이 리뷰에 다음 쿠폰이 발급됩니다. "
-            "답변에 쿠폰명, 할인 금액, 사용 조건을 모두 명확하게 포함하세요:\n"
-            + "\n".join(f"- {l}" for l in coupon_lines)
-        )
-
     user = f"""리뷰 내용: {review.get('content', '')}
 별점: {review.get('rating', '')}점
-상품: {review.get('product', '')}{customer_context}{coupon_context}
+상품: {review.get('product', '')}{customer_context}
 
 위 리뷰에 적절한 답변을 작성해주세요."""
 
