@@ -935,6 +935,10 @@ def admin_config_post():
         s["customer_type_hints"] = data["customer_type_hints"]
     if "spelling_correction" in data:
         s["spelling_correction"] = bool(data["spelling_correction"])
+    if "auto_retry_sensitive" in data:
+        s["auto_retry_sensitive"] = bool(data["auto_retry_sensitive"])
+    if "skip_reportable_reply" in data:
+        s["skip_reportable_reply"] = bool(data["skip_reportable_reply"])
     save_settings(s)
     return jsonify({"status": "ok"})
 

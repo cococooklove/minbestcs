@@ -159,7 +159,7 @@ def generate_reply(review: dict, brand_tone: str, client, settings: dict = None)
             else:
                 break
 
-    if reply_text and sensitive:
+    if reply_text and sensitive and settings.get("auto_retry_sensitive", True):
         found = _contains_sensitive(reply_text, sensitive)
         if found:
             retry_system = system + f"\n\n[재생성 요청] 이전 답변에 금지 표현({', '.join(found)})이 포함되었습니다. 이 표현 없이 다시 작성하세요."
@@ -230,7 +230,9 @@ def process_batch():
         existing_reply = reviews[idx].get("ai_reply", "")
         existing_status = reviews[idx].get("reply_status", "none")
 
-        if auto_generate and not existing_reply and not reviews[idx].get("replied"):
+        skip_reportable = settings.get("skip_reportable_reply", False)
+        is_reportable = bool(result.get("reportable"))
+        if auto_generate and not existing_reply and not reviews[idx].get("replied") and not (skip_reportable and is_reportable):
             try:
                 existing_reply = generate_reply(r, brand_tone, client, settings=settings)
                 if existing_reply:

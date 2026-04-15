@@ -839,6 +839,26 @@
         <span id="spelling-label" style="font-size:13px;color:#888;">ON</span>
       </div>
     </div>
+    <div class="admin-row" style="margin-top:12px">
+      <div>
+        <div class="admin-row-label">민감 표현 감지 시 자동 재생성</div>
+        <div class="admin-row-sub">금지 표현이 포함된 답변 감지 시 AI API를 한 번 더 호출해 재생성</div>
+      </div>
+      <div class="toggle-wrap">
+        <div class="toggle on" id="toggle-retry-sensitive" onclick="toggleRetrySensitive(); enableSave('btn-save-settings')"></div>
+        <span id="retry-sensitive-label" style="font-size:13px;color:#888;">ON</span>
+      </div>
+    </div>
+    <div class="admin-row" style="margin-top:12px">
+      <div>
+        <div class="admin-row-label">신고 가능 리뷰 답변 초안 생성 건너뜀</div>
+        <div class="admin-row-sub">신고 대상으로 분류된 리뷰는 답변 초안을 생성하지 않음</div>
+      </div>
+      <div class="toggle-wrap">
+        <div class="toggle" id="toggle-skip-reportable" onclick="toggleSkipReportable(); enableSave('btn-save-settings')"></div>
+        <span id="skip-reportable-label" style="font-size:13px;color:#888;">OFF</span>
+      </div>
+    </div>
     <div style="margin-top:16px">
       <label class="admin-label">신고 가능 리뷰 기준 (쉼표 구분)</label>
       <input class="admin-input" id="report-criteria" type="text" oninput="enableSave('btn-save-settings')" placeholder="욕설, 경쟁사 언급, 광고성, 반복 내용">
@@ -1884,6 +1904,14 @@ function loadAdminData() {
     adminConfig.spelling_correction = spellingVal;
     document.getElementById('toggle-spelling').classList.toggle('on', spellingVal);
     document.getElementById('spelling-label').textContent = spellingVal ? 'ON' : 'OFF';
+    const retryVal = cfg.auto_retry_sensitive !== false;
+    adminConfig.auto_retry_sensitive = retryVal;
+    document.getElementById('toggle-retry-sensitive').classList.toggle('on', retryVal);
+    document.getElementById('retry-sensitive-label').textContent = retryVal ? 'ON' : 'OFF';
+    const skipVal = cfg.skip_reportable_reply === true;
+    adminConfig.skip_reportable_reply = skipVal;
+    document.getElementById('toggle-skip-reportable').classList.toggle('on', skipVal);
+    document.getElementById('skip-reportable-label').textContent = skipVal ? 'ON' : 'OFF';
     if (cfg.coupon_rules) renderCouponRules(cfg.coupon_rules);
     if (cfg.reply_coupon_template) {
       const el = document.getElementById('coupon-reply-template');
@@ -1913,6 +1941,18 @@ function toggleSpelling() {
   adminConfig.spelling_correction = !adminConfig.spelling_correction;
   document.getElementById('toggle-spelling').classList.toggle('on', adminConfig.spelling_correction);
   document.getElementById('spelling-label').textContent = adminConfig.spelling_correction ? 'ON' : 'OFF';
+}
+
+function toggleRetrySensitive() {
+  adminConfig.auto_retry_sensitive = !adminConfig.auto_retry_sensitive;
+  document.getElementById('toggle-retry-sensitive').classList.toggle('on', adminConfig.auto_retry_sensitive);
+  document.getElementById('retry-sensitive-label').textContent = adminConfig.auto_retry_sensitive ? 'ON' : 'OFF';
+}
+
+function toggleSkipReportable() {
+  adminConfig.skip_reportable_reply = !adminConfig.skip_reportable_reply;
+  document.getElementById('toggle-skip-reportable').classList.toggle('on', adminConfig.skip_reportable_reply);
+  document.getElementById('skip-reportable-label').textContent = adminConfig.skip_reportable_reply ? 'ON' : 'OFF';
 }
 
 function renderCouponRules(rules) {
@@ -2115,7 +2155,7 @@ function saveSettings(btn) {
   fetch('/api/admin/config', {
     method: 'POST',
     headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify({auto_generate_reply: adminConfig.auto_generate_reply, spelling_correction: adminConfig.spelling_correction, report_criteria: criteria}),
+    body: JSON.stringify({auto_generate_reply: adminConfig.auto_generate_reply, spelling_correction: adminConfig.spelling_correction, auto_retry_sensitive: adminConfig.auto_retry_sensitive, skip_reportable_reply: adminConfig.skip_reportable_reply, report_criteria: criteria}),
   }).then(() => flashSaved(btn));
 }
 
