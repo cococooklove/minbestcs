@@ -1391,6 +1391,7 @@ function goPage(p) { currentPage = p; fetchReviews(); }
 function fetchReviews(onRendered) {
   const container = document.getElementById('reviews-container');
   let elapsed = 0;
+  container.style.minHeight = container.offsetHeight + 'px';
   container.innerHTML = '<div class="loading" id="loading-msg">불러오는 중... (0초)</div>';
   const timer = setInterval(() => {
     elapsed++;
@@ -1423,13 +1424,15 @@ function fetchReviews(onRendered) {
       renderStats(data.stats);
       renderReviews(data.reviews);
       renderPagination(data.pagination);
+      container.style.minHeight = '';
       document.getElementById('last-updated').textContent = new Date().toLocaleTimeString('ko-KR');
       _lastFetchTime = Date.now();
-      if (onRendered) onRendered();
+      if (onRendered) requestAnimationFrame(() => onRendered());
     })
     .catch(e => {
       clearInterval(timer);
       clearTimeout(timeout);
+      container.style.minHeight = '';
       const msg = e.name === 'AbortError' ? '응답 시간 초과 (20초) — 서버 상태를 확인해주세요' : '데이터를 불러오지 못했습니다';
       container.innerHTML = `<div class="empty-state"><div class="icon">⚠️</div><p>${msg}</p></div>`;
     });
