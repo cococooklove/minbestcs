@@ -105,6 +105,8 @@ def generate_reply(review: dict, brand_tone: str, client, settings: dict = None)
 
     settings = settings or load_settings()
     model = settings.get("active_model", "gpt-4o-mini")
+    if settings.get("spelling_correction", True):
+        system += "\n반드시 올바른 한국어 맞춤법과 띄어쓰기를 사용하세요. 오탈자가 없도록 주의하세요."
     sensitive = settings.get("sensitive_expressions", [])
     if sensitive:
         forbidden_block = "\n\n[절대 사용 금지 표현 — 아래 표현은 어떤 형태로도 답변에 포함하지 마세요]\n"

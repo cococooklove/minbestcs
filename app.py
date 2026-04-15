@@ -791,6 +791,19 @@ def api_coupon_revoke(idx):
     return jsonify({"status": "none"})
 
 
+@app.route("/api/refund/toggle/<int:idx>", methods=["POST"])
+def api_refund_toggle(idx):
+    """환불 완료 토글"""
+    reviews = load_reviews()
+    if idx >= len(reviews):
+        return jsonify({"error": "not found"}), 404
+    current = reviews[idx].get("refund_status", "none")
+    reviews[idx]["refund_status"] = "none" if current == "completed" else "completed"
+    save_reviews(reviews)
+    invalidate_reviews_cache()
+    return jsonify({"status": reviews[idx]["refund_status"]})
+
+
 @app.route("/api/approve/all/<int:idx>", methods=["POST"])
 def api_approve_all(idx):
     """쿠폰 + 답변 동시 승인"""
@@ -920,6 +933,8 @@ def admin_config_post():
         s["finetune_auto_threshold"] = int(data.get("finetune_auto_threshold") or 0)
     if "customer_type_hints" in data:
         s["customer_type_hints"] = data["customer_type_hints"]
+    if "spelling_correction" in data:
+        s["spelling_correction"] = bool(data["spelling_correction"])
     save_settings(s)
     return jsonify({"status": "ok"})
 
