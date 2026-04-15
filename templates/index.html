@@ -1823,6 +1823,8 @@ function toggleAdmin() {
   document.querySelector('.stats-bar').style.display = adminOpen ? 'none' : '';
   document.getElementById('chart-section').style.display = adminOpen ? 'none' : '';
   document.querySelector('.controls').style.display = adminOpen ? 'none' : '';
+  const pg = document.getElementById('pagination-controls');
+  if (pg) pg.style.display = adminOpen ? 'none' : '';
   document.getElementById('btn-admin').classList.toggle('active', adminOpen);
   if (adminOpen) loadAdminData();
 }
