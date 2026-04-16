@@ -301,6 +301,7 @@ def api_reviews():
     sentiment = request.args.get("sentiment", "")
     topic = request.args.get("topic", "")
     reportable = request.args.get("reportable", "")
+    refund = request.args.get("refund", "")
     sort = request.args.get("sort", "newest")
     date_from = request.args.get("date_from", "")  # YYYY-MM-DD
     date_to   = request.args.get("date_to",   "")  # YYYY-MM-DD
@@ -312,7 +313,8 @@ def api_reviews():
         r = all_r[i]
         if q and not (q in (r.get("content") or "").lower()
                       or q in (r.get("product") or "").lower()
-                      or q in (r.get("reviewer") or "").lower()):
+                      or q in (r.get("reviewer") or "").lower()
+                      or q in (r.get("order_no") or "").lower()):
             return False
         if rating and not str(r.get("rating", "")).startswith(rating):
             return False
@@ -325,6 +327,8 @@ def api_reviews():
         if topic and topic not in (r.get("topics") or []):
             return False
         if reportable == "yes" and not r.get("reportable"):
+            return False
+        if refund == "completed" and r.get("refund_status") != "completed":
             return False
         if date_from and (r.get("date") or "") < date_from:
             return False
@@ -363,6 +367,7 @@ def api_reviews():
             "unclassified":sum(1 for r in all_r if not r.get("sentiment")),
         },
         "reportable_count":  sum(1 for r in all_r if r.get("reportable")),
+        "refund_count":      sum(1 for r in all_r if r.get("refund_status") == "completed"),
         "draft_count":       sum(1 for r in all_r if r.get("reply_status") == "draft"),
         "need_reply_count":  sum(1 for r in all_r if not r.get("replied") and not r.get("ai_reply")),
     }
