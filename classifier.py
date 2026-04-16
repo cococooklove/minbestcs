@@ -69,6 +69,7 @@ def api_classify(review: dict, client, report_criteria: list = None,
             resp = client.chat.completions.create(
                 model="gpt-4o-mini",
                 max_tokens=max_tokens,
+                temperature=0.1,
                 messages=[{"role": "user", "content": prompt}],
             )
             text = resp.choices[0].message.content.strip()
@@ -146,6 +147,7 @@ def generate_reply(review: dict, brand_tone: str, client, settings: dict = None)
             resp = client.chat.completions.create(
                 model=model,
                 max_tokens=512,
+                temperature=0.4,
                 messages=[
                     {"role": "system", "content": system},
                     {"role": "user", "content": user},
@@ -167,6 +169,7 @@ def generate_reply(review: dict, brand_tone: str, client, settings: dict = None)
                 retry_resp = client.chat.completions.create(
                     model=model,
                     max_tokens=512,
+                    temperature=0.4,
                     messages=[
                         {"role": "system", "content": retry_system},
                         {"role": "user", "content": user},
