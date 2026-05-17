@@ -144,19 +144,127 @@ def _open_qr_tab(target) -> bool:
     return False
 
 
-def _wait_for_popup_close(popup, max_seconds: int = 300) -> bool:
-    """popup이 닫히기를 대기. 사용자가 QR 스캔/캡차 처리 등 직접 작업할 시간."""
-    print(f"[auto_login.qr] popup 종료 대기 중 (최대 {max_seconds}s — QR 스캔/직접 로그인)...")
+# nid 로그인 popup을 minimal하게 — QR 영역만 남기고 헤더/탭/풋터/광고/링크 모두 숨김
+_POPUP_MINIMAL_CSS = """
+/* 헤더, 탭, 풋터, 광고, 보조 링크 숨김 */
+header, nav, footer,
+.header, .footer, .gnb, .lnb, .navbar, .nav_area,
+[class*="banner" i], [class*="advert" i], [class*="footer" i], [class*="header" i],
+[class*="membership" i], [class*="benefit" i], [class*="recommend" i],
+.login_tab_area, .login_type, [role="tablist"], ul.tab, .tab_login, .tab_box, .login_tab,
+.find_box, .help_box, .link_box, .link_login, .login_link,
+[class*="find_" i], [class*="login_help"],
+.go_login, .find_pw, .find_id, .join {
+    display: none !important;
+}
+/* body 여백 최소화 */
+html, body {
+    margin: 0 !important;
+    padding: 16px !important;
+    background: #fff !important;
+    height: auto !important;
+    min-height: 0 !important;
+}
+body { overflow: hidden !important; }
+/* 메인 컨테이너 padding 제거 */
+.wrap, .content, .container, main, .main, [class*="content" i] {
+    padding: 0 !important;
+    margin: 0 !important;
+    min-height: 0 !important;
+}
+"""
+
+
+def _make_popup_minimal(popup, width: int = 400, height: int = 480) -> None:
+    """popup의 viewport를 작게 + CSS로 QR 영역만 남김.
+
+    screenshot(full_page=False)는 viewport 크기로 캡처되므로 viewport를 작게 만들면
+    캡처 이미지도 그만큼 작고 빈 공간이 안 생긴다.
+    """
+    # 1) viewport 크기 조정 — 캡처 크기에 영향
     try:
-        popup.wait_for_event("close", timeout=max_seconds * 1000)
-        print("[auto_login.qr] popup 종료 감지 — 로그인 진행됨")
-        return True
+        popup.set_viewport_size({"width": width, "height": height})
+        print(f"[auto_login.qr] popup viewport {width}x{height}")
+    except Exception as e:
+        print(f"[auto_login.qr] viewport 변경 실패: {e}")
+
+    # 2) CSS 주입 — 헤더/탭/풋터/광고/링크 숨김
+    try:
+        popup.add_style_tag(content=_POPUP_MINIMAL_CSS)
+        print("[auto_login.qr] popup 최소화 CSS 주입")
+    except Exception as e:
+        print(f"[auto_login.qr] CSS 주입 실패: {e}")
+
+
+def _extract_qr_data(popup) -> dict:
+    """popup에서 QR 이미지(canvas/img) + 남은시간 + 인증번호를 추출.
+
+    Returns: {"qr_image": bytes|None, "time_left": str|None, "code": str|None}
+    """
+    data = {"qr_image": None, "time_left": None, "code": None}
+
+    # QR 이미지 — canvas 우선, 없으면 img
+    for sel in ("canvas", "img[src*='qr' i]", "img[alt*='QR' i]", "[class*='qr'] canvas", "[class*='qr'] img"):
+        try:
+            loc = popup.locator(sel).first
+            if loc.count() == 0:
+                continue
+            bb = loc.bounding_box()
+            if not bb or bb["width"] < 40:
+                continue
+            data["qr_image"] = loc.screenshot()
+            break
+        except Exception:
+            continue
+
+    # 남은시간 + 인증번호 텍스트
+    try:
+        info = popup.evaluate(
+            r"""() => {
+                const txt = (document.body && document.body.innerText) || "";
+                const t = txt.match(/(\d{2}분\s*\d{1,2}초)/);
+                const c = txt.match(/숫자\s*중\s*(\d{1,3})/) || txt.match(/(\d{2,3})\s*를\s*선택/);
+                return {
+                    time: t ? t[1].replace(/\s+/g, ' ') : null,
+                    code: c ? c[1] : null,
+                };
+            }"""
+        )
+        data["time_left"] = info.get("time")
+        data["code"] = info.get("code")
     except Exception:
-        print("[auto_login.qr] popup 종료 대기 시간 초과")
-        return False
+        pass
+
+    return data
 
 
-def _autofill_login(page, naver_id: str = "", naver_pw: str = "") -> None:
+def _wait_for_popup_close(popup, max_seconds: int = 300, on_qr=None, poll_interval: float = 1.0) -> bool:
+    """popup이 닫히기를 대기. 사용자가 QR 스캔/캡차 처리 등 직접 작업할 시간.
+
+    on_qr: 콜백(dict). 주기적으로 popup에서 QR 데이터 추출해 호출.
+    """
+    print(f"[auto_login.qr] popup 종료 대기 중 (최대 {max_seconds}s — QR 스캔/직접 로그인)...")
+    deadline = time.time() + max_seconds
+    while time.time() < deadline:
+        try:
+            if popup.is_closed():
+                print("[auto_login.qr] popup 종료 감지 — 로그인 진행됨")
+                return True
+        except Exception:
+            print("[auto_login.qr] popup 접근 불가 (이미 닫힘)")
+            return True
+        if on_qr is not None:
+            try:
+                data = _extract_qr_data(popup)
+                on_qr(data)
+            except Exception as e:
+                print(f"[auto_login.qr] 추출 실패: {e}")
+        time.sleep(poll_interval)
+    print("[auto_login.qr] popup 종료 대기 시간 초과")
+    return False
+
+
+def _autofill_login(page, naver_id: str = "", naver_pw: str = "", on_qr=None) -> None:
     """네이버 로그인 흐름 시작. QR 탭을 열고 사용자가 모바일로 스캔할 때까지 대기.
 
     - accounts.commerce.naver.com 페이지면 '네이버 아이디로 로그인' 탭 → OAuth popup → QR 탭 → 대기
@@ -170,7 +278,7 @@ def _autofill_login(page, naver_id: str = "", naver_pw: str = "") -> None:
 
     if "nid.naver.com" in cur:
         _open_qr_tab(page)
-        _wait_for_popup_close(page)  # page 자체를 대기 (단일 페이지 흐름)
+        _wait_for_popup_close(page, on_qr=on_qr)  # page 자체를 대기 (단일 페이지 흐름)
         return
 
     if "accounts.commerce.naver.com" in cur:
@@ -198,7 +306,9 @@ def _autofill_login(page, naver_id: str = "", naver_pw: str = "") -> None:
                 pass
             print(f"[auto_login.qr] OAuth popup URL={popup.url}")
             _open_qr_tab(popup)
-            _wait_for_popup_close(popup)
+            time.sleep(0.8)  # QR 탭 렌더링 대기
+            _make_popup_minimal(popup)
+            _wait_for_popup_close(popup, on_qr=on_qr)
             return
         except Exception as e:
             print(f"[auto_login.qr] popup 흐름 실패: {e} — nid 직접 이동 폴백")
@@ -238,9 +348,10 @@ def _wait_for_human(page, max_seconds: int = 300) -> bool:
 
 
 def ensure_logged_in(page, naver_id: str = "", naver_pw: str = "",
-                      headless: bool = False, timeout_per_step: int = 120) -> str:
+                      headless: bool = False, timeout_per_step: int = 120, on_qr=None) -> str:
     """이미 열려있는 페이지의 로그인 상태를 보장.
 
+    on_qr: bytes 콜백. popup이 떴을 때 주기적으로 화면을 캡처해 호출. 외부 UI에 QR 표시 용.
     Returns: 'seller' | 'intervention' | 'failed' | 'timeout'
     """
     naver_id = (naver_id or os.environ.get("NAVER_ID", "")).strip()
@@ -259,16 +370,20 @@ def ensure_logged_in(page, naver_id: str = "", naver_pw: str = "",
         save_session(page.context)
         return "seller"
 
+    # headless에서 on_qr 콜백이 없으면 popup 인증 불가
+    if headless and on_qr is None:
+        print("[auto_login.ensure] 세션 만료 + headless + on_qr 없음 → 즉시 실패")
+        return "failed"
+
     if not naver_id or not naver_pw:
         if headless:
-            print("[auto_login.ensure] ID/PW 없음 + headless → 실패")
             return "failed"
         print("[auto_login.ensure] ID/PW 없음 → 사람 대기")
         ok = _wait_for_human(page, max_seconds=timeout_per_step * 2)
         return "seller" if ok else "timeout"
 
-    print(f"[auto_login.ensure] 자동입력 시도 (id={naver_id})")
-    _autofill_login(page, naver_id, naver_pw)
+    print(f"[auto_login.ensure] 자동입력 시도 (id={naver_id}, on_qr={'yes' if on_qr else 'no'})")
+    _autofill_login(page, naver_id, naver_pw, on_qr=on_qr)
     print(f"[auto_login.ensure] 자동입력 직후 URL={page.url}")
 
     result = _wait_after_login(page, max_seconds=timeout_per_step)
@@ -296,7 +411,7 @@ def _safe_title(page) -> str:
 
 
 def main(keep_open: bool = False, naver_id: str = None, naver_pw: str = None,
-         headless: bool = False, timeout_per_step: int = 120):
+         headless: bool = False, timeout_per_step: int = 120, on_qr=None):
     """
     Returns: (success: bool, pw, context, page)
       - keep_open=False 면 context/pw/page는 None 으로 반환되고 context는 close.
@@ -317,6 +432,19 @@ def main(keep_open: bool = False, naver_id: str = None, naver_pw: str = None,
     )
     page = context.pages[0] if context.pages else context.new_page()
 
+    # headful일 때 메인창은 화면 밖 + 1픽셀 — popup(OAuth)만 사용자에게 보이도록
+    if not headless:
+        try:
+            cdp = context.new_cdp_session(page)
+            wi = cdp.send("Browser.getWindowForTarget")
+            cdp.send("Browser.setWindowBounds", {
+                "windowId": wi["windowId"],
+                "bounds": {"left": -10000, "top": -10000, "width": 1, "height": 1},
+            })
+            print("[auto_login] 메인창 화면 밖 이동")
+        except Exception as e:
+            print(f"[auto_login] 메인창 hide 실패: {e}")
+
     def _finish(success: bool):
         if keep_open and success:
             return success, pw, context, page
@@ -334,17 +462,25 @@ def main(keep_open: bool = False, naver_id: str = None, naver_pw: str = None,
         # 1) 저장된 세션 시도
         if _try_session(page):
             print("[auto_login] 기존 세션 유효 — 자동 로그인 생략")
+            save_session(context)
             return _finish(True)
 
-        # 2) ID/PW 없으면 사람 로그인 대기 (login.py와 동일 폴백)
+        # 2) headless + on_qr 콜백 없으면 popup 인증 불가
+        if headless and on_qr is None:
+            print("[auto_login] 세션 만료 + headless + on_qr 없음 → 즉시 실패")
+            return _finish(False)
+
+        # 3) ID/PW 없으면 사람 로그인 대기
         if not naver_id or not naver_pw:
+            if headless:
+                return _finish(False)
             print("[auto_login] ID/PW 미입력 — 브라우저에서 수동 로그인 대기")
             ok = _wait_for_human(page, max_seconds=timeout_per_step * 2)
             return _finish(ok)
 
-        # 3) 자동 입력
-        print(f"[auto_login] 자동 로그인 시도: {naver_id}")
-        _autofill_login(page, naver_id, naver_pw)
+        # 4) 자동 입력 (popup은 on_qr 콜백으로 외부 UI에 표시)
+        print(f"[auto_login] 자동 로그인 시도: {naver_id}, on_qr={'yes' if on_qr else 'no'}")
+        _autofill_login(page, naver_id, naver_pw, on_qr=on_qr)
 
         # 4) 결과 판정
         result = _wait_after_login(page, max_seconds=timeout_per_step)

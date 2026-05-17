@@ -484,6 +484,31 @@ def api_login_status():
     return jsonify({"logged_in": logged_in})
 
 
+@app.route("/api/login/cancel", methods=["POST"])
+def api_login_cancel():
+    """진행 중인 자동 로그인 취소 — chromium 강제 종료."""
+    global _login_pw, _login_context, _login_page
+    try:
+        if _login_context is not None:
+            try: _login_context.close()
+            except Exception: pass
+        if _login_pw is not None:
+            try: _login_pw.stop()
+            except Exception: pass
+    finally:
+        _login_pw = _login_context = _login_page = None
+    # 잔여 chromium도 정리
+    try:
+        import subprocess
+        subprocess.run(["pkill", "-f", "chromium_headless_shell"], check=False)
+        subprocess.run(["pkill", "-f", "ms-playwright/chromium"], check=False)
+    except Exception:
+        pass
+    socketio.emit("login_qr_done", {})
+    socketio.emit("collect_status", {"step": "done", "success": False, "error": "사용자 취소"})
+    return jsonify({"status": "cancelled"})
+
+
 def _run_server_collect():
     """IS_SERVER 모드: 쿠키로 headless 수집"""
     global _scraping, _progress_step
@@ -539,9 +564,30 @@ def api_collect():
                 ensure_chromium()
                 import auto_login as login_mod
                 login_mod.PROFILE_DIR = PROFILE_DIR
+                # popup에서 QR + 남은시간 + 인증번호 추출 → 우리 UI로 전송 (chromium 창 안 띄움)
+                import base64
+                def _on_qr(data):
+                    try:
+                        img_bytes = data.get("qr_image")
+                        img_url = None
+                        if img_bytes:
+                            b64 = base64.b64encode(img_bytes).decode("ascii")
+                            img_url = f"data:image/png;base64,{b64}"
+                        socketio.emit("login_qr", {
+                            "image": img_url,
+                            "time_left": data.get("time_left"),
+                            "code": data.get("code"),
+                        })
+                    except Exception as e:
+                        print(f"[on_qr] emit 실패: {e}")
+
+                # 항상 headless로 시도 — 세션 살아있으면 즉시 통과 (QR 안 뜸),
+                # 만료면 popup 캡처가 _on_qr로 우리 UI에 전달되어 modal 자동 열림
                 success, pw, context, page = login_mod.main(
-                    keep_open=True, naver_id=naver_id, naver_pw=naver_pw
+                    keep_open=True, naver_id=naver_id, naver_pw=naver_pw,
+                    headless=True, on_qr=_on_qr,
                 )
+                socketio.emit("login_qr_done", {})
                 if not success:
                     socketio.emit("collect_status", {"step": "login_failed", "error": "로그인 실패"})
                     return

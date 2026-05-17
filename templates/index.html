@@ -2452,7 +2452,7 @@ socket.on('collect_status', data => {
   }
   if (data.step === 'login_start') {
     if (btn) btn.textContent = '로그인 중...';
-    showProgress('브라우저에서 네이버 로그인을 완료해주세요.');
+    showProgress('백그라운드에서 자동 로그인 시도 중...');
   } else if (data.step === 'login_done') {
     if (btn) btn.textContent = '수집 중...';
     showProgress('로그인 완료 — 리뷰 수집 시작 중...');
@@ -2479,10 +2479,96 @@ document.addEventListener('visibilitychange', () => {
   }
 });
 
+// 네이버 로그인 QR 모달 — popup에서 추출한 데이터로 우리가 직접 렌더링
+socket.on('login_qr', data => {
+  const overlay = document.getElementById('qr-login-overlay');
+  if (!overlay) return;
+  const img = document.getElementById('qr-login-img');
+  const timeEl = document.getElementById('qr-login-time');
+  const codeEl = document.getElementById('qr-login-code');
+  if (data.image && img) img.src = data.image;
+  if (timeEl) timeEl.textContent = data.time_left || '';
+  if (codeEl) codeEl.textContent = data.code || '--';
+  overlay.style.display = 'flex';
+});
+socket.on('login_qr_done', () => {
+  const overlay = document.getElementById('qr-login-overlay');
+  if (overlay) overlay.style.display = 'none';
+});
+
+function cancelQRLogin() {
+  const overlay = document.getElementById('qr-login-overlay');
+  if (overlay) overlay.style.display = 'none';
+  // 백엔드 진행 중인 로그인도 취소 (chromium 종료)
+  fetch('/api/login/cancel', {method: 'POST'}).catch(() => {});
+  const btn = document.getElementById('btn-collect');
+  if (btn) { btn.disabled = false; btn.textContent = '로그인 및 리뷰 수집'; }
+}
+
 </script>
 
 <div id="photo-lightbox" onclick="this.classList.remove('open')">
   <img src="" alt="리뷰 포토">
 </div>
+
+<div id="qr-login-overlay" style="display:none;position:fixed;inset:0;background:rgba(15,20,25,0.72);backdrop-filter:blur(6px);z-index:9999;align-items:center;justify-content:center;animation:qrFadeIn .25s ease-out;font-family:-apple-system,'Pretendard','Apple SD Gothic Neo','Noto Sans KR',sans-serif;">
+  <div style="background:#fff;padding:36px 40px 32px;border-radius:20px;text-align:center;box-shadow:0 24px 72px rgba(0,0,0,0.45);animation:qrPop .3s cubic-bezier(.2,.9,.3,1.2);width:380px;position:relative;">
+    <!-- 닫기 X 버튼 -->
+    <button type="button" onclick="cancelQRLogin()" aria-label="닫기"
+            style="position:absolute;top:14px;right:14px;width:32px;height:32px;border-radius:50%;border:0;background:#f5f5f5;color:#666;font-size:18px;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .15s;"
+            onmouseover="this.style.background='#e8e8e8';this.style.color='#000';"
+            onmouseout="this.style.background='#f5f5f5';this.style.color='#666';">×</button>
+
+    <!-- NAVER 로고 -->
+    <div style="font-size:28px;font-weight:900;color:#03c75a;letter-spacing:-1px;margin-bottom:6px;">NAVER</div>
+    <div style="font-size:15px;color:#888;margin-bottom:24px;font-weight:500;">QR 코드로 안전하게 로그인</div>
+
+    <!-- QR 영역 -->
+    <div style="background:#fafafa;border-radius:14px;padding:24px 20px;margin-bottom:20px;position:relative;">
+      <img id="qr-login-img" src="" alt="QR"
+           style="width:220px;height:220px;display:block;margin:0 auto;background:#fff;border-radius:8px;">
+
+      <!-- 남은시간 -->
+      <div style="margin-top:16px;display:flex;justify-content:center;align-items:baseline;gap:10px;">
+        <span style="font-size:12px;color:#999;">남은시간</span>
+        <span id="qr-login-time" style="font-size:18px;font-weight:700;color:#03c75a;">--:--</span>
+      </div>
+    </div>
+
+    <!-- 인증번호 -->
+    <div style="background:#f3faf5;border:1px solid #d8f0e0;border-radius:12px;padding:18px 16px;margin-bottom:18px;">
+      <div style="font-size:13px;color:#444;line-height:1.7;margin-bottom:12px;">
+        <span style="display:inline-flex;align-items:center;gap:6px;flex-wrap:wrap;justify-content:center;">
+          <strong style="color:#222;">네이버 앱</strong>
+          <!-- 네이버 앱 메인 동그라미 버튼 -->
+          <span style="display:inline-block;width:18px;height:18px;border-radius:50%;background:#03c75a;position:relative;vertical-align:middle;box-shadow:0 1px 2px rgba(0,0,0,0.1);">
+            <span style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:#fff;font-size:11px;font-weight:900;line-height:1;">N</span>
+          </span>
+          <span style="color:#888;">→</span>
+          <!-- 렌즈 아이콘 -->
+          <span style="display:inline-flex;align-items:center;gap:3px;">
+            <span style="display:inline-block;width:18px;height:18px;border-radius:5px;background:#222;position:relative;vertical-align:middle;">
+              <span style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:9px;height:9px;border:2px solid #fff;border-radius:50%;box-sizing:border-box;"></span>
+            </span>
+            <strong style="color:#222;">렌즈</strong>
+          </span>
+          <span style="color:#888;">→</span>
+          <span>QR 스캔</span>
+        </span>
+      </div>
+      <div style="font-size:13px;color:#555;margin-bottom:8px;">앱에 보이는 숫자 중 아래 숫자를 누르세요</div>
+      <div id="qr-login-code"
+           style="font-size:42px;font-weight:900;color:#222;background:#fff;border-radius:10px;padding:10px 0;letter-spacing:2px;box-shadow:inset 0 0 0 1px rgba(3,199,90,.2);">
+        --
+      </div>
+    </div>
+
+    <div style="font-size:11px;color:#bbb;">로그인 완료 시 자동으로 닫힙니다</div>
+  </div>
+</div>
+<style>
+@keyframes qrFadeIn { from { opacity: 0 } to { opacity: 1 } }
+@keyframes qrPop { from { transform: scale(.94); opacity: 0 } to { transform: scale(1); opacity: 1 } }
+</style>
 </body>
 </html>
