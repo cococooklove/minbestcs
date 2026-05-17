@@ -44,6 +44,7 @@ def excel_to_reviews(filepath):
         "replied":       ["답글여부", "답변여부"],
         "reply_content": ["답글내용", "답변내용"],
         "order_no":      ["상품주문번호", "주문번호"],
+        "review_id":     ["리뷰글번호"],
     }
 
     def find_col(field):
@@ -82,6 +83,7 @@ def excel_to_reviews(filepath):
             "replied":       replied_val in ("Y", "y", "완료", "답글있음", "True", "true", "1"),
             "reply_content": cell(row, "reply_content"),
             "order_no":      cell(row, "order_no"),
+            "review_id":     cell(row, "review_id"),
             "scraped_at":    datetime.now().isoformat(),
         })
     return reviews
@@ -138,6 +140,12 @@ def main(progress_cb=None, existing_page=None, cookies=None, headless=False):
             viewport={"width": 1440, "height": 900},
             accept_downloads=True,
         )
+        # 저장된 세션 복원 (auto_login.save_session에서 저장됨)
+        try:
+            import auto_login as _al
+            _al.restore_session(context)
+        except Exception:
+            pass
         page = context.pages[0] if context.pages else context.new_page()
         page.on("dialog", lambda d: d.accept())
 
@@ -148,23 +156,21 @@ def main(progress_cb=None, existing_page=None, cookies=None, headless=False):
     excel_path = None
     try:
         if existing_page is None and not cookies:
-            # 셀러센터로 이동 후 로그인 대기 (최대 5분, 로컬 직접 실행 전용)
-            progress("셀러센터로 이동 중...")
+            # auto_login으로 셀러센터 진입 보장 (commerce ID OAuth popup 자동 처리)
+            progress("자동 로그인 중...")
             try:
-                page.goto("https://sell.smartstore.naver.com/#/review/search",
-                          wait_until="domcontentloaded", timeout=20000)
-            except Exception:
-                pass
-            progress("로그인 대기 중...")
-            for _ in range(300):
-                url = page.url.lower()
-                if "sell.smartstore.naver.com" in url and not _is_on_login_page(page):
-                    break
-                time.sleep(1)
-            else:
-                raise Exception("로그인 시간 초과 (5분). 다시 시도해주세요.")
-            progress("로그인 확인됨. 수집 시작...")
-            time.sleep(3)
+                import auto_login as _al
+                status = _al.ensure_logged_in(
+                    page,
+                    naver_id=os.environ.get("NAVER_ID", ""),
+                    naver_pw=os.environ.get("NAVER_PW", ""),
+                )
+            except Exception as e:
+                raise Exception(f"자동 로그인 실패: {e}")
+            if status != "seller":
+                raise Exception(f"자동 로그인 실패: {status}")
+            progress("로그인 OK. 수집 시작...")
+            time.sleep(2)
 
         # 리뷰 페이지로 이동
         progress("리뷰 페이지 로딩 중...")

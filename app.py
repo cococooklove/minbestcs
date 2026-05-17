@@ -1136,7 +1136,7 @@ def finetune_activate():
 
 @app.route("/api/reply/post/<int:idx>", methods=["POST"])
 def api_post_reply(idx):
-    """셀러센터에 답글 게시 (Playwright 비동기 실행)"""
+    """셀러센터에 답글 게시 (HTTP 직접 호출 via reply_poster.py subprocess)"""
     reviews = load_reviews()
     if idx >= len(reviews):
         return jsonify({"error": "not found"}), 404
@@ -1145,6 +1145,8 @@ def api_post_reply(idx):
         return jsonify({"error": "게시할 답글이 없습니다."}), 400
     if r.get("replied"):
         return jsonify({"error": "이미 답글이 달린 리뷰입니다."}), 400
+    if not (r.get("review_id") or "").strip():
+        return jsonify({"error": "review_id 없음 — 리뷰를 재수집해주세요 (엑셀 '리뷰글번호')"}), 422
     body = request.get_json(silent=True) or {}
     env = os.environ.copy()
     if body.get("naver_id"):

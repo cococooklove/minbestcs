@@ -4,11 +4,13 @@ data/reviews.json
 data/classify_progress.json
 data/post_progress.json
 data/manual_tags.json
+data/session_state.json
 __pycache__/
 *.pyc
 .DS_Store
 .env
 baselines/
+recordings/
 build/
 dist/
 release/

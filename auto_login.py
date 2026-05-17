@@ -10,7 +10,7 @@ login.py와 같은 시그니처를 유지하되 ID/PW 인자를 추가로 받는
 """
 from playwright.sync_api import sync_playwright
 from dotenv import load_dotenv
-import os, sys, time, functools
+import os, sys, time, json, functools
 
 load_dotenv()
 
@@ -18,6 +18,7 @@ load_dotenv()
 print = functools.partial(print, flush=True)
 
 PROFILE_DIR = os.environ.get("SCRAPER_PROFILE_DIR") or os.path.abspath("data/browser_profile")
+SESSION_STATE_PATH = os.environ.get("SESSION_STATE_PATH") or os.path.abspath("data/session_state.json")
 
 SELLER_HOME = "https://sell.smartstore.naver.com/"
 # 세션 유효성은 '보호된' 페이지로 확인해야 한다. 홈(/)은 미인증에도 일부 진입 가능하지만
@@ -45,6 +46,34 @@ def _clean_profile_locks():
                 os.remove(lp)
             except OSError:
                 pass
+
+
+def restore_session(context) -> bool:
+    """저장된 cookies/localStorage를 context에 주입. 파일 없거나 실패 시 False."""
+    if not os.path.exists(SESSION_STATE_PATH):
+        return False
+    try:
+        with open(SESSION_STATE_PATH, encoding="utf-8") as f:
+            state = json.load(f)
+        cookies = state.get("cookies", [])
+        if cookies:
+            context.add_cookies(cookies)
+            print(f"[auto_login.session] cookies {len(cookies)}개 복원")
+        # localStorage는 origin별로 page에서 복원해야 하므로 여기서는 cookies만
+        return True
+    except Exception as e:
+        print(f"[auto_login.session] 복원 실패: {e}")
+        return False
+
+
+def save_session(context) -> None:
+    """현재 context의 cookies + localStorage를 파일에 저장."""
+    try:
+        os.makedirs(os.path.dirname(SESSION_STATE_PATH), exist_ok=True)
+        context.storage_state(path=SESSION_STATE_PATH)
+        print(f"[auto_login.session] 저장 완료: {SESSION_STATE_PATH}")
+    except Exception as e:
+        print(f"[auto_login.session] 저장 실패: {e}")
 
 
 def _is_on_seller_center(page) -> bool:
@@ -220,12 +249,14 @@ def ensure_logged_in(page, naver_id: str = "", naver_pw: str = "",
 
     if _is_on_seller_center(page):
         print("[auto_login.ensure] 이미 셀러센터")
+        save_session(page.context)
         return "seller"
 
     print("[auto_login.ensure] _try_session() 호출")
     ok = _try_session(page)
     print(f"[auto_login.ensure] _try_session={ok}, URL={page.url}, title={_safe_title(page)}")
     if ok:
+        save_session(page.context)
         return "seller"
 
     if not naver_id or not naver_pw:
@@ -243,11 +274,17 @@ def ensure_logged_in(page, naver_id: str = "", naver_pw: str = "",
     result = _wait_after_login(page, max_seconds=timeout_per_step)
     print(f"[auto_login.ensure] _wait_after_login={result}, URL={page.url}, title={_safe_title(page)}")
 
+    if result == "seller":
+        save_session(page.context)
+        return "seller"
     if result == "intervention":
         if headless:
             return "intervention"
         ok = _wait_for_human(page, max_seconds=timeout_per_step * 2)
-        return "seller" if ok else "intervention"
+        if ok:
+            save_session(page.context)
+            return "seller"
+        return "intervention"
     return result
 
 

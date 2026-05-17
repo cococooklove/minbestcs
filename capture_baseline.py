@@ -72,6 +72,8 @@ def main():
         viewport={"width": 1440, "height": 900},
         accept_downloads=True,
     )
+    # 저장된 세션 복원 (persistent profile에 더해서 cookies 명시 주입)
+    auto_login.restore_session(context)
 
     # 네트워크 로그 수집 (record_har_path 가 persistent context에서 silent fail하므로 직접 수집)
     net_events = []

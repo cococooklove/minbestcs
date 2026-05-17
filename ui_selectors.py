@@ -47,7 +47,8 @@ REVIEW_PAGE = {
     # 검색어 입력
     "search_type_select": "select",                              # 첫 select가 검색유형
     "search_type_order_label": "상품주문번호",                   # select_option(label=...)
-    "search_input_placeholder": "검색어를 입력해 주세요",        # get_by_placeholder
+    "search_input_placeholder": "입력 후 검색하세요.",            # get_by_placeholder (2026-05 확인)
+    "search_input_placeholder_legacy": "검색어를 입력해 주세요",  # 구버전 fallback
     # 결과/다운로드
     "excel_download_text": "엑셀다운",                           # get_by_text(...).first
     "visible_buttons": "button:visible",                         # 디버깅용

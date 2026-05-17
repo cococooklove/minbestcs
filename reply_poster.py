@@ -1,18 +1,31 @@
 """
-스마트스토어 셀러센터에 답글 자동 게시
-- post_reply(idx): 특정 리뷰 1건 게시
-- 실행: python3 reply_poster.py <idx>
+스마트스토어 셀러센터에 답글 자동 게시 — HTTP 직접 호출.
+
+실제 셀러센터 API를 record로 캡처해 확인:
+    POST /api/v3/contents/reviews/comment/bulk-create
+    Body: {"reviewIds":[<rid>], "commentContent":"<text>"}
+
+reviews.json의 'review_id' 필드를 사용. 그 필드가 없으면 재수집 필요.
+인증: session_state.json 의 cookies (auto_login.save_session으로 저장됨).
+
+실행:
+    python3 reply_poster.py <idx> [--dry-run]
 """
-import json, os, sys, time
-from pathlib import Path
-from playwright.sync_api import sync_playwright
+import json
+import os
+import sys
+import functools
+
+import reply_api
+
+print = functools.partial(print, flush=True)
 
 REVIEWS_FILE = "data/reviews.json"
-PROFILE_DIR = os.path.abspath("data/browser_profile")
 POST_PROGRESS_FILE = "data/post_progress.json"
 
 
 def write_post_progress(step, success=None, error=None):
+    os.makedirs(os.path.dirname(POST_PROGRESS_FILE), exist_ok=True)
     with open(POST_PROGRESS_FILE, "w", encoding="utf-8") as f:
         json.dump({"step": step, "success": success, "error": error, "running": step != "완료"}, f)
 
@@ -27,147 +40,53 @@ def save_reviews(reviews):
         json.dump(reviews, f, ensure_ascii=False, indent=2)
 
 
-def post_reply(idx: int) -> dict:
-    """단일 리뷰 idx에 대해 셀러센터에 답글 게시. 결과 dict 반환."""
+def post_reply(idx: int, dry_run: bool = False) -> dict:
+    """단일 리뷰 idx에 답글 게시. dry_run=True면 실제 POST 안 함.
+
+    Returns:
+        {"ok": bool, "error": str|None, "status": int|None}
+    """
     reviews = load_reviews()
-    if idx >= len(reviews):
-        return {"ok": False, "error": "리뷰를 찾을 수 없습니다."}
+    if idx < 0 or idx >= len(reviews):
+        return {"ok": False, "error": f"리뷰 idx {idx} 범위 밖 (전체 {len(reviews)})"}
 
     r = reviews[idx]
-    reply_text = r.get("ai_reply", "").strip()
-    order_no = r.get("order_no", "").strip()
+    reply_text = (r.get("ai_reply") or "").strip()
+    review_id = (r.get("review_id") or "").strip()
 
-    if not reply_text:
-        return {"ok": False, "error": "게시할 답글 내용이 없습니다."}
-    if not order_no:
-        return {"ok": False, "error": "주문번호(order_no)가 없어 자동 게시 불가합니다."}
+    if not review_id:
+        return {"ok": False, "error": "review_id 없음 — scraper로 재수집이 필요합니다 (엑셀의 '리뷰글번호' 컬럼)"}
     if r.get("replied"):
         return {"ok": False, "error": "이미 답글이 달린 리뷰입니다."}
+    if not reply_text:
+        if dry_run:
+            reply_text = "[dry-run] 검증용 텍스트 — 실제 게시되지 않습니다."
+        else:
+            return {"ok": False, "error": "게시할 답글 내용이 없습니다 (ai_reply 비어있음)."}
 
-    # 락 파일 정리
-    for lock in ["SingletonLock", "SingletonCookie", "SingletonSocket"]:
-        lp = os.path.join(PROFILE_DIR, lock)
-        if os.path.exists(lp):
-            os.remove(lp)
+    write_post_progress("답글 등록 API 호출 중")
+    result = reply_api.post_reply(review_id=review_id, text=reply_text, dry_run=dry_run)
 
-    write_post_progress("브라우저 시작 중")
-    pw = sync_playwright().start()
-    context = pw.chromium.launch_persistent_context(
-        user_data_dir=PROFILE_DIR,
-        headless=False,
-        slow_mo=80,
-        viewport={"width": 1440, "height": 900},
-    )
-    result = {"ok": False, "error": ""}
-    try:
-        page = context.pages[0] if context.pages else context.new_page()
-        page.on("dialog", lambda d: d.accept())
+    if not result["ok"]:
+        write_post_progress("오류", error=result.get("error"))
+        return {"ok": False, "error": result.get("error"), "status": result.get("status")}
 
-        write_post_progress("셀러센터 이동 중")
-        page.goto("https://sell.smartstore.naver.com/#/review/search", timeout=20000)
-        page.wait_for_load_state("networkidle", timeout=15000)
-        time.sleep(3)
-
-        # 로그인 확인 — 필요 시 자동 로그인 시도
-        if any(x in page.url.lower() for x in ("login", "nidlogin", "oauth", "signin")):
-            write_post_progress("자동 로그인 시도 중")
-            import auto_login
-            status = auto_login.ensure_logged_in(
-                page,
-                naver_id=os.environ.get("NAVER_ID", ""),
-                naver_pw=os.environ.get("NAVER_PW", ""),
-            )
-            if status != "seller":
-                result["error"] = f"로그인 실패({status}). 관리자 패널에서 네이버 ID/PW를 확인하세요."
-                return result
-            page.goto("https://sell.smartstore.naver.com/#/review/search", timeout=20000)
-            page.wait_for_load_state("networkidle", timeout=15000)
-            time.sleep(2)
-
-        write_post_progress(f"주문번호 {order_no} 검색 중")
-
-        # 주문번호 검색 입력
-        try:
-            # 검색 유형 선택 (주문번호)
-            search_type_sel = page.locator("select").first
-            search_type_sel.select_option(label="상품주문번호") if search_type_sel else None
-        except Exception:
-            pass
-
-        try:
-            search_input = page.get_by_placeholder("검색어를 입력해 주세요").first
-            search_input.fill(order_no)
-            page.keyboard.press("Enter")
-            page.wait_for_load_state("networkidle", timeout=10000)
-            time.sleep(2)
-        except Exception as e:
-            result["error"] = f"검색 입력 실패: {e}"
-            return result
-
-        write_post_progress("답글작성 버튼 찾는 중")
-
-        # 답글작성 버튼 찾기 (해당 행)
-        try:
-            reply_btn = page.get_by_text("답글작성").first
-            reply_btn.wait_for(state="visible", timeout=8000)
-            reply_btn.click()
-            time.sleep(1)
-        except Exception as e:
-            result["error"] = f"답글작성 버튼을 찾을 수 없습니다: {e}"
-            return result
-
-        write_post_progress("답글 입력 중")
-
-        # 답글 텍스트 입력
-        try:
-            textarea = page.locator("textarea").last
-            textarea.wait_for(state="visible", timeout=5000)
-            textarea.click()
-            textarea.fill(reply_text)
-            time.sleep(0.5)
-        except Exception as e:
-            result["error"] = f"텍스트 입력 실패: {e}"
-            return result
-
-        # 등록/확인 버튼 클릭
-        for sel in [
-            "button:has-text('등록')",
-            "button:has-text('확인')",
-            "button:has-text('저장')",
-            "[class*='btn'][class*='primary']",
-        ]:
-            try:
-                btn = page.wait_for_selector(sel, timeout=3000, state="visible")
-                if btn:
-                    btn.click()
-                    time.sleep(2)
-                    break
-            except Exception:
-                continue
-
-        write_post_progress("완료", success=True)
-        result["ok"] = True
-
-        # reviews.json 업데이트
+    # dry-run이 아닌 경우에만 reviews.json 업데이트
+    if not dry_run:
         reviews[idx]["replied"] = True
         reviews[idx]["reply_status"] = "posted"
         save_reviews(reviews)
 
-    except Exception as e:
-        result["error"] = str(e)
-        write_post_progress("오류", error=str(e))
-    finally:
-        context.close()
-        pw.stop()
-
-    write_post_progress("완료", success=result["ok"], error=result.get("error"))
-    return result
+    write_post_progress("완료", success=True)
+    return {"ok": True, "error": None, "status": result.get("status")}
 
 
 if __name__ == "__main__":
     if len(sys.argv) < 2:
-        print("사용법: python3 reply_poster.py <리뷰_인덱스>")
+        print("사용법: python3 reply_poster.py <리뷰_인덱스> [--dry-run]")
         sys.exit(1)
     idx = int(sys.argv[1])
-    res = post_reply(idx)
-    print("성공" if res["ok"] else f"실패: {res['error']}")
+    dry_run = "--dry-run" in sys.argv[2:]
+    res = post_reply(idx, dry_run=dry_run)
+    print(f"\n결과: {res}")
+    sys.exit(0 if res["ok"] else 1)
