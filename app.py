@@ -20,6 +20,11 @@ load_dotenv(os.path.join(_base_dir, ".env"))
 IS_SERVER = bool(os.environ.get("RAILWAY_ENVIRONMENT") or os.environ.get("RAILWAY_SERVICE_NAME"))
 
 app = Flask(__name__)
+if not IS_SERVER:
+    # 로컬: templates/*.html, static/* 수정 시 서버 재시작 없이 즉시 반영
+    app.config["TEMPLATES_AUTO_RELOAD"] = True
+    app.jinja_env.auto_reload = True
+    app.config["SEND_FILE_MAX_AGE_DEFAULT"] = 0
 socketio = SocketIO(app, cors_allowed_origins="*", async_mode="threading", ping_timeout=60, ping_interval=25)
 
 @app.after_request
