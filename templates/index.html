@@ -834,44 +834,6 @@
   </div>
 </header>
 
-<div id="ext-banner" style="display:none;background:#f0faf4;border-bottom:1px solid #c3e6cb;padding:10px 20px;align-items:center;gap:12px;font-size:13px;color:#2d6a4f;">
-  <span id="cookie-dot" style="width:9px;height:9px;border-radius:50%;background:#ccc;flex-shrink:0;display:inline-block;"></span>
-  <span id="cookie-status">확장 프로그램으로 수집을 시작하세요</span>
-  <a href="/extension/download" style="margin-left:auto;padding:5px 12px;background:#03c75a;color:#fff;border-radius:5px;text-decoration:none;font-size:12px;font-weight:600;" download>확장 프로그램 다운로드</a>
-  <button onclick="document.getElementById('ext-guide').style.display=document.getElementById('ext-guide').style.display==='none'?'block':'none'" style="background:none;border:1px solid #aaa;border-radius:4px;padding:4px 8px;font-size:11px;cursor:pointer;color:#555;">설치방법</button>
-</div>
-<div id="ext-guide" style="display:none;background:#fafafa;border-bottom:1px solid #e0e0e0;padding:24px 32px;">
-  <div style="font-size:14px;font-weight:700;color:#222;margin-bottom:18px;">Chrome 확장 프로그램 설치 방법 <span style="font-size:12px;font-weight:400;color:#888;">— 최초 1회만</span></div>
-  <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:14px;">
-
-    <div style="background:#fff;border:1px solid #e8e8e8;border-radius:10px;padding:16px;">
-      <div style="font-size:11px;font-weight:700;color:#03c75a;margin-bottom:6px;letter-spacing:.5px;">STEP 1</div>
-      <div style="font-size:13px;font-weight:600;color:#222;margin-bottom:6px;">확장 프로그램 다운로드</div>
-      <div style="font-size:12px;color:#555;line-height:1.7;">상단 <b>확장 프로그램 다운로드</b> 버튼 클릭<br>→ zip 파일 저장 후 <b>압축 해제</b></div>
-    </div>
-
-    <div style="background:#fff;border:1px solid #e8e8e8;border-radius:10px;padding:16px;">
-      <div style="font-size:11px;font-weight:700;color:#03c75a;margin-bottom:6px;letter-spacing:.5px;">STEP 2</div>
-      <div style="font-size:13px;font-weight:600;color:#222;margin-bottom:6px;">Chrome 확장 관리 열기</div>
-      <div style="font-size:12px;color:#555;line-height:1.7;">Chrome 주소창에 입력:<br><code style="background:#f0f0f0;padding:2px 6px;border-radius:4px;font-size:11px;">chrome://extensions</code><br>→ 오른쪽 상단 <b>개발자 모드</b> 토글 켜기</div>
-    </div>
-
-    <div style="background:#fff;border:1px solid #e8e8e8;border-radius:10px;padding:16px;">
-      <div style="font-size:11px;font-weight:700;color:#03c75a;margin-bottom:6px;letter-spacing:.5px;">STEP 3</div>
-      <div style="font-size:13px;font-weight:600;color:#222;margin-bottom:6px;">폴더 불러오기</div>
-      <div style="font-size:12px;color:#555;line-height:1.7;"><b>압축해제된 확장 프로그램을 로드합니다</b> 클릭<br>→ 압축 해제한 폴더 선택<br>→ 확장 프로그램 목록에 추가됨</div>
-    </div>
-
-    <div style="background:#fff;border:1px solid #e8e8e8;border-radius:10px;padding:16px;">
-      <div style="font-size:11px;font-weight:700;color:#03c75a;margin-bottom:6px;letter-spacing:.5px;">STEP 4</div>
-      <div style="font-size:13px;font-weight:600;color:#222;margin-bottom:6px;">수집 시작</div>
-      <div style="font-size:12px;color:#555;line-height:1.7;"><a href="https://sell.smartstore.naver.com" target="_blank" style="color:#03c75a;">네이버 셀러센터</a>에 로그인<br>→ Chrome 우측 상단 <b>확장 아이콘(🧩)</b> 클릭<br>→ <b>리뷰 수집 시작</b> 버튼 클릭</div>
-    </div>
-
-  </div>
-  <div style="margin-top:14px;font-size:11px;color:#aaa;">※ 설치 후에는 매번 STEP 4만 반복하면 됩니다.</div>
-</div>
-
 <div class="stats-bar" id="stats-bar">
   <div class="stat"><div class="val" id="stat-total">-</div><div class="lbl">전체 리뷰</div></div>
   <div class="stat"><div class="val" id="stat-avg">-</div><div class="lbl">평균 별점</div></div>
@@ -1815,10 +1777,6 @@ function fetchReviews(onRendered) {
 }
 
 function runCollect() {
-  if (IS_SERVER) {
-    showToast('확장 프로그램 아이콘을 클릭하고 "리뷰 수집 시작"을 눌러주세요.', 5000);
-    return;
-  }
   if (!confirm('로그인 및 리뷰를 수집하겠습니까?')) return;
   const btn = document.getElementById('btn-collect');
   btn.disabled = true;
@@ -3221,61 +3179,15 @@ socket.on('agent_progress', data => {
   showProgress(data.step || '수집 중...');
 });
 
-const IS_SERVER = {{ is_server | tojson }};
-if (IS_SERVER) {
-  const banner = document.getElementById('ext-banner');
-  if (banner) { banner.style.display = 'flex'; }
-  const collectBtn = document.getElementById('btn-collect');
-  if (collectBtn) { collectBtn.style.display = 'none'; }
-
-  // 확장프로그램이 ?collecting=1 파라미터로 열었으면 즉시 모달 표시
-  if (new URLSearchParams(location.search).get('collecting') === '1') {
-    showProgress('수집 준비 중...');
-    history.replaceState(null, '', location.pathname);
-    // 최신 리뷰 날짜 조회 후 안내 표시
-    fetch('/api/latest-review-date').then(r => r.json()).then(d => {
-      const note = document.getElementById('popup-incremental-note');
-      if (!note) return;
-      if (d.date) {
-        note.textContent = `마지막 수집: ${d.date} 이후 신규 리뷰만 다운로드`;
-        note.style.display = 'block';
-      } else {
-        note.textContent = '전체 1년치 리뷰 다운로드 (최초 수집)';
-        note.style.display = 'block';
-      }
-    }).catch(() => {});
+// 페이지 로드 시 수집 고착 상태 자동 리셋
+fetch('/api/status').then(r => r.json()).then(data => {
+  if (data.scraping) {
+    fetch('/api/reset', { method: 'POST' }).catch(() => {});
   }
-
-  // 페이지 로드 시 수집 중 상태 복원
-  fetch('/api/status').then(r => r.json()).then(data => {
-    const dot = document.getElementById('cookie-dot');
-    const cookieStatus = document.getElementById('cookie-status');
-    if (data.scraping) {
-      // 페이지 로드 시점에 scraping=true면 서버 재시작으로 인한 고착 상태 — 자동 리셋
-      fetch('/api/reset', { method: 'POST' }).catch(() => {});
-      if (dot) dot.style.background = '#ccc';
-      if (cookieStatus) cookieStatus.textContent = '';
-    } else if (data.has_cookies) {
-      if (dot) dot.style.background = '#03c75a';
-      if (cookieStatus) cookieStatus.textContent = '쿠키 수신됨 — 수집 버튼을 누르거나 확장에서 재시작하세요';
-    }
-  }).catch(() => {});
-}
+}).catch(() => {});
 
 socket.on('collect_status', data => {
   const btn = document.getElementById('btn-collect');
-  // 확장 프로그램 쿠키 상태 표시
-  const dot = document.getElementById('cookie-dot');
-  const cookieStatus = document.getElementById('cookie-status');
-  if (dot && cookieStatus) {
-    if (data.step === 'cookies_received' || data.step === 'scraping') {
-      dot.style.background = '#03c75a';
-      cookieStatus.textContent = '쿠키 수신됨 — 수집 중...';
-    } else if (data.step === 'done') {
-      dot.style.background = data.success ? '#03c75a' : '#e74c3c';
-      cookieStatus.textContent = data.success ? '수집 완료' : '수집 실패';
-    }
-  }
   if (data.step === 'cookies_received') {
     if (btn) { btn.textContent = '수집 중...'; btn.disabled = true; }
     showProgress('쿠키 수신됨 — 리뷰 수집 준비 중...');

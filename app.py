@@ -180,7 +180,7 @@ def api_status():
 
 @app.route("/")
 def index():
-    return render_template("index.html", is_server=IS_SERVER)
+    return render_template("index.html")
 
 
 @app.route("/api/reset", methods=["POST"])
@@ -335,24 +335,6 @@ def api_receive_cookies():
     socketio.emit("collect_status", {"step": "cookies_received"})
     threading.Thread(target=_run_server_collect, daemon=True).start()
     return jsonify({"status": "started"})
-
-
-@app.route("/extension/download")
-def download_extension():
-    import io, zipfile
-    from flask import send_file
-    server_url = request.host_url.rstrip('/')
-    ext_dir = os.path.join(_base_dir, "extension")
-    buf = io.BytesIO()
-    with zipfile.ZipFile(buf, 'w', zipfile.ZIP_DEFLATED) as zf:
-        for fname in ['manifest.json', 'popup.html', 'popup.js', 'background.js', 'content_main.js', 'content.js']:
-            fpath = os.path.join(ext_dir, fname)
-            if os.path.exists(fpath):
-                zf.write(fpath, fname)
-        zf.writestr('config.js', f'const SERVER_URL = "{server_url}";')
-    buf.seek(0)
-    return send_file(buf, mimetype='application/zip', as_attachment=True,
-                     download_name='민베스트_확장프로그램.zip')
 
 
 @app.route("/api/reviews")
@@ -714,11 +696,6 @@ def api_collect():
     global _scraping
     if _scraping:
         return jsonify({"error": "수집 중입니다. 잠시 기다려주세요."}), 400
-    if IS_SERVER:
-        if not _session_cookies:
-            return jsonify({"error": "확장 프로그램에서 수집을 시작해주세요."}), 400
-        threading.Thread(target=_run_server_collect, daemon=True).start()
-        return jsonify({"status": "started"})
     body = request.get_json(silent=True) or {}
     naver_id = (body.get("naver_id") or "").strip()
     naver_pw = body.get("naver_pw") or ""
