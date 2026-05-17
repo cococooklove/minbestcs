@@ -3,7 +3,7 @@
 - 실행: python3 classifier.py  (미분류 리뷰 일괄 처리)
 - OPENAI_API_KEY 환경변수 필요
 """
-import json, os, time, re, threading, argparse
+import json, os, time, re, threading, argparse, unicodedata
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timedelta
 from dotenv import load_dotenv
@@ -88,18 +88,72 @@ def api_classify(review: dict, client, report_criteria: list = None,
     return {}
 
 
+# 단일 명사형 표현 뒤에 붙는 한국어 어미/조사 — 선택적 허용
+_KOREAN_SUFFIX_RE = r"(?:을|를|이|가|은|는|에|에서|와|과|로|으로|도|만|적|적인|적이|적으로|에도|에는)?"
+
+
+def _normalize_text(s: str) -> str:
+    return unicodedata.normalize("NFC", s or "")
+
+
+def _build_sensitive_pattern(expr: str) -> "re.Pattern":
+    """등록된 민감 표현을 한국어 변형(어미/조사/공백)까지 흡수하는 정규식으로 변환."""
+    expr = _normalize_text(expr)
+    parts = expr.split()
+    if len(parts) > 1:
+        # 어구: 어절 사이 공백 변형(여러 공백) 허용
+        body = r"\s+".join(re.escape(p) for p in parts)
+        return re.compile(body)
+    # 단일 단어: 끝에 어미/조사 변형 허용
+    return re.compile(re.escape(expr) + _KOREAN_SUFFIX_RE)
+
+
+# 정규식 캐시 (settings 핫리로드 대응 위해 키는 표현 문자열)
+_sensitive_pattern_cache: dict = {}
+
+
+def _get_pattern(expr: str) -> "re.Pattern":
+    pat = _sensitive_pattern_cache.get(expr)
+    if pat is None:
+        pat = _build_sensitive_pattern(expr)
+        _sensitive_pattern_cache[expr] = pat
+    return pat
+
+
 def _contains_sensitive(text: str, expressions: list) -> list:
-    """생성된 답변에서 민감 표현 검출. 발견된 표현 목록 반환."""
+    """생성된 답변에서 민감 표현 검출 (어미/조사/공백 변형 흡수). 발견된 원본 표현 목록 반환."""
+    if not text or not expressions:
+        return []
+    text_n = _normalize_text(text)
     found = []
-    text_lower = text.lower()
     for expr in expressions:
-        if expr.lower() in text_lower:
+        if _get_pattern(expr).search(text_n):
             found.append(expr)
     return found
 
 
-def generate_reply(review: dict, brand_tone: str, client, settings: dict = None) -> str:
-    """OpenAI API 기반 답변 생성"""
+_SAFE_ALTERNATIVES_BLOCK = (
+    "\n\n[안전한 대체 표현 예시]\n"
+    '- "효과가 있습니다" → "좋은 경험으로 이어지길 바랍니다"\n'
+    '- "효과를 보장합니다" → "꾸준히 드시면서 긍정적인 변화를 느끼셨으면 좋겠습니다"\n'
+    '- "치료에 도움이 됩니다" → "건강한 일상에 도움이 되길 바랍니다"\n'
+    '- "혈압/혈당/콜레스테롤" 등 수치·질환 언급 → 언급 자체를 생략하고 공감 표현으로 대체'
+)
+
+MAX_SENSITIVE_RETRIES = 3
+
+
+def generate_reply(review: dict, brand_tone: str, client, settings: dict = None) -> dict:
+    """OpenAI API 기반 답변 생성.
+
+    반환: {"text": str, "sensitive_remaining": list[str], "attempts": int}
+      - sensitive_remaining 비어있으면 안전, 채워져 있으면 자동 등록 금지 신호.
+    """
+    settings = settings or load_settings()
+    sensitive = settings.get("sensitive_expressions", [])
+    auto_retry = settings.get("auto_retry_sensitive", True)
+    model = settings.get("active_model", "gpt-4o-mini")
+
     system = f"""당신은 건강기능식품 브랜드의 고객 담당자입니다.
 아래 브랜드 톤 가이드에 따라 리뷰에 답변하세요.
 
@@ -107,15 +161,14 @@ def generate_reply(review: dict, brand_tone: str, client, settings: dict = None)
 
 답변만 출력하세요. 따옴표나 설명 없이 답변 텍스트만."""
 
-    settings = settings or load_settings()
-    model = settings.get("active_model", "gpt-4o-mini")
     if settings.get("spelling_correction", True):
         system += "\n반드시 올바른 한국어 맞춤법과 띄어쓰기를 사용하세요. 오탈자가 없도록 주의하세요."
-    sensitive = settings.get("sensitive_expressions", [])
+
     if sensitive:
-        forbidden_block = "\n\n[절대 사용 금지 표현 — 아래 표현은 어떤 형태로도 답변에 포함하지 마세요]\n"
+        forbidden_block = "\n\n[절대 사용 금지 표현 — 어떤 변형(어미/조사 포함)으로도 답변에 포함 금지]\n"
         forbidden_block += "\n".join(f"- {e}" for e in sensitive)
         forbidden_block += "\n고객 리뷰에 위 표현이 있더라도 답글에서 반복하거나 단정하지 마세요."
+        forbidden_block += _SAFE_ALTERNATIVES_BLOCK
         system += forbidden_block
 
     customer_type    = review.get("customer_type", "")
@@ -144,45 +197,54 @@ def generate_reply(review: dict, brand_tone: str, client, settings: dict = None)
 
 위 리뷰에 적절한 답변을 작성해주세요."""
 
-    reply_text = ""
-    for attempt in range(2):
-        try:
-            resp = client.chat.completions.create(
-                model=model,
-                max_tokens=512,
-                temperature=0.4,
-                messages=[
-                    {"role": "system", "content": system},
-                    {"role": "user", "content": user},
-                ],
-            )
-            reply_text = resp.choices[0].message.content.strip()
-            break
-        except Exception as e:
-            if "rate_limit" in str(e).lower() or "429" in str(e) and attempt == 0:
-                time.sleep(2)
-            else:
-                break
-
-    if reply_text and sensitive and settings.get("auto_retry_sensitive", True):
-        found = _contains_sensitive(reply_text, sensitive)
-        if found:
-            retry_system = system + f"\n\n[재생성 요청] 이전 답변에 금지 표현({', '.join(found)})이 포함되었습니다. 이 표현 없이 다시 작성하세요."
+    def _call(sys_prompt: str) -> str:
+        for attempt in range(2):
             try:
-                retry_resp = client.chat.completions.create(
+                resp = client.chat.completions.create(
                     model=model,
                     max_tokens=512,
                     temperature=0.4,
                     messages=[
-                        {"role": "system", "content": retry_system},
+                        {"role": "system", "content": sys_prompt},
                         {"role": "user", "content": user},
                     ],
                 )
-                reply_text = retry_resp.choices[0].message.content.strip()
-            except Exception:
-                pass
+                return resp.choices[0].message.content.strip()
+            except Exception as e:
+                if "rate_limit" in str(e).lower() or "429" in str(e) and attempt == 0:
+                    time.sleep(2)
+                else:
+                    break
+        return ""
 
-    return reply_text
+    reply_text = _call(system)
+    attempts = 1
+    found = _contains_sensitive(reply_text, sensitive) if sensitive else []
+
+    while found and auto_retry and attempts <= MAX_SENSITIVE_RETRIES:
+        if attempts == 1:
+            extra = (
+                f"\n\n[재생성 요청 1/{MAX_SENSITIVE_RETRIES}] 이전 답변에 금지 표현"
+                f"({', '.join(found)})이 포함되었습니다. 이 표현 및 변형 없이 다시 작성하세요."
+            )
+        else:
+            extra = (
+                f"\n\n[재생성 요청 {attempts}/{MAX_SENSITIVE_RETRIES}] 이전 답변에 여전히 금지 표현"
+                f"({', '.join(found)})이 포함되어 있습니다. "
+                "위 [안전한 대체 표현 예시]를 반드시 따라 다시 작성하세요. "
+                "고객 리뷰에 해당 표현이 등장하더라도 답글에서는 절대 그 표현이나 어미 변형을 쓰지 마세요."
+            )
+        retry_text = _call(system + extra)
+        if retry_text:
+            reply_text = retry_text
+        attempts += 1
+        found = _contains_sensitive(reply_text, sensitive) if sensitive else []
+
+    return {
+        "text": reply_text,
+        "sensitive_remaining": found,
+        "attempts": attempts,
+    }
 
 
 def classify_review(review: dict, client, report_criteria: list = None) -> dict:
@@ -250,11 +312,19 @@ def process_batch():
 
         skip_reportable = settings.get("skip_reportable_reply", False)
         is_reportable = bool(result.get("reportable"))
+        new_sensitive_flags = None  # None=손대지 않음, []=초기화, list=세팅
         if auto_generate and not existing_reply and not reviews[idx].get("replied") and not (skip_reportable and is_reportable):
             try:
-                existing_reply = generate_reply(r, brand_tone, client, settings=settings)
+                gen = generate_reply(r, brand_tone, client, settings=settings)
+                existing_reply = gen.get("text", "")
+                remaining = gen.get("sensitive_remaining", [])
                 if existing_reply:
-                    existing_status = "draft"
+                    if remaining:
+                        existing_status = "needs_review"
+                        new_sensitive_flags = remaining
+                    else:
+                        existing_status = "draft"
+                        new_sensitive_flags = []
             except Exception:
                 pass
 
@@ -270,6 +340,10 @@ def process_batch():
                 "ai_reply": existing_reply,
                 "reply_status": existing_status,
             })
+            if new_sensitive_flags:
+                reviews[idx]["sensitive_flags"] = new_sensitive_flags
+            elif new_sensitive_flags == []:
+                reviews[idx].pop("sensitive_flags", None)
             done_count[0] += 1
             _done = done_count[0]
         write_progress(_done, total, f"처리 중 ({_done}/{total})")

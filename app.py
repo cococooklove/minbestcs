@@ -27,6 +27,10 @@ def add_cors(response):
     response.headers["Access-Control-Allow-Origin"] = "*"
     response.headers["Access-Control-Allow-Methods"] = "GET,POST,OPTIONS"
     response.headers["Access-Control-Allow-Headers"] = "Content-Type"
+    if response.mimetype == "text/html":
+        response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+        response.headers["Pragma"] = "no-cache"
+        response.headers["Expires"] = "0"
     return response
 REVIEWS_FILE = os.path.join(_base_dir, "data", "reviews.json")
 
@@ -40,6 +44,11 @@ _login_page = None
 _scraping = False
 _session_cookies = None
 _progress_step = ""
+
+# 클라이언트별 세션 정보 (멀티 클라이언트 대응 — 우선 메모리 보관, 만료시간 표시용)
+# { client_id: {"expires_at": float, "cookies": list, "updated_at": float} }
+_sessions_by_client = {}
+_sessions_lock = threading.Lock()
 
 def _log(msg):
     from datetime import datetime
@@ -263,10 +272,19 @@ def api_receive_cookies():
         return jsonify({"error": "수집 중입니다. 잠시 기다려주세요."}), 400
     data = request.json or {}
     cookies = data.get("cookies", [])
-    _log(f"[EXT-DBG] 쿠키 수신 요청: {len(cookies)}개")
+    client_id = (data.get("client_id") or "").strip() or None
+    _log(f"[EXT-DBG] 쿠키 수신 요청: {len(cookies)}개 (client_id={client_id})")
     if not cookies:
         return jsonify({"error": "쿠키가 없습니다. 네이버에 로그인 후 다시 시도해주세요."}), 400
     _session_cookies = cookies
+    if client_id:
+        import time
+        with _sessions_lock:
+            _sessions_by_client[client_id] = {
+                "expires_at": _earliest_expires(cookies, "expirationDate"),
+                "cookies": cookies,
+                "updated_at": time.time(),
+            }
     _log("🟡 수집 시작 (쿠키 수신)")
     socketio.emit("collect_status", {"step": "cookies_received"})
     threading.Thread(target=_run_server_collect, daemon=True).start()
@@ -369,6 +387,7 @@ def api_reviews():
         "reportable_count":  sum(1 for r in all_r if r.get("reportable")),
         "refund_count":      sum(1 for r in all_r if r.get("refund_status") == "completed"),
         "draft_count":       sum(1 for r in all_r if r.get("reply_status") == "draft"),
+        "needs_review_count":sum(1 for r in all_r if r.get("reply_status") == "needs_review"),
         "need_reply_count":  sum(1 for r in all_r if not r.get("replied") and not r.get("ai_reply")),
     }
 
@@ -459,6 +478,7 @@ def api_login_start():
     body = request.get_json(silent=True) or {}
     naver_id = (body.get("naver_id") or "").strip()
     naver_pw = body.get("naver_pw") or ""
+    client_id = (body.get("client_id") or "").strip() or None
     def run_login():
         global _login_pw, _login_context, _login_page
         try:
@@ -470,6 +490,19 @@ def api_login_start():
             )
             if success:
                 _login_pw, _login_context, _login_page = pw, context, page
+                if client_id and os.path.exists(SESSION_STATE_PATH):
+                    try:
+                        import time as _t
+                        with open(SESSION_STATE_PATH, encoding="utf-8") as f:
+                            state = json.load(f)
+                        with _sessions_lock:
+                            _sessions_by_client[client_id] = {
+                                "expires_at": _earliest_expires(state.get("cookies", []), "expires"),
+                                "cookies": state.get("cookies", []),
+                                "updated_at": _t.time(),
+                            }
+                    except Exception:
+                        pass
             socketio.emit("login_status", {"logged_in": bool(success)})
         except Exception as e:
             socketio.emit("login_status", {"logged_in": False, "error": str(e)})
@@ -477,11 +510,68 @@ def api_login_start():
     return jsonify({"status": "started"})
 
 
+SESSION_STATE_PATH = os.path.join(_base_dir, "data", "session_state.json")
+# 셀러센터(smartstore) 세션 만료를 가장 잘 반영하는 쿠키들. 첫 매칭의 expires를 사용.
+_SESSION_COOKIE_NAMES = ("kit.session", "NACT")
+
+
+def _earliest_expires(cookies, expires_key):
+    """쿠키 리스트에서 세션 쿠키들의 expires 최소값을 반환. 없으면 None."""
+    import time
+    vals = []
+    for c in cookies or []:
+        if c.get("name") in _SESSION_COOKIE_NAMES:
+            exp = c.get(expires_key)
+            if isinstance(exp, (int, float)) and exp > 0:
+                vals.append(float(exp))
+    if not vals:
+        return None
+    earliest = min(vals)
+    return earliest if earliest > time.time() else None
+
+
+def _global_session_expires_at():
+    """글로벌 폴백: 확장에서 받은 인메모리 쿠키 → session_state.json 순으로 확인."""
+    exp = _earliest_expires(_session_cookies, "expirationDate")
+    if exp:
+        return exp
+    if os.path.exists(SESSION_STATE_PATH):
+        try:
+            with open(SESSION_STATE_PATH, encoding="utf-8") as f:
+                state = json.load(f)
+            return _earliest_expires(state.get("cookies", []), "expires")
+        except Exception:
+            return None
+    return None
+
+
+def _session_expires_at(client_id=None):
+    """주어진 client_id의 세션 만료 unix epoch(seconds). 없으면 글로벌 폴백."""
+    import time
+    if client_id:
+        with _sessions_lock:
+            rec = _sessions_by_client.get(client_id)
+        if rec:
+            exp = rec.get("expires_at")
+            if exp and exp > time.time():
+                return float(exp)
+    return _global_session_expires_at()
+
+
 @app.route("/api/login/status")
 def api_login_status():
+    import time
+    client_id = (request.args.get("client_id") or "").strip() or None
     cookies_path = os.path.join(PROFILE_DIR, "Default", "Cookies")
     logged_in = os.path.exists(cookies_path)
-    return jsonify({"logged_in": logged_in})
+    expires_at = _session_expires_at(client_id)
+    remaining = int(expires_at - time.time()) if expires_at else None
+    return jsonify({
+        "logged_in": logged_in,
+        "expires_at": expires_at,
+        "remaining_seconds": remaining,
+        "client_id": client_id,
+    })
 
 
 @app.route("/api/login/cancel", methods=["POST"])
@@ -556,6 +646,7 @@ def api_collect():
     body = request.get_json(silent=True) or {}
     naver_id = (body.get("naver_id") or "").strip()
     naver_pw = body.get("naver_pw") or ""
+    client_id = (body.get("client_id") or "").strip() or None
     def run_collect():
         global _login_pw, _login_context, _login_page, _scraping
         try:
@@ -591,6 +682,19 @@ def api_collect():
                     socketio.emit("collect_status", {"step": "login_failed", "error": "로그인 실패"})
                     return
                 _login_pw, _login_context, _login_page = pw, context, page
+                if client_id and os.path.exists(SESSION_STATE_PATH):
+                    try:
+                        import time as _t
+                        with open(SESSION_STATE_PATH, encoding="utf-8") as f:
+                            _st = json.load(f)
+                        with _sessions_lock:
+                            _sessions_by_client[client_id] = {
+                                "expires_at": _earliest_expires(_st.get("cookies", []), "expires"),
+                                "cookies": _st.get("cookies", []),
+                                "updated_at": _t.time(),
+                            }
+                    except Exception:
+                        pass
                 socketio.emit("collect_status", {"step": "login_done"})
             _scraping = True
             socketio.emit("collect_status", {"step": "scraping"})
@@ -704,27 +808,40 @@ def api_generate_reply(idx):
         client = OpenAI(api_key=api_key)
         brand_tone = load_brand_tone()
         settings_data = load_settings()
-        reply = generate_reply(reviews[idx], brand_tone, client, settings=settings_data)
+        gen = generate_reply(reviews[idx], brand_tone, client, settings=settings_data)
+        reply = gen.get("text", "") if isinstance(gen, dict) else (gen or "")
+        sensitive_remaining = gen.get("sensitive_remaining", []) if isinstance(gen, dict) else []
         if not reply:
             return jsonify({"error": "AI 답변 생성에 실패했습니다. API 키와 크레딧을 확인해주세요."}), 500
         auto_reply = settings_data.get("auto_reply", False)
         reviews[idx]["ai_reply"] = reply
-        reviews[idx]["reply_status"] = "approved" if auto_reply else "draft"
+        if sensitive_remaining:
+            # 민감 표현이 남아있으면 auto_reply 설정과 무관하게 자동 등록 차단
+            reviews[idx]["reply_status"] = "needs_review"
+            reviews[idx]["sensitive_flags"] = sensitive_remaining
+        else:
+            reviews[idx]["reply_status"] = "approved" if auto_reply else "draft"
+            reviews[idx].pop("sensitive_flags", None)
         save_reviews(reviews)
         invalidate_reviews_cache()
-        return jsonify({"reply": reply, "status": reviews[idx]["reply_status"]})
+        return jsonify({
+            "reply": reply,
+            "status": reviews[idx]["reply_status"],
+            "sensitive_remaining": sensitive_remaining,
+        })
     except Exception:
         return jsonify({"error": "AI 답변 생성 중 오류가 발생했습니다."}), 500
 
 
 @app.route("/api/reply/approve/<int:idx>", methods=["POST"])
 def api_approve_reply(idx):
-    """답변 승인"""
+    """답변 승인. force=true 없이는 민감 표현 포함 시 거부."""
     reviews = load_reviews()
     if idx >= len(reviews):
         return jsonify({"error": "not found"}), 404
 
     data = request.get_json() or {}
+    force = bool(data.get("force"))
     if "reply" in data:
         old_reply = reviews[idx].get("ai_reply", "")
         new_reply = data["reply"]
@@ -733,11 +850,29 @@ def api_approve_reply(idx):
             history.insert(0, {"text": old_reply, "saved_at": datetime.now().strftime("%Y-%m-%d %H:%M")})
             reviews[idx]["reply_history"] = history[:5]
         reviews[idx]["ai_reply"] = new_reply
+
+    # 승인 직전 민감 표현 재검증
+    from classifier import _contains_sensitive
+    settings_data = load_settings()
+    sensitive = settings_data.get("sensitive_expressions", [])
+    found = _contains_sensitive(reviews[idx].get("ai_reply", ""), sensitive)
+    if found and not force:
+        reviews[idx]["sensitive_flags"] = found
+        if reviews[idx].get("reply_status") != "needs_review":
+            reviews[idx]["reply_status"] = "needs_review"
+            save_reviews(reviews)
+            invalidate_reviews_cache()
+        return jsonify({
+            "error": "민감 표현이 포함되어 있습니다. 확인 후 force=true로 재승인하세요.",
+            "sensitive_remaining": found,
+        }), 400
+
     reviews[idx]["reply_status"] = "approved"
+    reviews[idx].pop("sensitive_flags", None)
     save_reviews(reviews)
     invalidate_reviews_cache()
     threading.Thread(target=maybe_auto_finetune, daemon=True).start()
-    return jsonify({"status": "approved"})
+    return jsonify({"status": "approved", "forced": bool(found and force)})
 
 
 @app.route("/api/reply/reject/<int:idx>", methods=["POST"])
@@ -905,17 +1040,33 @@ def api_refund_toggle(idx):
 
 @app.route("/api/approve/all/<int:idx>", methods=["POST"])
 def api_approve_all(idx):
-    """쿠폰 + 답변 동시 승인"""
+    """쿠폰 + 답변 동시 승인. 답변에 민감 표현 포함 시 force=true 없이는 거부."""
     reviews = load_reviews()
     if idx >= len(reviews):
         return jsonify({"error": "not found"}), 404
     data = request.get_json() or {}
     approve_reply  = data.get("approve_reply",  True)
     approve_coupon = data.get("approve_coupon", True)
+    force = bool(data.get("force"))
     if approve_reply:
         if "reply" in data:
             reviews[idx]["ai_reply"] = data["reply"]
+        from classifier import _contains_sensitive
+        settings_data = load_settings()
+        sensitive = settings_data.get("sensitive_expressions", [])
+        found = _contains_sensitive(reviews[idx].get("ai_reply", ""), sensitive)
+        if found and not force:
+            reviews[idx]["sensitive_flags"] = found
+            if reviews[idx].get("reply_status") != "needs_review":
+                reviews[idx]["reply_status"] = "needs_review"
+                save_reviews(reviews)
+                invalidate_reviews_cache()
+            return jsonify({
+                "error": "민감 표현이 포함되어 있습니다. 확인 후 force=true로 재승인하세요.",
+                "sensitive_remaining": found,
+            }), 400
         reviews[idx]["reply_status"] = "approved"
+        reviews[idx].pop("sensitive_flags", None)
     if approve_coupon:
         reviews[idx]["coupon_status"] = "approved"
     save_reviews(reviews)
@@ -1070,7 +1221,7 @@ def _run_finetune_job():
     try:
         settings = load_settings()
         reviews = load_reviews()
-        approved = [r for r in reviews if r.get("reply_status") == "approved" and r.get("ai_reply")]
+        approved = [r for r in reviews if r.get("reply_status") == "approved" and r.get("ai_reply") and not r.get("sensitive_flags")]
         if len(approved) < 10:
             _log(f"파인튜닝 스킵: 승인 답변 {len(approved)}개 (최소 10개 필요)")
             return
@@ -1127,7 +1278,7 @@ def maybe_auto_finetune():
             return
 
     reviews = load_reviews()
-    current_approved = sum(1 for r in reviews if r.get("reply_status") == "approved" and r.get("ai_reply"))
+    current_approved = sum(1 for r in reviews if r.get("reply_status") == "approved" and r.get("ai_reply") and not r.get("sensitive_flags"))
     last_count = settings.get("finetune_last_count", 0)
 
     if current_approved - last_count < threshold:
@@ -1149,7 +1300,7 @@ def finetune_status():
     reviews = load_reviews()
     training_count = sum(
         1 for r in reviews
-        if r.get("reply_status") == "approved" and r.get("ai_reply")
+        if r.get("reply_status") == "approved" and r.get("ai_reply") and not r.get("sensitive_flags")
     )
     result = {
         "training_count": training_count,
@@ -1194,7 +1345,7 @@ def finetune_start():
     if settings.get("finetune_job_id"):
         return jsonify({"error": "이미 진행 중인 파인튜닝이 있습니다."}), 400
     reviews = load_reviews()
-    approved_count = sum(1 for r in reviews if r.get("reply_status") == "approved" and r.get("ai_reply"))
+    approved_count = sum(1 for r in reviews if r.get("reply_status") == "approved" and r.get("ai_reply") and not r.get("sensitive_flags"))
     if approved_count < 10:
         return jsonify({"error": f"승인된 답변이 {approved_count}개입니다. 최소 10개 필요합니다."}), 400
     with _finetune_lock:

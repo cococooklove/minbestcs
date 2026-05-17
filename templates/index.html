@@ -11,27 +11,41 @@
   body { font-family: -apple-system, 'Noto Sans KR', sans-serif; background: #f5f6fa; color: #222; }
 
   header {
-    background: #03c75a; color: white;
-    padding: 14px 24px; display: flex; align-items: center; gap: 12px;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+    background: #fff; color: #202124;
+    padding: 12px 24px; display: flex; align-items: center; gap: 10px;
+    border-bottom: 1px solid #e8eaed;
   }
-  header h1 { font-size: 17px; font-weight: 700; }
-  .header-actions { margin-left: auto; display: flex; align-items: center; gap: 10px; }
+  header svg { fill: #03c75a; }
+  header h1 { font-size: 16px; font-weight: 700; color: #202124; }
+  .header-actions { margin-left: auto; display: flex; align-items: center; gap: 8px; }
   .btn-classify {
-    background: rgba(255,255,255,0.2); color: white; border: 1px solid rgba(255,255,255,0.4);
-    padding: 6px 14px; border-radius: 6px; font-size: 13px; cursor: pointer;
-    transition: background 0.15s;
+    background: #fff; color: #202124;
+    border: 1px solid #d5d8dc;
+    height: 32px; padding: 0 12px; border-radius: 4px;
+    font-size: 13px; cursor: pointer;
+    display: inline-flex; align-items: center; gap: 4px;
+    transition: background 0.15s, border-color 0.15s;
   }
-  .btn-classify:hover { background: rgba(255,255,255,0.35); }
-  .last-updated { font-size: 12px; opacity: 0.8; }
+  .btn-classify:hover { background: #f5f6f7; border-color: #b0b4b8; }
+  .session-remain {
+    font-size: 12px; color: #5f6368;
+    background: #f5f6f7; border: 1px solid #e3e5e8;
+    padding: 4px 10px; border-radius: 12px;
+    font-variant-numeric: tabular-nums;
+    display: inline-block;
+  }
+  .session-remain.warn { background: #fff8e1; border-color: #ffe082; color: #8a6d3b; }
+  .session-remain.danger { background: #fdecea; border-color: #f5c2c0; color: #b3261e; }
+  .session-remain.muted { background: #fafbfc; border-color: #e3e5e8; color: #80868b; }
   .btn-admin {
-    background: rgba(255,255,255,0.15); color: white;
-    border: 1px solid rgba(255,255,255,0.3);
-    padding: 6px 14px; border-radius: 6px; font-size: 13px; cursor: pointer;
-    transition: background 0.15s;
+    background: #fff; color: #5f6368;
+    border: 1px solid #d5d8dc;
+    height: 32px; padding: 0 12px; border-radius: 4px;
+    font-size: 13px; cursor: pointer;
+    transition: background 0.15s, border-color 0.15s;
   }
-  .btn-admin:hover { background: rgba(255,255,255,0.28); }
-  .btn-admin.active { background: rgba(255,255,255,0.35); }
+  .btn-admin:hover { background: #f5f6f7; border-color: #b0b4b8; }
+  .btn-admin.active { background: #e8f5ee; border-color: #03c75a; color: #03c75a; }
 
   /* 관리자 패널 */
   .admin-panel { display: none; padding: 24px; max-width: 800px; margin: 0 auto; }
@@ -315,81 +329,163 @@
   .coupon-flash { animation: couponFlash 1.4s ease-out; }
 
   .stats-bar {
-    background: white; border-bottom: 1px solid #e8e8e8;
-    padding: 12px 24px; display: flex; gap: 24px; flex-wrap: wrap; align-items: center;
+    background: #fff; border-bottom: 1px solid #e8eaed;
+    padding: 14px 24px; display: flex; gap: 0; flex-wrap: wrap; align-items: stretch;
   }
-  .stat { text-align: center; }
-  .stat .val { font-size: 20px; font-weight: 700; color: #03c75a; }
-  .stat .lbl { font-size: 11px; color: #888; margin-top: 2px; }
-  .stat.warn .val { color: #e53935; }
-  .stat.info .val { color: #1976d2; }
-  .refund-stat { border-radius: 8px; padding: 4px 8px; transition: background 0.15s; }
-  .refund-stat .val { color: #6a1b9a; }
-  .refund-stat:hover { background: #f3e5f5; }
-  .refund-stat.active { background: #ede7f6; outline: 2px solid #7b1fa2; }
+  .stat {
+    text-align: left; min-width: 76px;
+    padding: 2px 16px; border-right: 1px solid #f1f3f4;
+    display: flex; flex-direction: column; justify-content: center;
+  }
+  .stat:first-child { padding-left: 0; }
+  .stat.no-divider, .stat.last-stat { border-right: none; }
+  .stat .val {
+    font-size: 22px; font-weight: 700; color: #202124;
+    line-height: 1.2; letter-spacing: -0.3px;
+  }
+  .stat .lbl { font-size: 12px; color: #5f6368; margin-top: 2px; }
+  .stat.warn .val[data-nonzero="1"] { color: #d93025; }
+  .stat.warn[data-nonzero="1"] .lbl { color: #d93025; font-weight: 600; }
+  .refund-stat {
+    cursor: pointer; border-radius: 4px;
+    padding: 4px 24px 4px 16px;
+    transition: background 0.15s;
+    position: relative;
+  }
+  .refund-stat:hover { background: #f5f6f7; }
+  .refund-stat:hover::after {
+    content: '›'; position: absolute; right: 8px; top: 50%;
+    transform: translateY(-50%); color: #5f6368; font-size: 16px;
+  }
+  .refund-stat.active { background: #e8f5ee; border-right-color: transparent; }
+  .refund-stat.active .val { color: #03c75a; }
+  .refund-stat.active .lbl { color: #03c75a; }
 
+  .sentiment-card {
+    margin-left: auto; padding: 8px 14px;
+    border: 1px solid #e8eaed; border-radius: 6px;
+    background: #fafbfc; min-width: 240px;
+  }
+  .sentiment-card .sc-title {
+    font-size: 11px; color: #5f6368; font-weight: 600; margin-bottom: 6px;
+  }
   .sentiment-bar { display: flex; align-items: center; gap: 8px; }
-  .sbar { height: 8px; border-radius: 4px; min-width: 4px; transition: width 0.3s; }
+  .sbar-track {
+    flex: 1; height: 6px; border-radius: 3px; background: #f1f3f4;
+    display: flex; overflow: hidden;
+  }
+  .sbar { height: 6px; min-width: 0; transition: width 0.3s; }
   .sbar.pos { background: #03c75a; }
-  .sbar.neg { background: #e53935; }
-  .sbar.mix { background: #ff9800; }
-  .sbar-label { font-size: 11px; color: #666; }
+  .sbar.neg { background: #d93025; }
+  .sbar.mix { background: #f9ab00; }
+  .sbar-label { font-size: 11px; color: #5f6368; white-space: nowrap; }
+
+  #chart-section { background: #fff; border-bottom: 1px solid #e8eaed; }
+  .chart-toggle {
+    padding: 10px 24px; cursor: pointer;
+    display: flex; align-items: center; gap: 8px;
+    font-size: 13px; color: #5f6368; user-select: none;
+  }
+  .chart-toggle:hover { background: #fafbfc; }
+  .chart-toggle #chart-toggle-icon { font-size: 10px; color: #80868b; width: 10px; }
+  .chart-range-label { margin-left: 6px; font-size: 12px; color: #80868b; }
+  #chart-body { display: none; padding: 0 24px 16px; }
 
   .btn-classify-main {
-    padding: 7px 16px;
-    background: #03c75a; color: white; border: none;
-    border-radius: 6px; cursor: pointer;
+    height: 32px; padding: 0 14px;
+    background: #03c75a; color: #fff; border: none;
+    border-radius: 4px; cursor: pointer;
     font-size: 13px; font-weight: 700; white-space: nowrap;
-    box-shadow: 0 2px 6px rgba(3,199,90,0.25);
-    transition: background 0.15s, box-shadow 0.15s;
+    display: inline-flex; align-items: center; gap: 4px;
+    transition: background 0.15s;
   }
-  .btn-classify-main:hover { background: #02b350; box-shadow: 0 3px 10px rgba(3,199,90,0.35); }
-  .btn-classify-main:disabled { background: #a8e6c5; box-shadow: none; cursor: not-allowed; }
+  .btn-classify-main:hover { background: #02b350; }
+  .btn-classify-main:disabled { background: #cbe9d6; cursor: not-allowed; }
 
   .btn-unanalyzed {
-    padding: 7px 14px;
+    height: 32px; padding: 0 12px;
     background: #fff; color: #03c75a;
-    border: 1.5px solid #03c75a;
-    border-radius: 6px; cursor: pointer;
-    font-size: 13px; font-weight: 700; white-space: nowrap;
-    transition: background 0.15s, color 0.15s;
+    border: 1px solid #03c75a;
+    border-radius: 4px; cursor: pointer;
+    font-size: 12px; font-weight: 700; white-space: nowrap;
+    display: inline-flex; align-items: center; gap: 4px;
+    transition: background 0.15s;
   }
   .btn-unanalyzed:hover { background: #f0faf4; }
-  .btn-unanalyzed:disabled { color: #aaa; border-color: #ddd; cursor: not-allowed; background: #fafafa; }
+  .btn-unanalyzed:disabled { color: #aaa; border-color: #e1e3e5; cursor: not-allowed; background: #fafbfc; }
 
   .controls {
-    padding: 12px 24px; display: flex; gap: 8px; flex-wrap: wrap; align-items: center;
-    background: white; border-bottom: 1px solid #e8e8e8;
-    position: sticky; top: 0; z-index: 10; box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+    padding: 12px 24px; display: flex; flex-direction: column; gap: 8px;
+    background: #fff; border-bottom: 1px solid #e8eaed;
+    position: sticky; top: 0; z-index: 10;
+  }
+  .ctrl-row {
+    display: flex; gap: 6px; flex-wrap: wrap; align-items: center;
+  }
+  .ctrl-row + .ctrl-row { padding-top: 8px; border-top: 1px solid #f1f3f4; }
+  .controls .ctrl-spacer { flex: 1 1 auto; }
+  .ctrl-label {
+    font-size: 12px; color: #80868b; font-weight: 600;
+    margin-right: 4px; white-space: nowrap;
   }
   .search-box {
-    width: 220px; flex: none; padding: 7px 12px;
-    border: 1px solid #ddd; border-radius: 6px; font-size: 14px; outline: none;
+    width: 240px; flex: none; height: 32px; padding: 0 12px;
+    border: 1px solid #d5d8dc; border-radius: 4px;
+    font-size: 13px; color: #202124; outline: none;
+    background: #fff;
+    transition: border-color 0.15s;
   }
+  .search-box::placeholder { color: #9aa0a6; }
   .search-box:focus { border-color: #03c75a; }
-  select {
-    padding: 7px 10px; border: 1px solid #ddd; border-radius: 6px;
-    font-size: 13px; background: white; cursor: pointer; outline: none;
+  .controls select {
+    height: 32px; padding: 0 28px 0 10px;
+    border: 1px solid #d5d8dc; border-radius: 4px;
+    font-size: 13px; color: #202124;
+    background: #fff url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath fill='none' stroke='%235f6368' stroke-width='1.5' d='M1 1l4 4 4-4'/%3E%3C/svg%3E") no-repeat right 10px center;
+    -webkit-appearance: none; -moz-appearance: none; appearance: none;
+    cursor: pointer; outline: none;
+    transition: border-color 0.15s;
   }
-  .filter-count { font-size: 13px; color: #666; margin-left: auto; }
+  .controls select:hover { border-color: #b0b4b8; }
+  .controls select:focus { border-color: #03c75a; }
+  .filter-count {
+    font-size: 13px; color: #5f6368; white-space: nowrap;
+    padding: 0 4px;
+  }
+  .filter-count strong { color: #202124; font-weight: 700; }
 
   .coupon-approve-box { margin-top: 6px; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
   .coupon-dropdown { position:absolute; top:100%; left:0; z-index:100; background:#fff; border:1px solid #ddd; border-radius:5px; box-shadow:0 2px 8px rgba(0,0,0,.15); min-width:230px; }
   .coupon-dropdown-item { padding:7px 12px; cursor:pointer; font-size:12px; white-space:nowrap; }
   .coupon-dropdown-item:hover { background:#f0f4ff; }
 
-  .date-filter-group { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; }
+  .date-filter-group {
+    display: inline-flex; align-items: center; gap: 0;
+    border: 1px solid #d5d8dc; border-radius: 4px; overflow: hidden;
+    background: #fff; height: 32px;
+  }
   .date-quick-btn {
-    padding: 5px 10px; border: 1px solid #ddd; border-radius: 6px;
-    background: #fff; font-size: 12px; cursor: pointer; color: #555; line-height: 1;
+    padding: 0 12px; height: 30px;
+    border: none; border-right: 1px solid #e8eaed;
+    background: #fff; font-size: 12px; cursor: pointer; color: #5f6368;
+    line-height: 1; transition: background 0.15s, color 0.15s;
   }
-  .date-quick-btn.active { background: #1a73e8; color: #fff; border-color: #1a73e8; }
-  .date-quick-btn:hover:not(.active) { border-color: #aaa; }
+  .date-quick-btn:hover:not(.active) { background: #f5f6f7; color: #202124; }
+  .date-quick-btn.active { background: #03c75a; color: #fff; }
+  .date-input-wrap {
+    display: inline-flex; align-items: center; gap: 4px;
+    padding: 0 8px; height: 30px;
+  }
   #date-from, #date-to {
-    border: 1px solid #ddd; border-radius: 6px; padding: 4px 6px;
-    font-size: 12px; color: #333; outline: none;
+    border: none; padding: 0; height: 28px;
+    font-size: 12px; color: #202124; outline: none;
+    background: transparent;
   }
-  #date-from:focus, #date-to:focus { border-color: #1a73e8; }
+  #date-from::-webkit-calendar-picker-indicator,
+  #date-to::-webkit-calendar-picker-indicator {
+    opacity: 0.55; cursor: pointer;
+  }
+  .date-sep { color: #9aa0a6; font-size: 12px; }
 
   .reviews-container { padding: 14px 24px; }
 
@@ -466,8 +562,15 @@
 
   .ai-reply-box {
     background: #fafafa; border: 1px solid #e8e8e8; border-radius: 6px;
-    padding: 10px 12px;
+    padding: 10px 12px; width: 100%;
   }
+  .ai-reply-box.ai-reply-empty {
+    background: #fafbfc; border-style: dashed; border-color: #d8dde2;
+  }
+  .ai-reply-box.ai-reply-empty .ai-reply-text {
+    background: transparent !important; color: #999; cursor: default;
+  }
+  .ai-reply-box.ai-reply-empty .ai-reply-actions { justify-content: center; }
   .ai-reply-text {
     width: 100%; border: none; background: transparent; font-size: 13px;
     font-family: inherit; color: #333; resize: none; min-height: 120px;
@@ -503,7 +606,7 @@
 
   /* 2컬럼 카드 */
   .card-body { display: flex; gap: 0; }
-  .card-left { width: 30%; min-width: 0; padding-right: 14px; border-right: 1px solid #f0f0f0; overflow: hidden; }
+  .card-left { width: 40%; min-width: 0; padding-right: 14px; border-right: 1px solid #f0f0f0; overflow: hidden; }
   .card-divider {
     width: 6px; flex-shrink: 0; cursor: col-resize;
     background: transparent; position: relative; margin: 0 -3px; z-index: 1;
@@ -515,14 +618,18 @@
     display: flex; flex-direction: column;
   }
   .card-right-section {
-    padding: 10px 0;
+    padding: 8px 0;
     border-bottom: 1px solid #f3f3f3;
+    display: flex; align-items: flex-start; gap: 10px;
   }
   .card-right-section:last-child { border-bottom: none; }
+  .card-right-section.section-stack { flex-direction: column; gap: 6px; }
   .card-right-label {
-    font-size: 10px; font-weight: 700; color: #bbb; text-transform: uppercase;
-    letter-spacing: .06em; margin-bottom: 6px;
+    font-size: 11px; font-weight: 700; color: #888;
+    flex: 0 0 56px; padding-top: 4px; line-height: 1.4;
   }
+  .card-right-section.section-stack .card-right-label { flex: none; padding-top: 0; margin-bottom: 2px; }
+  .card-right-content { flex: 1; min-width: 0; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
   .badge-coupon {
     display: inline-flex; align-items: center; gap: 4px;
     background: #fff8e1; color: #9e7a20; border: 1px solid #ffe082;
@@ -589,12 +696,12 @@
 <body>
 
 <header>
-  <svg width="22" height="22" viewBox="0 0 24 24" fill="white" style="cursor:pointer" onclick="goHome()"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 14.5v-9l6 4.5-6 4.5z"/></svg>
+  <svg width="22" height="22" viewBox="0 0 24 24" style="cursor:pointer" onclick="goHome()"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 14.5v-9l6 4.5-6 4.5z"/></svg>
   <h1 style="cursor:pointer" onclick="goHome()">스마트스토어 리뷰 관리</h1>
   <div class="header-actions">
-    <button class="btn-classify" id="btn-collect" onclick="runCollect()" style="background:rgba(255,255,255,.18)">로그인 및 리뷰 수집</button>
+    <span class="session-remain" id="session-remain" title="네이버 셀러센터 세션이 만료되기까지 남은 시간"></span>
+    <button class="btn-classify" id="btn-collect" onclick="runCollect()">로그인 및 리뷰 수집</button>
     <button class="btn-admin" id="btn-admin" onclick="toggleAdmin()">관리자</button>
-    <span class="last-updated" id="last-updated">-</span>
   </div>
 </header>
 
@@ -640,87 +747,97 @@
   <div class="stat"><div class="val" id="stat-total">-</div><div class="lbl">전체 리뷰</div></div>
   <div class="stat"><div class="val" id="stat-avg">-</div><div class="lbl">평균 별점</div></div>
   <div class="stat"><div class="val" id="stat-replied">-</div><div class="lbl">답글 완료</div></div>
-  <div class="stat warn"><div class="val" id="stat-report">-</div><div class="lbl">신고 가능</div></div>
+  <div class="stat warn" id="stat-report-card"><div class="val" id="stat-report">-</div><div class="lbl">신고 가능</div></div>
   <div class="stat info"><div class="val" id="stat-draft">-</div><div class="lbl">AI 초안 대기</div></div>
-  <div class="stat warn"><div class="val" id="stat-need-reply">-</div><div class="lbl">답변 생성 필요</div></div>
+  <div class="stat warn" id="stat-need-reply-card"><div class="val" id="stat-need-reply">-</div><div class="lbl">답변 생성 필요</div></div>
   <div class="stat refund-stat" id="stat-refund-card" onclick="quickFilterRefund()" title="클릭하여 환불 완료 리뷰만 보기"><div class="val" id="stat-refund">-</div><div class="lbl">환불 완료</div></div>
-  <div class="stat">
-    <div class="sbar-label" style="margin-bottom:4px;font-size:11px;color:#888">감성 분포</div>
+  <div class="sentiment-card">
+    <div class="sc-title">감성 분포</div>
     <div class="sentiment-bar" id="sentiment-bar"></div>
   </div>
 </div>
 
 <!-- 일별 리뷰 현황 차트 -->
-<div id="chart-section" style="background:white;border-bottom:1px solid #e8e8e8;">
-  <div onclick="toggleChart()" style="padding:10px 24px;cursor:pointer;display:flex;align-items:center;gap:8px;font-size:13px;color:#555;user-select:none;">
-    <span id="chart-toggle-icon">▶</span> 일별 리뷰 현황
-    <span style="margin-left:auto;display:flex;gap:8px;" onclick="event.stopPropagation()">
-      <button onclick="setChartRange(7)" id="chart-btn-7" style="font-size:12px;padding:3px 10px;border:1px solid #ddd;border-radius:4px;background:#03c75a;color:white;cursor:pointer;">7일</button>
-      <button onclick="setChartRange(30)" id="chart-btn-30" style="font-size:12px;padding:3px 10px;border:1px solid #ddd;border-radius:4px;background:white;color:#555;cursor:pointer;">30일</button>
-      <button onclick="setChartRange(0)" id="chart-btn-all" style="font-size:12px;padding:3px 10px;border:1px solid #ddd;border-radius:4px;background:white;color:#555;cursor:pointer;">전체</button>
-    </span>
+<div id="chart-section">
+  <div class="chart-toggle" onclick="toggleChart()">
+    <span id="chart-toggle-icon">▶</span>
+    <span>일별 리뷰 현황</span>
+    <span class="chart-range-label" id="chart-range-label"></span>
   </div>
-  <div id="chart-body" style="display:none;padding:0 24px 16px;">
+  <div id="chart-body">
     <canvas id="daily-chart" height="80"></canvas>
   </div>
 </div>
 
 <div class="controls">
-  <input class="search-box" type="text" id="search" placeholder="리뷰 내용, 상품명, 작성자, 주문번호 검색...">
-  <select id="filter-rating">
-    <option value="">별점 전체</option>
-    <option value="5">★ 5점</option>
-    <option value="4">★ 4점</option>
-    <option value="3">★ 3점</option>
-    <option value="2">★ 2점</option>
-    <option value="1">★ 1점</option>
-  </select>
-  <select id="filter-sentiment">
-    <option value="">감성 전체</option>
-    <option value="positive">긍정</option>
-    <option value="negative">부정</option>
-    <option value="mixed">혼합</option>
-  </select>
-  <select id="filter-topic">
-    <option value="">주제 전체</option>
-    <option value="효능">효능</option>
-    <option value="성분">성분</option>
-    <option value="포장">포장</option>
-    <option value="배송">배송</option>
-    <option value="가격">가격</option>
-    <option value="냄새/맛">냄새/맛</option>
-    <option value="복용편의">복용편의</option>
-  </select>
-  <select id="filter-replied">
-    <option value="">답글 전체</option>
-    <option value="yes">답글 완료</option>
-    <option value="no">미답글</option>
-  </select>
-  <select id="filter-reportable">
-    <option value="">신고 전체</option>
-    <option value="yes">신고 가능</option>
-  </select>
-  <select id="filter-refund">
-    <option value="">환불 전체</option>
-    <option value="completed">환불 완료</option>
-  </select>
-  <div class="date-filter-group" id="date-filter-group">
-    <button class="date-quick-btn active" id="dq-all" onclick="setDateQuick('all')">전체</button>
-    <button class="date-quick-btn" id="dq-30" onclick="setDateQuick('30')">30일</button>
-    <button class="date-quick-btn" id="dq-7" onclick="setDateQuick('7')">7일</button>
-    <input type="date" id="date-from" onchange="setDateCustom()">
-    <span style="color:#888;font-size:12px">~</span>
-    <input type="date" id="date-to" onchange="setDateCustom()">
+  <div class="ctrl-row">
+    <input class="search-box" type="text" id="search" placeholder="리뷰 내용, 상품명, 작성자, 주문번호">
+    <span class="ctrl-spacer"></span>
+    <span class="filter-count" id="filter-count"></span>
+    <button id="btn-run-unanalyzed" class="btn-unanalyzed" onclick="openClassifyModal()" disabled>미분석 확인 중...</button>
+    <button class="btn-classify-main" onclick="openClassifyModal()">✦ AI 분석</button>
   </div>
-  <select id="sort">
-    <option value="newest">최신순</option>
-    <option value="oldest">오래된순</option>
-    <option value="rating_high">별점 높은순</option>
-    <option value="rating_low">별점 낮은순</option>
-  </select>
-  <span class="filter-count" id="filter-count"></span>
-  <button id="btn-run-unanalyzed" class="btn-unanalyzed" onclick="openClassifyModal()" disabled>미분석 확인 중...</button>
-  <button class="btn-classify-main" onclick="openClassifyModal()">✦ AI 분석</button>
+  <div class="ctrl-row">
+    <span class="ctrl-label">필터</span>
+    <select id="filter-rating">
+      <option value="">별점 전체</option>
+      <option value="5">★ 5점</option>
+      <option value="4">★ 4점</option>
+      <option value="3">★ 3점</option>
+      <option value="2">★ 2점</option>
+      <option value="1">★ 1점</option>
+    </select>
+    <select id="filter-sentiment">
+      <option value="">감성 전체</option>
+      <option value="positive">긍정</option>
+      <option value="negative">부정</option>
+      <option value="mixed">혼합</option>
+    </select>
+    <select id="filter-topic">
+      <option value="">주제 전체</option>
+      <option value="효능">효능</option>
+      <option value="성분">성분</option>
+      <option value="포장">포장</option>
+      <option value="배송">배송</option>
+      <option value="가격">가격</option>
+      <option value="냄새/맛">냄새/맛</option>
+      <option value="복용편의">복용편의</option>
+    </select>
+    <select id="filter-replied">
+      <option value="">답글 전체</option>
+      <option value="yes">답글 완료</option>
+      <option value="no">미답글</option>
+    </select>
+    <select id="filter-reportable">
+      <option value="">신고 전체</option>
+      <option value="yes">신고 가능</option>
+    </select>
+    <select id="filter-refund">
+      <option value="">환불 전체</option>
+      <option value="completed">환불 완료</option>
+    </select>
+  </div>
+  <div class="ctrl-row">
+    <span class="ctrl-label">기간</span>
+    <div class="date-filter-group" id="date-filter-group">
+      <button class="date-quick-btn active" id="dq-all" onclick="setDateQuick('all')">전체</button>
+      <button class="date-quick-btn" id="dq-30" onclick="setDateQuick('30')">30일</button>
+      <button class="date-quick-btn" id="dq-7" onclick="setDateQuick('7')">7일</button>
+      <div class="date-input-wrap">
+        <input type="date" id="date-from" onchange="setDateCustom()">
+        <span class="date-sep">~</span>
+        <input type="date" id="date-to" onchange="setDateCustom()">
+      </div>
+    </div>
+    <span class="ctrl-spacer"></span>
+    <span class="ctrl-label">정렬</span>
+    <select id="sort">
+      <option value="newest">최신순</option>
+      <option value="oldest">오래된순</option>
+      <option value="rating_high">별점 높은순</option>
+      <option value="rating_low">별점 낮은순</option>
+    </select>
+  </div>
 </div>
 
 <div class="naver-popup-overlay" id="popup-overlay" onclick="overlayClick()"></div>
@@ -1119,6 +1236,7 @@ function setDateQuick(period) {
   document.getElementById('date-to').value   = _dateTo;
   currentPage = 1;
   fetchReviews();
+  if (typeof renderDailyChart === 'function') renderDailyChart();
 }
 
 function setDateCustom() {
@@ -1127,6 +1245,7 @@ function setDateCustom() {
   ['all','30','7'].forEach(k => document.getElementById('dq-'+k).classList.remove('active'));
   currentPage = 1;
   fetchReviews();
+  if (typeof renderDailyChart === 'function') renderDailyChart();
 }
 
 function starsHTML(rating) {
@@ -1230,19 +1349,13 @@ function renderReviews(reviews) {
         </div>
       </div>` : '';
 
-    // ── 우측: AI 분류 결과 ──
+    // ── AI 분류: 헤더에 inline 흡수 ──
     const hasAnalysis = r.sentiment || (r.topics && r.topics.length) || r.reportable;
-    const analysisSection = `
-      <div class="card-right-section">
-        <div class="card-right-label">AI 분류</div>
-        ${hasAnalysis ? `
-          <div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:${(r.topics||[]).length?'6px':'0'}">
-            ${r.sentiment ? sentimentBadge(r.sentiment) : ''}
-            ${r.reportable ? `<span class="badge badge-report">🚨 ${r.report_reason || '신고가능'}</span>` : ''}
-          </div>
-          ${(r.topics||[]).length ? `<div class="topic-chips">${r.topics.map(t=>`<span class="topic-chip">${t}</span>`).join('')}</div>` : ''}
-        ` : `<span class="no-analysis">미분류</span>`}
-      </div>`;
+    const analysisInline = hasAnalysis ? `
+      ${r.sentiment ? sentimentBadge(r.sentiment) : ''}
+      ${r.reportable ? `<span class="badge badge-report">🚨 ${r.report_reason || '신고가능'}</span>` : ''}
+      ${(r.topics||[]).map(t=>`<span class="topic-chip">${t}</span>`).join('')}
+    ` : '';
 
     // ── 우측: 환불 처리 (부정 리뷰만) ──
     let refundSection = '';
@@ -1251,17 +1364,15 @@ function renderReviews(reviews) {
       let refundBody = '';
       if (refundStatus === 'completed') {
         refundBody = `
-          <div style="display:flex;align-items:center;gap:6px">
-            <span style="font-size:12px;color:#6a1b9a">✓ 환불 완료</span>
-            <button class="btn-sm btn-ghost" style="font-size:11px" onclick="toggleRefund(${idx})">취소</button>
-          </div>`;
+          <span style="font-size:12px;color:#6a1b9a">✓ 환불 완료</span>
+          <button class="btn-sm btn-ghost" style="font-size:11px" onclick="toggleRefund(${idx})">취소</button>`;
       } else {
         refundBody = `<button class="btn-sm btn-purple" onclick="toggleRefund(${idx})">환불 완료</button>`;
       }
       refundSection = `
         <div class="card-right-section">
-          <div class="card-right-label">환불 처리</div>
-          ${refundBody}
+          <div class="card-right-label">환불</div>
+          <div class="card-right-content">${refundBody}</div>
         </div>`;
     }
 
@@ -1273,40 +1384,31 @@ function renderReviews(reviews) {
     if (couponStatus === 'approved') {
       const badges = coupons.map(c => `<span class="badge-coupon">${c.coupon}</span>`).join('');
       couponBody = `
-        <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
-          <span style="font-size:12px;color:#2e7d32">✓ 승인됨</span>
-          ${badges}
-          <button class="btn-sm btn-ghost" style="font-size:11px" onclick="revokeCoupon(${idx})">취소</button>
-        </div>`;
+        <span style="font-size:12px;color:#2e7d32">✓ 승인됨</span>
+        ${badges}
+        <button class="btn-sm btn-ghost" style="font-size:11px" onclick="revokeCoupon(${idx})">취소</button>`;
     } else if (couponStatus === 'manual') {
       couponBody = `
-        <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
-          <span class="badge-coupon badge-coupon-manual">✋ ${manualCouponName}</span>
-          <span style="font-size:11px;color:#888">수동발급</span>
-          <button class="btn-sm btn-ghost" style="font-size:11px" onclick="revokeCoupon(${idx})">취소</button>
-        </div>`;
+        <span class="badge-coupon badge-coupon-manual">✋ ${manualCouponName}</span>
+        <span style="font-size:11px;color:#888">수동발급</span>
+        <button class="btn-sm btn-ghost" style="font-size:11px" onclick="revokeCoupon(${idx})">취소</button>`;
     } else if (coupons.length) {
       const badges = coupons.map(c =>
         `<span class="badge-coupon${c.manual?' badge-coupon-manual':''}">${c.manual?'✋ ':' '}${c.coupon}</span>`
       ).join('');
       couponBody = `
-        <div class="coupon-list">${badges}</div>
-        <div class="coupon-approve-box">
-          <button class="btn-sm btn-green" onclick="approveCoupon(${idx})">쿠폰 승인</button>
-          <span style="color:#ccc;font-size:11px">|</span>
-          <button class="btn-sm btn-light-blue" onclick="manualCouponByAmount(${idx})">수동 발급</button>
-        </div>`;
+        ${badges}
+        <button class="btn-sm btn-green" onclick="approveCoupon(${idx})">승인</button>
+        <button class="btn-sm btn-light-blue" onclick="manualCouponByAmount(${idx})">수동 발급</button>`;
     } else {
       couponBody = `
-        <div class="coupon-approve-box">
-          <span class="no-analysis" style="margin-right:4px">해당 없음</span>
-          <button class="btn-sm btn-light-blue" onclick="manualCouponByAmount(${idx})">수동 발급</button>
-        </div>`;
+        <span class="no-analysis">해당 없음</span>
+        <button class="btn-sm btn-light-blue" onclick="manualCouponByAmount(${idx})">수동 발급</button>`;
     }
     const couponSection = `
       <div class="card-right-section">
-        <div class="card-right-label">쿠폰 발급</div>
-        ${couponBody}
+        <div class="card-right-label">쿠폰</div>
+        <div class="card-right-content">${couponBody}</div>
       </div>`;
 
     // ── 우측: 답변 ──
@@ -1329,7 +1431,7 @@ function renderReviews(reviews) {
       aiSection = `
         <div class="card-right-section">
           <div class="card-right-label">답변 상태</div>
-          <span class="badge badge-replied">✓ 답변완료</span>
+          <div class="card-right-content"><span class="badge badge-replied">✓ 답변완료</span></div>
         </div>`;
     } else if (r.reply_status === 'draft') {
       const hasPendingCoupon = (coupons.length > 0) && couponStatus === 'none';
@@ -1337,7 +1439,7 @@ function renderReviews(reviews) {
         ? `<button class="btn-sm btn-orange" onclick="approveAll(${idx})">쿠폰 + 답변 모두 승인</button>`
         : '';
       aiSection = `
-        <div class="card-right-section">
+        <div class="card-right-section section-stack">
           <div class="card-right-label">AI 답변 <span class="badge badge-draft">초안</span></div>
           <div class="ai-reply-box">
             <textarea class="ai-reply-text" id="reply-text-${idx}" data-idx="${idx}" oninput="autoResize(this)">${r.ai_reply || ''}</textarea>
@@ -1352,7 +1454,7 @@ function renderReviews(reviews) {
         </div>`;
     } else if (r.reply_status === 'approved') {
       aiSection = `
-        <div class="card-right-section">
+        <div class="card-right-section section-stack">
           <div class="card-right-label">AI 답변 <span class="badge badge-approved">승인됨</span></div>
           <div class="ai-reply-box">
             <textarea class="ai-reply-text" id="reply-text-${idx}" data-idx="${idx}" readonly oninput="autoResize(this)">${r.ai_reply || ''}</textarea>
@@ -1369,9 +1471,14 @@ function renderReviews(reviews) {
         </div>`;
     } else {
       aiSection = `
-        <div class="card-right-section">
+        <div class="card-right-section section-stack">
           <div class="card-right-label">AI 답변</div>
-          <button class="btn-sm btn-light-blue" onclick="generateReply(${idx}, this)">답변 작성</button>
+          <div class="ai-reply-box ai-reply-empty">
+            <textarea class="ai-reply-text" id="reply-text-${idx}" placeholder="아직 작성된 답변이 없습니다. 'AI로 작성' 버튼을 눌러 초안을 생성하세요." readonly></textarea>
+            <div class="ai-reply-actions">
+              <button class="btn-sm btn-light-blue" onclick="generateReply(${idx}, this)">✦ AI로 작성</button>
+            </div>
+          </div>
         </div>`;
     }
 
@@ -1379,13 +1486,13 @@ function renderReviews(reviews) {
       <div class="review-header">
         <div class="reviewer-avatar">${r.reviewer ? r.reviewer[0].toUpperCase() : '?'}</div>
         <div class="reviewer-info">
-          <div class="reviewer-name">${r.reviewer || '익명'} ${customerTypeBadge(r.customer_type)} ${repliedBadge} ${replyStatusBadge(r.reply_status)} <button class="btn-gift-tag ${r.customer_type==='gift'?'active':''}" onclick="tagGift(${idx},this)" title="선물 구매자 태그">🎁</button></div>
+          <div class="reviewer-name">${r.reviewer || '익명'} ${customerTypeBadge(r.customer_type)} ${repliedBadge} ${replyStatusBadge(r.reply_status)} <button class="btn-gift-tag ${r.customer_type==='gift'?'active':''}" onclick="tagGift(${idx},this)" title="선물 구매자 태그">🎁</button> ${analysisInline}</div>
           <div style="margin-top:3px">${starsHTML(r.rating)}</div>
           <div class="review-meta">${r.date || ''}</div>
         </div>
       </div>
       <div class="card-body" data-idx="${idx}">
-        <div class="card-left" style="width:${window._cardLeftPct||50}%">
+        <div class="card-left" style="width:${window._cardLeftPct||40}%">
           ${product}
           <div class="review-content">${r.content || '(내용 없음)'}</div>
           ${r.photo_url ? `<div class="review-photo"><img src="${r.photo_url}" loading="lazy" onclick="openPhoto('${r.photo_url}')"></div>` : ''}
@@ -1394,7 +1501,6 @@ function renderReviews(reviews) {
         </div>
         <div class="card-divider" onmousedown="startResize(event)"></div>
         <div class="card-right">
-          ${analysisSection}
           ${refundSection}
           ${couponSection}
           ${aiSection}
@@ -1409,24 +1515,37 @@ function renderReviews(reviews) {
 }
 
 function renderStats(stats) {
-  document.getElementById('stat-total').textContent = stats.total.toLocaleString();
+  const setVal = (id, n, alertWhenNonZero) => {
+    const el = document.getElementById(id);
+    el.textContent = (typeof n === 'number') ? n.toLocaleString() : (n || '-');
+    if (alertWhenNonZero) {
+      const nonzero = (typeof n === 'number' && n > 0) ? '1' : '0';
+      el.dataset.nonzero = nonzero;
+      const card = el.closest('.stat');
+      if (card) card.dataset.nonzero = nonzero;
+    }
+  };
+  setVal('stat-total', stats.total);
   document.getElementById('stat-avg').textContent = stats.avg_rating || '-';
-  document.getElementById('stat-replied').textContent = stats.replied_count.toLocaleString();
-  document.getElementById('stat-report').textContent = stats.reportable_count || 0;
-  document.getElementById('stat-draft').textContent = stats.draft_count || 0;
-  document.getElementById('stat-need-reply').textContent = stats.need_reply_count || 0;
-  document.getElementById('stat-refund').textContent = stats.refund_count || 0;
+  setVal('stat-replied', stats.replied_count);
+  setVal('stat-report', stats.reportable_count || 0, true);
+  setVal('stat-draft', stats.draft_count || 0);
+  setVal('stat-need-reply', stats.need_reply_count || 0, true);
+  setVal('stat-refund', stats.refund_count || 0);
   document.getElementById('stat-refund-card').classList.toggle('active', document.getElementById('filter-refund').value === 'completed');
-  document.getElementById('filter-count').textContent = `${stats.filtered.toLocaleString()}건`;
+  document.getElementById('filter-count').innerHTML = `<strong>${stats.filtered.toLocaleString()}</strong>건`;
 
   const sd = stats.sentiment_dist || {};
-  const total = (sd.positive||0) + (sd.negative||0) + (sd.mixed||0) || 1;
-  const pct = v => Math.max(Math.round(v/total*100), 2);
+  const pos = sd.positive||0, neg = sd.negative||0, mix = sd.mixed||0;
+  const total = pos + neg + mix || 1;
+  const pct = v => (v/total*100).toFixed(1);
   document.getElementById('sentiment-bar').innerHTML = `
-    <span class="sbar pos" style="width:${pct(sd.positive||0)}px" title="긍정 ${sd.positive||0}"></span>
-    <span class="sbar neg" style="width:${pct(sd.negative||0)}px" title="부정 ${sd.negative||0}"></span>
-    <span class="sbar mix" style="width:${pct(sd.mixed||0)}px" title="혼합 ${sd.mixed||0}"></span>
-    <span class="sbar-label">긍정 ${sd.positive||0} / 부정 ${sd.negative||0} / 혼합 ${sd.mixed||0}</span>
+    <div class="sbar-track">
+      <div class="sbar pos" style="width:${pct(pos)}%" title="긍정 ${pos}"></div>
+      <div class="sbar mix" style="width:${pct(mix)}%" title="혼합 ${mix}"></div>
+      <div class="sbar neg" style="width:${pct(neg)}%" title="부정 ${neg}"></div>
+    </div>
+    <span class="sbar-label">긍 ${pos} · 부 ${neg} · 혼 ${mix}</span>
   `;
 }
 
@@ -1487,7 +1606,6 @@ function fetchReviews(onRendered) {
       renderReviews(data.reviews);
       renderPagination(data.pagination);
       container.style.minHeight = '';
-      document.getElementById('last-updated').textContent = new Date().toLocaleTimeString('ko-KR');
       _lastFetchTime = Date.now();
       if (onRendered) requestAnimationFrame(() => onRendered());
     })
@@ -1512,7 +1630,7 @@ function runCollect() {
   fetch('/api/collect', {
     method: 'POST',
     headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify(getNaverCreds()),
+    body: JSON.stringify({ ...getNaverCreds(), client_id: window.CLIENT_ID }),
   })
     .then(r => r.json())
     .then(data => {
@@ -2370,25 +2488,14 @@ function saveSettings(btn) {
 // ── 일별 리뷰 차트 ──
 let dailyChartInst = null;
 let chartOpen = false;
-let chartRange = 7;
 let allDates = [], allCounts = [];
 
 function toggleChart() {
   chartOpen = !chartOpen;
-  document.getElementById('chart-body').style.display = chartOpen ? '' : 'none';
+  document.getElementById('chart-body').style.display = chartOpen ? 'block' : 'none';
   document.getElementById('chart-toggle-icon').textContent = chartOpen ? '▼' : '▶';
   if (chartOpen && allDates.length === 0) loadDailyChart();
-}
-
-function setChartRange(days) {
-  chartRange = days;
-  ['7','30','all'].forEach(k => {
-    const el = document.getElementById(`chart-btn-${k}`);
-    const active = (days === 7 && k==='7') || (days === 30 && k==='30') || (days === 0 && k==='all');
-    el.style.background = active ? '#03c75a' : 'white';
-    el.style.color = active ? 'white' : '#555';
-  });
-  renderDailyChart();
+  else if (chartOpen) renderDailyChart();
 }
 
 function loadDailyChart() {
@@ -2400,10 +2507,21 @@ function loadDailyChart() {
 }
 
 function renderDailyChart() {
+  if (!chartOpen) return;
   let dates = allDates, counts = allCounts;
-  if (chartRange > 0 && dates.length > chartRange) {
-    dates = dates.slice(-chartRange);
-    counts = counts.slice(-chartRange);
+  // 필터 바 기간(_dateFrom/_dateTo)에 맞춰 차트 데이터 필터링
+  if (_dateFrom || _dateTo) {
+    const pairs = dates.map((d, i) => [d, counts[i]])
+      .filter(([d]) => (!_dateFrom || d >= _dateFrom) && (!_dateTo || d <= _dateTo));
+    dates = pairs.map(p => p[0]);
+    counts = pairs.map(p => p[1]);
+  }
+  const lbl = document.getElementById('chart-range-label');
+  if (lbl) {
+    if (_dateFrom && _dateTo) lbl.textContent = `· ${_dateFrom} ~ ${_dateTo}`;
+    else if (_dateFrom) lbl.textContent = `· ${_dateFrom} ~`;
+    else if (_dateTo) lbl.textContent = `· ~ ${_dateTo}`;
+    else lbl.textContent = `· 전체`;
   }
   const labels = dates.map(d => d.slice(5)); // MM-DD
   if (dailyChartInst) dailyChartInst.destroy();
@@ -2444,6 +2562,54 @@ fetch('/api/admin/config').then(r => r.json()).then(cfg => {
   loadUnanalyzedCount();
   setInterval(fetchReviews, 5 * 60 * 1000);
 });
+
+// 클라이언트 식별자 (브라우저별 localStorage) — 멀티 클라이언트 세션 분리용
+function getClientId() {
+  let id = localStorage.getItem('client_id');
+  if (!id) {
+    id = (window.crypto && crypto.randomUUID && crypto.randomUUID()) ||
+         (Date.now().toString(36) + Math.random().toString(36).slice(2, 10));
+    localStorage.setItem('client_id', id);
+  }
+  return id;
+}
+window.CLIENT_ID = getClientId();
+
+// 세션 남은 시간 표시
+let _sessionExpiresAt = null;
+let _sessionLoggedIn = false;
+function _setSessionBadge(text, cls) {
+  const el = document.getElementById('session-remain');
+  if (!el) return;
+  el.textContent = text;
+  el.classList.remove('warn', 'danger', 'muted');
+  if (cls) el.classList.add(cls);
+  el.style.display = 'inline-block';
+}
+function renderSessionRemain() {
+  if (!_sessionLoggedIn) { _setSessionBadge('로그인 필요', 'danger'); return; }
+  if (!_sessionExpiresAt) { _setSessionBadge('세션 정보 없음', 'muted'); return; }
+  const remain = Math.floor(_sessionExpiresAt - Date.now() / 1000);
+  if (remain <= 0) { _setSessionBadge('세션 만료', 'danger'); return; }
+  const h = Math.floor(remain / 3600);
+  const m = Math.floor((remain % 3600) / 60);
+  const s = remain % 60;
+  const pad = n => String(n).padStart(2, '0');
+  const label = h > 0 ? `${h}시간 ${pad(m)}분` : `${m}:${pad(s)}`;
+  const cls = remain < 600 ? 'danger' : (remain < 3600 ? 'warn' : null);
+  _setSessionBadge(`세션 남음 ${label}`, cls);
+}
+function refreshSession() {
+  fetch('/api/login/status?client_id=' + encodeURIComponent(window.CLIENT_ID))
+    .then(r => r.json()).then(d => {
+      _sessionLoggedIn = !!d.logged_in;
+      _sessionExpiresAt = d.expires_at || null;
+      renderSessionRemain();
+    }).catch(() => {});
+}
+refreshSession();
+setInterval(refreshSession, 30 * 1000);
+setInterval(renderSessionRemain, 1000);
 
 
 function tagGift(idx, btn) {
