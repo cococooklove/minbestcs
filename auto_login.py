@@ -197,11 +197,11 @@ def _make_popup_minimal(popup, width: int = 400, height: int = 480) -> None:
 
 
 def _extract_qr_data(popup) -> dict:
-    """popup에서 QR 이미지(canvas/img) + 남은시간 + 인증번호를 추출.
+    """popup에서 QR 이미지 + 안내문 이미지(네이버 원본) + 남은시간 + 인증번호 추출.
 
-    Returns: {"qr_image": bytes|None, "time_left": str|None, "code": str|None}
+    Returns: {"qr_image": bytes|None, "guide_image": bytes|None, "time_left": str|None, "code": str|None}
     """
-    data = {"qr_image": None, "time_left": None, "code": None}
+    data = {"qr_image": None, "guide_image": None, "time_left": None, "code": None}
 
     # QR 이미지 — canvas 우선, 없으면 img
     for sel in ("canvas", "img[src*='qr' i]", "img[alt*='QR' i]", "[class*='qr'] canvas", "[class*='qr'] img"):
@@ -216,6 +216,32 @@ def _extract_qr_data(popup) -> dict:
             break
         except Exception:
             continue
+
+    # 안내문 영역 — "네이버 앱"/"렌즈" 텍스트 포함하는 가장 안쪽 컨테이너의 bounding box
+    try:
+        guide_box = popup.evaluate(
+            r"""() => {
+                const elems = document.querySelectorAll('div, p, ul, section');
+                let best = null;
+                let bestArea = Infinity;
+                for (const el of elems) {
+                    const t = el.innerText || '';
+                    if (!t.includes('네이버 앱') || !t.includes('렌즈')) continue;
+                    const r = el.getBoundingClientRect();
+                    if (r.width < 50 || r.height < 30) continue;
+                    const area = r.width * r.height;
+                    if (area < bestArea) { best = r; bestArea = area; }
+                }
+                if (!best) return null;
+                // 약간의 여백
+                return {x: Math.max(0, best.left - 4), y: Math.max(0, best.top - 4),
+                        width: best.width + 8, height: best.height + 8};
+            }"""
+        )
+        if guide_box and guide_box.get("width", 0) > 50:
+            data["guide_image"] = popup.screenshot(clip=guide_box)
+    except Exception as e:
+        print(f"[auto_login.qr] 안내문 영역 캡처 실패: {e}")
 
     # 남은시간 + 인증번호 텍스트
     try:

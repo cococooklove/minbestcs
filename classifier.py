@@ -11,6 +11,9 @@ load_dotenv()
 
 REVIEWS_FILE = "data/reviews.json"
 _days = 365  # 기본값, __main__에서 오버라이드
+_date_from = None  # YYYY-MM-DD, 지정 시 _days 무시
+_date_to = None    # YYYY-MM-DD
+_reanalyze = False # True 시 이미 분석된(미답변) 리뷰도 재분석
 PROGRESS_FILE = "data/classify_progress.json"
 BRAND_TONE_FILE = "config/brand_tone.txt"
 SETTINGS_FILE = "config/settings.json"
@@ -215,10 +218,22 @@ def process_batch():
     report_criteria = settings.get("report_criteria", ["욕설", "경쟁사 언급", "광고성", "반복 내용"])
     auto_generate = settings.get("auto_generate_reply", False)
 
-    cutoff = (datetime.now() - timedelta(days=_days)).strftime("%Y-%m-%d") if _days > 0 else None
-    unclassified = [i for i, r in enumerate(reviews)
-                    if r.get("sentiment") is None and not r.get("replied")
-                    and (cutoff is None or r.get("date", "") >= cutoff)]
+    if _date_from or _date_to:
+        df = _date_from or "0000-00-00"
+        dt = _date_to or "9999-99-99"
+        in_range = lambda r: df <= r.get("date", "") <= dt
+    else:
+        cutoff = (datetime.now() - timedelta(days=_days)).strftime("%Y-%m-%d") if _days > 0 else None
+        in_range = lambda r: cutoff is None or r.get("date", "") >= cutoff
+
+    def needs_classify(r):
+        if r.get("replied"):
+            return False
+        if _reanalyze:
+            return True
+        return r.get("sentiment") is None
+
+    unclassified = [i for i, r in enumerate(reviews) if needs_classify(r) and in_range(r)]
     total = len(unclassified)
     print(f"미분류 리뷰: {total}건")
     write_progress(0, total, "시작 중")
@@ -288,6 +303,12 @@ def process_batch():
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--days", type=int, default=365, help="최근 N일 리뷰만 분류 (0=전체)")
+    parser.add_argument("--date-from", type=str, default=None, help="시작일 YYYY-MM-DD (지정 시 --days 무시)")
+    parser.add_argument("--date-to", type=str, default=None, help="종료일 YYYY-MM-DD")
+    parser.add_argument("--reanalyze", action="store_true", help="이미 분석된 리뷰(미답변)도 재분석")
     args = parser.parse_args()
     _days = args.days
+    _date_from = args.date_from
+    _date_to = args.date_to
+    _reanalyze = args.reanalyze
     process_batch()

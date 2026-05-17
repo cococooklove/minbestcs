@@ -567,14 +567,13 @@ def api_collect():
                 # popup에서 QR + 남은시간 + 인증번호 추출 → 우리 UI로 전송 (chromium 창 안 띄움)
                 import base64
                 def _on_qr(data):
+                    def _b64(b):
+                        if not b: return None
+                        return "data:image/png;base64," + base64.b64encode(b).decode("ascii")
                     try:
-                        img_bytes = data.get("qr_image")
-                        img_url = None
-                        if img_bytes:
-                            b64 = base64.b64encode(img_bytes).decode("ascii")
-                            img_url = f"data:image/png;base64,{b64}"
                         socketio.emit("login_qr", {
-                            "image": img_url,
+                            "image": _b64(data.get("qr_image")),
+                            "guide_image": _b64(data.get("guide_image")),
                             "time_left": data.get("time_left"),
                             "code": data.get("code"),
                         })
@@ -622,17 +621,42 @@ def api_classify_progress():
         return jsonify(json.load(f))
 
 
+def _needs_classify(r, reanalyze: bool) -> bool:
+    if r.get("replied"):
+        return False
+    if reanalyze:
+        return True
+    return r.get("sentiment") is None
+
+
 @app.route("/api/classify/count")
 def api_classify_count():
-    """기간별 미분류 리뷰 건수 반환"""
+    """기간별 미분류 리뷰 건수 반환.
+
+    - 쿼리 파라미터 없음: 사전정의 기간(30/90/180/365/전체)별 건수.
+    - date_from/date_to 지정: {"custom": N} 형태로 단일 건수.
+    - reanalyze=1: 이미 분석된(미답변) 리뷰까지 포함해 건수 산정.
+    """
     from datetime import datetime, timedelta
     reviews = load_reviews()
+    reanalyze = request.args.get("reanalyze") in ("1", "true", "True")
+    date_from = request.args.get("date_from")
+    date_to = request.args.get("date_to")
+
+    if date_from or date_to:
+        df = date_from or "0000-00-00"
+        dt = date_to or "9999-99-99"
+        count = sum(1 for r in reviews
+                    if _needs_classify(r, reanalyze)
+                    and df <= r.get("date", "") <= dt)
+        return jsonify({"custom": count})
+
     periods = {"30": 30, "90": 90, "180": 180, "365": 365, "0": 0}
     result = {}
     for key, days in periods.items():
         cutoff = (datetime.now() - timedelta(days=days)).strftime("%Y-%m-%d") if days > 0 else None
         count = sum(1 for r in reviews
-                    if r.get("sentiment") is None and not r.get("replied")
+                    if _needs_classify(r, reanalyze)
                     and (cutoff is None or r.get("date", "") >= cutoff))
         result[key] = count
     return jsonify(result)
@@ -642,9 +666,23 @@ def api_classify_count():
 def api_classify():
     """미분류 리뷰 일괄 분류"""
     data = request.get_json() or {}
-    days = str(data.get("days", 365))
-    _log(f"🤖 AI 분석 시작 ({days}일 기준)")
-    subprocess.Popen([sys.executable, "classifier.py", "--days", days], cwd=_base_dir)
+    date_from = data.get("date_from")
+    date_to = data.get("date_to")
+    reanalyze = bool(data.get("reanalyze", False))
+
+    cmd = [sys.executable, "classifier.py"]
+    if date_from or date_to:
+        if date_from: cmd += ["--date-from", date_from]
+        if date_to:   cmd += ["--date-to", date_to]
+        _log(f"🤖 AI 분석 시작 ({date_from or '처음'} ~ {date_to or '오늘'}{', 재분석' if reanalyze else ''})")
+    else:
+        days = str(data.get("days", 365))
+        cmd += ["--days", days]
+        _log(f"🤖 AI 분석 시작 ({days}일 기준{', 재분석' if reanalyze else ''})")
+    if reanalyze:
+        cmd.append("--reanalyze")
+
+    subprocess.Popen(cmd, cwd=_base_dir)
     mtime = os.path.getmtime(REVIEWS_FILE) if os.path.exists(REVIEWS_FILE) else 0
     return jsonify({"status": "started", "mtime": mtime})
 
