@@ -8,4 +8,4 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . .
 
-CMD ["sh", "-c", "gunicorn --worker-class eventlet -w 1 app:app --bind 0.0.0.0:$PORT --timeout 300"]
+CMD ["sh", "-c", "gunicorn --worker-class gthread --threads 8 -w 1 app:app --bind 0.0.0.0:$PORT --timeout 300"]
