@@ -8,3 +8,7 @@ __pycache__/
 *.pyc
 .DS_Store
 .env
+baselines/
+build/
+dist/
+release/
