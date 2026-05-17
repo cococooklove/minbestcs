@@ -892,13 +892,11 @@ def api_generate_reply(idx):
         client = OpenAI(api_key=api_key)
         brand_tone = load_brand_tone()
         settings_data = load_settings()
-        top_k = int(settings_data.get("rag_top_k", 3))
         examples = []
-        if top_k > 0:
-            try:
-                examples = rag.retrieve_similar(reviews[idx], client, top_k=top_k)
-            except Exception:
-                examples = []
+        try:
+            examples = rag.retrieve_similar(reviews[idx], client, top_k=3)
+        except Exception:
+            examples = []
         gen = generate_reply(reviews[idx], brand_tone, client, settings=settings_data, examples=examples)
         reply = gen.get("text", "") if isinstance(gen, dict) else (gen or "")
         sensitive_remaining = gen.get("sensitive_remaining", []) if isinstance(gen, dict) else []
@@ -1270,13 +1268,6 @@ def admin_config_post():
         s["sensitive_expressions"] = data["sensitive_expressions"]
     if "loyal_threshold" in data:
         s["loyal_threshold"] = int(data["loyal_threshold"])
-    if "rag_auto_index" in data:
-        s["rag_auto_index"] = bool(data["rag_auto_index"])
-    if "rag_top_k" in data:
-        try:
-            s["rag_top_k"] = max(0, min(10, int(data["rag_top_k"])))
-        except (TypeError, ValueError):
-            pass
     if "customer_type_hints" in data:
         s["customer_type_hints"] = data["customer_type_hints"]
     if "spelling_correction" in data:
@@ -1308,163 +1299,110 @@ def admin_brand_tone_post():
     return jsonify({"status": "ok"})
 
 
-_finetune_running = False
-_finetune_lock = threading.Lock()
+_rag_rebuilding = False
+_rag_lock = threading.Lock()
 
 
-def _run_finetune_job():
-    """백그라운드 파인튜닝 실행 (공통)"""
-    global _finetune_running
-    import io
+def _get_openai_client():
+    from openai import OpenAI
+    api_key = os.environ.get("OPENAI_API_KEY", load_settings().get("openai_api_key", ""))
+    return OpenAI(api_key=api_key)
+
+
+def _rag_upsert_async(review_snapshot: dict):
+    """승인된 리뷰를 RAG 인덱스에 비동기 upsert."""
     try:
-        settings = load_settings()
-        reviews = load_reviews()
-        approved = [r for r in reviews if r.get("reply_status") == "approved" and r.get("ai_reply") and not r.get("sensitive_flags")]
-        if len(approved) < 10:
-            _log(f"파인튜닝 스킵: 승인 답변 {len(approved)}개 (최소 10개 필요)")
+        if not (review_snapshot.get("ai_reply") and not review_snapshot.get("sensitive_flags")):
             return
-
-        brand_tone = ""
-        if os.path.exists(BRAND_TONE_FILE):
-            with open(BRAND_TONE_FILE, encoding="utf-8") as f:
-                brand_tone = f.read()
-
-        lines = []
-        for r in approved:
-            user_msg = f"리뷰 내용: {r.get('content', '')}\n별점: {r.get('rating', '')}점\n상품: {r.get('product', '')}"
-            entry = {
-                "messages": [
-                    {"role": "system", "content": f"당신은 건강기능식품 브랜드의 고객 담당자입니다.\n{brand_tone}\n답변만 출력하세요."},
-                    {"role": "user", "content": user_msg},
-                    {"role": "assistant", "content": r["ai_reply"]},
-                ]
-            }
-            lines.append(json.dumps(entry, ensure_ascii=False))
-        jsonl_bytes = "\n".join(lines).encode("utf-8")
-
-        from openai import OpenAI
-        api_key = os.environ.get("OPENAI_API_KEY", settings.get("openai_api_key", ""))
-        client = OpenAI(api_key=api_key)
-        file_obj = client.files.create(
-            file=("finetune_data.jsonl", io.BytesIO(jsonl_bytes), "application/json"),
-            purpose="fine-tune",
-        )
-        job = client.fine_tuning.jobs.create(training_file=file_obj.id, model="gpt-4o-mini")
-        settings = load_settings()
-        settings["finetune_job_id"] = job.id
-        settings["finetune_last_count"] = len(approved)
-        save_settings(settings)
-        _log(f"파인튜닝 시작: job_id={job.id}, 학습 데이터={len(approved)}개")
+        import rag
+        client = _get_openai_client()
+        ok = rag.upsert_review(review_snapshot, client)
+        if ok:
+            _log(f"RAG 인덱스 추가: review_id={(review_snapshot.get('review_id') or '')[:12]}")
     except Exception as e:
-        _log(f"파인튜닝 오류: {e}")
+        _log(f"RAG upsert 오류: {e}")
+
+
+def _run_rag_rebuild():
+    """전체 승인 답변으로 인덱스 재구축 (백그라운드)"""
+    global _rag_rebuilding
+    try:
+        import rag
+        reviews = load_reviews()
+        client = _get_openai_client()
+        count = rag.rebuild_index(reviews, client)
+        _log(f"RAG 인덱스 재구축 완료: {count}개")
+    except Exception as e:
+        _log(f"RAG 재구축 오류: {e}")
     finally:
-        global _finetune_running
-        _finetune_running = False
+        _rag_rebuilding = False
 
 
-def maybe_auto_finetune():
-    """승인 답변 누적 임계값 초과 시 자동 파인튜닝 트리거"""
-    global _finetune_running
-    settings = load_settings()
-    threshold = settings.get("finetune_auto_threshold", 0)
-    if not threshold:
-        return
-    if settings.get("finetune_job_id"):  # 진행 중인 job 있으면 스킵
-        return
-    with _finetune_lock:
-        if _finetune_running:
+def _rag_auto_recover():
+    """서버 기동 시 승인 답변 수와 인덱스 수가 어긋나면 백그라운드 재구축."""
+    global _rag_rebuilding
+    try:
+        import rag
+        reviews = load_reviews()
+        approved_count = sum(
+            1 for r in reviews
+            if r.get("reply_status") == "approved" and r.get("ai_reply") and not r.get("sensitive_flags")
+        )
+        indexed_count = rag.index_stats()["count"]
+        if approved_count == 0 or indexed_count >= approved_count:
             return
-
-    reviews = load_reviews()
-    current_approved = sum(1 for r in reviews if r.get("reply_status") == "approved" and r.get("ai_reply") and not r.get("sensitive_flags"))
-    last_count = settings.get("finetune_last_count", 0)
-
-    if current_approved - last_count < threshold:
-        return
-
-    with _finetune_lock:
-        if _finetune_running:
+        if not os.environ.get("OPENAI_API_KEY") and not load_settings().get("openai_api_key"):
             return
-        _finetune_running = True
+        with _rag_lock:
+            if _rag_rebuilding:
+                return
+            _rag_rebuilding = True
+        _log(f"RAG 자동 복구 시작: 승인 {approved_count}건 vs 인덱스 {indexed_count}건")
+        threading.Thread(target=_run_rag_rebuild, daemon=True).start()
+    except Exception as e:
+        _log(f"RAG 자동 복구 검사 오류: {e}")
 
-    _log(f"자동 파인튜닝 트리거: 승인 {current_approved}개 (이전 {last_count}개, 임계값 {threshold})")
-    threading.Thread(target=_run_finetune_job, daemon=True).start()
+
+@app.route("/api/admin/rag/status", methods=["GET"])
+def rag_status():
+    """RAG 인덱스 상태 조회 (표시 전용)"""
+    import rag
+    stats = rag.index_stats()
+    return jsonify({
+        "indexed_count": stats["count"],
+        "last_updated": stats["last_updated"],
+        "rebuilding": _rag_rebuilding,
+    })
 
 
-@app.route("/api/admin/finetune/status", methods=["GET"])
-def finetune_status():
-    """파인튜닝 상태 조회"""
-    settings = load_settings()
+@app.route("/api/admin/usage", methods=["GET"])
+def admin_usage():
+    """OpenAI API 사용량/비용 집계 (기본 7일, ?days=N 지원)"""
+    import usage_tracker
+    try:
+        days = max(1, min(90, int(request.args.get("days", 7))))
+    except (TypeError, ValueError):
+        days = 7
+    return jsonify(usage_tracker.summary(days=days))
+
+
+@app.route("/api/admin/rag/rebuild", methods=["POST"])
+def rag_rebuild():
+    """승인된 모든 답변으로 RAG 인덱스 재구축"""
+    global _rag_rebuilding
     reviews = load_reviews()
-    training_count = sum(
+    approved_count = sum(
         1 for r in reviews
         if r.get("reply_status") == "approved" and r.get("ai_reply") and not r.get("sensitive_flags")
     )
-    result = {
-        "training_count": training_count,
-        "active_model": f"review_v{settings.get('finetune_version', 0)}",
-        "job_id": settings.get("finetune_job_id", ""),
-        "job_status": "none",
-        "fine_tuned_model": "",
-    }
-    result["auto_threshold"] = settings.get("finetune_auto_threshold", 0)
-    result["last_count"] = settings.get("finetune_last_count", 0)
-    result["version"] = settings.get("finetune_version", 0)
-    job_id = settings.get("finetune_job_id", "")
-    if job_id:
-        try:
-            from openai import OpenAI
-            client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY", settings.get("openai_api_key", "")))
-            job = client.fine_tuning.jobs.retrieve(job_id)
-            result["job_status"] = job.status
-            result["fine_tuned_model"] = job.fine_tuned_model or ""
-            # 완료 시 자동 활성화 + 버전 증가
-            if job.status == "succeeded" and job.fine_tuned_model:
-                s = load_settings()
-                if s.get("active_model") != job.fine_tuned_model:
-                    s["active_model"] = job.fine_tuned_model
-                    s["finetune_job_id"] = ""
-                    s["finetune_version"] = s.get("finetune_version", 0) + 1
-                    save_settings(s)
-                    result["active_model"] = f"review_v{s['finetune_version']}"
-                    result["job_id"] = ""
-                    result["version"] = s["finetune_version"]
-                    _log(f"파인튜닝 완료 — 자동 전환: {job.fine_tuned_model} (review_v{s['finetune_version']})")
-        except Exception:
-            result["job_status"] = "error"
-    return jsonify(result)
-
-
-@app.route("/api/admin/finetune/start", methods=["POST"])
-def finetune_start():
-    """파인튜닝 수동 시작"""
-    global _finetune_running
-    settings = load_settings()
-    if settings.get("finetune_job_id"):
-        return jsonify({"error": "이미 진행 중인 파인튜닝이 있습니다."}), 400
-    reviews = load_reviews()
-    approved_count = sum(1 for r in reviews if r.get("reply_status") == "approved" and r.get("ai_reply") and not r.get("sensitive_flags"))
-    if approved_count < 10:
-        return jsonify({"error": f"승인된 답변이 {approved_count}개입니다. 최소 10개 필요합니다."}), 400
-    with _finetune_lock:
-        if _finetune_running:
-            return jsonify({"error": "이미 파인튜닝이 실행 중입니다."}), 400
-        _finetune_running = True
-    threading.Thread(target=_run_finetune_job, daemon=True).start()
-    return jsonify({"status": "started", "training_count": approved_count})
-
-
-@app.route("/api/admin/finetune/activate", methods=["POST"])
-def finetune_activate():
-    """파인튜닝 완료된 모델을 활성 모델로 전환"""
-    data = request.get_json() or {}
-    model_id = (data.get("model_id") or "").strip()
-    if not model_id:
-        return jsonify({"error": "model_id 필요"}), 400
-    settings = load_settings()
-    settings["active_model"] = model_id
-    save_settings(settings)
-    return jsonify({"status": "ok", "active_model": model_id})
+    if approved_count == 0:
+        return jsonify({"error": "승인된 답변이 없습니다. 먼저 답변을 승인해주세요."}), 400
+    with _rag_lock:
+        if _rag_rebuilding:
+            return jsonify({"error": "이미 재구축 중입니다."}), 400
+        _rag_rebuilding = True
+    threading.Thread(target=_run_rag_rebuild, daemon=True).start()
+    return jsonify({"status": "started", "approved_count": approved_count})
 
 
 # ── 답글 게시 동시성 관리 ──
@@ -1721,4 +1659,5 @@ def api_scrape_status():
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 8080))
     threading.Timer(1.5, lambda: webbrowser.open(f"http://localhost:{port}")).start()
+    threading.Timer(2.0, _rag_auto_recover).start()
     socketio.run(app, host="127.0.0.1", port=port, debug=False, allow_unsafe_werkzeug=True)

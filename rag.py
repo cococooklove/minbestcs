@@ -18,6 +18,7 @@ RAG (Retrieval-Augmented Generation) — 승인된 답변을 임베딩 인덱스
 """
 import json, os, math, hashlib, threading
 from datetime import datetime
+import usage_tracker
 
 RAG_INDEX_FILE = "data/rag_index.json"
 EMBED_MODEL = "text-embedding-3-small"
@@ -60,6 +61,7 @@ def _embed_input(review: dict) -> str:
 
 def embed_text(text: str, client) -> list:
     resp = client.embeddings.create(model=EMBED_MODEL, input=text)
+    usage_tracker.log(EMBED_MODEL, "embed", getattr(resp, "usage", None))
     return resp.data[0].embedding
 
 
@@ -67,6 +69,7 @@ def embed_batch(texts: list, client) -> list:
     if not texts:
         return []
     resp = client.embeddings.create(model=EMBED_MODEL, input=texts)
+    usage_tracker.log(EMBED_MODEL, "embed_batch", getattr(resp, "usage", None), meta={"batch_size": len(texts)})
     return [d.embedding for d in resp.data]
 
 

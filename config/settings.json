@@ -2,10 +2,6 @@
   "auto_reply": false,
   "auto_generate_reply": true,
   "active_model": "gpt-4o-mini",
-  "finetune_job_id": "",
-  "finetune_auto_threshold": 30,
-  "finetune_last_count": 0,
-  "finetune_version": 0,
   "report_criteria": [
     "욕설",
     "경쟁사 언급",
@@ -94,5 +90,6 @@
   ],
   "spelling_correction": true,
   "auto_retry_sensitive": true,
-  "skip_reportable_reply": false
+  "skip_reportable_reply": false,
+  "test_mode": false
 }

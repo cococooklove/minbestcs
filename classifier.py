@@ -7,6 +7,7 @@ import json, os, time, re, threading, argparse, unicodedata
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timedelta
 from dotenv import load_dotenv
+import usage_tracker
 load_dotenv()
 
 REVIEWS_FILE = "data/reviews.json"
@@ -75,6 +76,7 @@ def api_classify(review: dict, client, report_criteria: list = None,
                 temperature=0.1,
                 messages=[{"role": "user", "content": prompt}],
             )
+            usage_tracker.log("gpt-4o-mini", "classify_with_reply" if include_reply else "classify", getattr(resp, "usage", None))
             text = resp.choices[0].message.content.strip()
             match = re.search(r'\{.*\}', text, re.DOTALL)
             if match:
@@ -227,6 +229,7 @@ def generate_reply(review: dict, brand_tone: str, client, settings: dict = None,
                     temperature=0.4,
                     messages=messages,
                 )
+                usage_tracker.log(model, "reply", getattr(resp, "usage", None))
                 return resp.choices[0].message.content.strip()
             except Exception as e:
                 if "rate_limit" in str(e).lower() or "429" in str(e) and attempt == 0:

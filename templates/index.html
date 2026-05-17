@@ -247,6 +247,28 @@
   .coupon-rule-input:focus { border-color: #03c75a; box-shadow: 0 0 0 3px rgba(3,199,90,.08); }
   .coupon-rule-input:disabled { background: #fafafa; color: #ccc; }
 
+  /* 사용량 패널 */
+  .usage-stat {
+    background: #fafbfc; border: 1px solid #eef0f2; border-radius: 8px;
+    padding: 12px 14px;
+  }
+  .usage-stat-label { font-size: 11px; font-weight: 600; color: #888; text-transform: uppercase; letter-spacing: .04em; margin-bottom: 6px; }
+  .usage-stat-value { font-size: 20px; font-weight: 700; color: #222; line-height: 1.2; }
+  .usage-stat-sub   { font-size: 11px; color: #888; margin-top: 3px; }
+  .usage-table {
+    width: 100%; border-collapse: collapse; font-size: 12px;
+  }
+  .usage-table th {
+    background: #f7f8f9; color: #666; font-weight: 600; padding: 6px 8px;
+    text-align: left; border-bottom: 1px solid #e8e8e8;
+  }
+  .usage-table td {
+    padding: 6px 8px; border-bottom: 1px solid #f3f3f3; color: #333;
+  }
+  .usage-table tr:last-child td { border-bottom: none; }
+  .usage-table td.num { text-align: right; font-variant-numeric: tabular-nums; }
+  .usage-table td.zero { color: #ccc; }
+
   /* 토글 종속 그룹 (자동화 토글 계층화) */
   .toggle-children {
     margin-top: 10px;
@@ -1001,7 +1023,7 @@
 
 <!-- 일괄 게시 모달 -->
 <div id="bulk-post-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:9998;" onclick="closeBulkPostModal()"></div>
-<div id="bulk-post-modal" style="display:none;position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:#fff;border-radius:14px;box-shadow:0 8px 32px rgba(0,0,0,.18);z-index:9999;width:480px;max-height:80vh;padding:24px;font-family:-apple-system,'Malgun Gothic',sans-serif;display:flex;flex-direction:column;">
+<div id="bulk-post-modal" style="display:none;position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:#fff;border-radius:14px;box-shadow:0 8px 32px rgba(0,0,0,.18);z-index:9999;width:480px;max-height:80vh;padding:24px;font-family:-apple-system,'Malgun Gothic',sans-serif;flex-direction:column;">
   <div style="font-size:15px;font-weight:700;color:#222;margin-bottom:4px;">스토어에 일괄 게시</div>
   <div id="bulk-post-summary" style="font-size:12px;color:#666;margin-bottom:14px;">대상을 불러오는 중…</div>
   <div id="bulk-post-list" style="flex:1;overflow-y:auto;border:1px solid #eee;border-radius:8px;padding:8px;font-size:12px;color:#333;min-height:120px;max-height:300px;"></div>
@@ -1023,7 +1045,7 @@
 
 <!-- 일괄 게시 결과 모달 -->
 <div id="bulk-result-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:9998;" onclick="closeBulkResultModal()"></div>
-<div id="bulk-result-modal" style="display:none;position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:#fff;border-radius:14px;box-shadow:0 8px 32px rgba(0,0,0,.18);z-index:9999;width:460px;max-height:80vh;padding:24px;font-family:-apple-system,'Malgun Gothic',sans-serif;display:flex;flex-direction:column;">
+<div id="bulk-result-modal" style="display:none;position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:#fff;border-radius:14px;box-shadow:0 8px 32px rgba(0,0,0,.18);z-index:9999;width:460px;max-height:80vh;padding:24px;font-family:-apple-system,'Malgun Gothic',sans-serif;flex-direction:column;">
   <div style="font-size:15px;font-weight:700;color:#222;margin-bottom:6px;">일괄 게시 결과</div>
   <div id="bulk-result-summary" style="font-size:13px;color:#444;margin-bottom:10px;"></div>
   <div id="bulk-result-failures" style="flex:1;overflow-y:auto;font-size:12px;"></div>
@@ -1055,24 +1077,22 @@
     </div>
   </div>
 
-  <!-- 파인튜닝 관리 -->
+  <!-- 리뷰 AI -->
   <div class="admin-section">
-    <div class="admin-section-title">🤖 파인튜닝 관리</div>
-    <div style="font-size:12px;color:#888;margin-bottom:16px">승인된 답변이 N개 누적될 때마다 자동으로 AI를 재학습합니다. 완료 시 자동으로 새 버전으로 전환됩니다.</div>
+    <div class="admin-section-title">🤖 리뷰 AI</div>
+    <div style="font-size:12px;color:#888;margin-bottom:16px">승인하신 답변 스타일을 자동으로 학습해 다음 답변에 반영합니다.</div>
 
-    <!-- 개인화 리뷰 AI 상태 카드 -->
     <div class="ft-ai-card" id="ft-ai-card">
       <div class="ft-ai-inner">
         <div class="ft-ai-header">
-          <div class="ft-ai-icon">🧠</div>
+          <div class="ft-ai-icon">🤖</div>
           <div>
-            <div class="ft-ai-name">개인화 리뷰 AI</div>
+            <div class="ft-ai-name">리뷰 AI</div>
             <div class="ft-ai-subtitle" id="ft-ai-subtitle">대기 중</div>
           </div>
           <div class="ft-ai-badge ft-badge-ready" id="ft-ai-badge">준비 완료</div>
         </div>
 
-        <!-- 학습 중 애니메이션 -->
         <div id="ft-training-anim">
           <div style="display:flex;align-items:center;gap:14px">
             <div class="ft-wave">
@@ -1081,35 +1101,54 @@
               <span class="bar"></span><span class="bar"></span>
             </div>
             <div style="color:#ccc;font-size:12px;line-height:1.5">
-              리뷰 패턴을 학습하는 중입니다<span class="ft-loading-dots"><span>.</span><span>.</span><span>.</span></span><br>
+              승인 답변을 학습 중입니다<span class="ft-loading-dots"><span>.</span><span>.</span><span>.</span></span><br>
               <span id="ft-job-status" style="font-size:11px;color:#8899aa"></span>
             </div>
           </div>
         </div>
       </div>
     </div>
+  </div>
 
-    <div style="display:flex;flex-direction:column;gap:10px">
-      <div style="display:flex;align-items:center;gap:12px;font-size:13px">
-        <span style="color:#555;width:120px;flex-shrink:0">자동 학습 주기</span>
-        <input type="number" id="ft-threshold" min="0" step="10"
-          style="width:70px;padding:4px 8px;border:1px solid #e0e0e0;border-radius:5px;font-size:13px"
-          oninput="enableSave('btn-ft-save')">
-        <span style="color:#888">개마다 자동 실행 (0 = 비활성)</span>
+  <!-- OpenAI 사용량/비용 -->
+  <div class="admin-section">
+    <div class="admin-section-title">
+      💰 AI 사용량 · 비용
+      <select id="usage-range" onchange="loadUsageStats()" style="margin-left:auto; padding:4px 8px; border:1px solid #e0e0e0; border-radius:6px; font-size:12px; color:#444; background:white; cursor:pointer;">
+        <option value="7" selected>최근 7일</option>
+        <option value="14">최근 14일</option>
+        <option value="30">최근 30일</option>
+        <option value="90">최근 90일</option>
+      </select>
+    </div>
+
+    <div id="usage-summary-grid" style="display:grid; grid-template-columns:repeat(4,1fr); gap:10px; margin-bottom:14px;">
+      <div class="usage-stat">
+        <div class="usage-stat-label">총 호출</div>
+        <div class="usage-stat-value" id="usage-total-calls">—</div>
       </div>
-      <div style="display:flex;align-items:center;gap:12px;font-size:13px">
-        <span style="color:#555;width:120px;flex-shrink:0">학습 데이터</span>
-        <span id="ft-training-count" style="font-weight:600">-</span>
-        <span style="color:#888">개 승인 완료 &nbsp;|&nbsp; 이전 학습 후 <span id="ft-new-count" style="font-weight:600;color:#1565c0">-</span>개 추가됨</span>
+      <div class="usage-stat">
+        <div class="usage-stat-label">입력 토큰</div>
+        <div class="usage-stat-value" id="usage-total-input">—</div>
+      </div>
+      <div class="usage-stat">
+        <div class="usage-stat-label">출력 토큰</div>
+        <div class="usage-stat-value" id="usage-total-output">—</div>
+      </div>
+      <div class="usage-stat">
+        <div class="usage-stat-label">총 비용</div>
+        <div class="usage-stat-value" id="usage-total-cost">—</div>
+        <div class="usage-stat-sub" id="usage-total-cost-krw"></div>
       </div>
     </div>
 
-    <div class="admin-footer" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-      <button class="btn-save" id="btn-ft-save" onclick="saveFinetuneThreshold(this)" disabled>저장됨</button>
-      <button class="btn-save" id="btn-ft-refresh" onclick="refreshFinetuneStatus()"
-        style="background:#555;color:#fff;opacity:1;cursor:pointer">상태 새로고침</button>
-      <button class="btn-save" id="btn-ft-start" onclick="startFinetune(this)"
-        style="background:#1565c0;color:#fff;opacity:1;cursor:pointer">지금 바로 학습</button>
+    <div class="admin-label">일별 비용</div>
+    <table class="usage-table">
+      <thead><tr><th>날짜</th><th style="text-align:right">호출</th><th style="text-align:right">토큰</th><th style="text-align:right">비용</th></tr></thead>
+      <tbody id="usage-daily-body"><tr><td colspan="4" style="color:#aaa; text-align:center; padding:14px">로딩 중…</td></tr></tbody>
+    </table>
+    <div style="margin-top:10px; font-size:11px; color:#aaa">
+      ※ 호출별 입출력 토큰 × 모델 가격으로 추정한 값. 실제 청구액은 제공자 대시보드 기준.
     </div>
   </div>
 
@@ -2623,69 +2662,33 @@ function toggleAdmin() {
   if (adminOpen) loadAdminData();
 }
 
-function loadFinetuneStatus() {
-  fetch('/api/admin/finetune/status').then(r => r.json()).then(d => {
-    document.getElementById('ft-training-count').textContent = d.training_count ?? '-';
-
-    const newCount = (d.training_count ?? 0) - (d.last_count ?? 0);
-    document.getElementById('ft-new-count').textContent = Math.max(0, newCount);
-
-    const thresholdEl = document.getElementById('ft-threshold');
-    if (thresholdEl && thresholdEl.dataset.loaded !== '1') {
-      thresholdEl.value = d.auto_threshold ?? 0;
-      thresholdEl.dataset.loaded = '1';
-    }
-
-    const isTraining = !!(d.job_id && d.job_status === 'running');
+function loadRagStatus() {
+  fetch('/api/admin/rag/status').then(r => r.json()).then(d => {
     const card    = document.getElementById('ft-ai-card');
     const badge   = document.getElementById('ft-ai-badge');
     const subtitle = document.getElementById('ft-ai-subtitle');
-    const animEl  = document.getElementById('ft-training-anim');
     const jobEl   = document.getElementById('ft-job-status');
+    if (!card || !badge || !subtitle) return;
 
-    if (isTraining) {
+    if (d.rebuilding) {
       card.classList.add('training');
       badge.className = 'ft-ai-badge ft-badge-training';
       badge.textContent = '학습 중';
-      subtitle.textContent = '패턴 학습 진행 중';
+      subtitle.textContent = '승인 답변을 학습 중입니다';
       if (jobEl) jobEl.textContent = '';
     } else {
       card.classList.remove('training');
       badge.className = 'ft-ai-badge ft-badge-ready';
       badge.textContent = '준비 완료';
-      const subtitleMap = {succeeded:'최근 학습 완료 ✓', failed:'학습 실패 — 재시도 필요', cancelled:'학습 취소됨'};
-      subtitle.textContent = (d.job_status && subtitleMap[d.job_status]) || '대기 중';
+      if (d.indexed_count > 0) {
+        subtitle.textContent = `${d.indexed_count}건 학습됨${d.last_updated ? ' · 최근 ' + d.last_updated : ''}`;
+      } else {
+        subtitle.textContent = '아직 학습된 사례가 없습니다 — 답변을 승인하면 자동으로 추가됩니다';
+      }
       if (jobEl) jobEl.textContent = '';
     }
-  });
+  }).catch(() => {});
 }
-
-function saveFinetuneThreshold(btn) {
-  const val = parseInt(document.getElementById('ft-threshold').value) || 0;
-  fetch('/api/admin/config', {
-    method: 'POST',
-    headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify({finetune_auto_threshold: val}),
-  }).then(r => r.json()).then(d => {
-    if (d.status === 'ok') {
-      btn.textContent = '저장됨'; btn.disabled = true;
-    }
-  });
-}
-
-function startFinetune(btn) {
-  if (!confirm('승인된 답변 데이터로 지금 바로 파인튜닝을 시작합니다.\n백그라운드에서 실행되며 완료 시 자동으로 새 모델로 전환됩니다.')) return;
-  btn.disabled = true; btn.textContent = '시작 중...';
-  fetch('/api/admin/finetune/start', {method:'POST'})
-    .then(r => r.json()).then(d => {
-      btn.disabled = false; btn.textContent = '지금 바로 학습';
-      if (d.error) { alert(d.error); return; }
-      alert(`파인튜닝 시작! 백그라운드에서 학습 중입니다.\n"상태 새로고침"으로 진행 상황을 확인하세요.`);
-      loadFinetuneStatus();
-    });
-}
-
-function refreshFinetuneStatus() { loadFinetuneStatus(); }
 
 function loadAdminData() {
   Promise.all([
@@ -2732,7 +2735,53 @@ function loadAdminData() {
       if (el) el.value = hints[t] || '';
     });
   });
-  loadFinetuneStatus();
+  loadRagStatus();
+  loadUsageStats();
+}
+
+function _fmtNum(n) {
+  return (n || 0).toLocaleString('ko-KR');
+}
+function _fmtCost(usd) {
+  if (!usd) return '$0';
+  if (usd < 0.01) return '$' + usd.toFixed(4);
+  if (usd < 1)    return '$' + usd.toFixed(3);
+  return '$' + usd.toFixed(2);
+}
+function loadUsageStats() {
+  const days = parseInt(document.getElementById('usage-range').value || '7', 10);
+  fetch(`/api/admin/usage?days=${days}`)
+    .then(r => r.json())
+    .then(d => {
+      const t = d.total || {};
+      document.getElementById('usage-total-calls').textContent  = _fmtNum(t.calls);
+      document.getElementById('usage-total-input').textContent  = _fmtNum(t.input_tokens);
+      document.getElementById('usage-total-output').textContent = _fmtNum(t.output_tokens);
+      document.getElementById('usage-total-cost').textContent   = _fmtCost(t.cost_usd);
+      document.getElementById('usage-total-cost-krw').textContent =
+        t.cost_krw ? `≈ ₩${_fmtNum(t.cost_krw)}` : '';
+
+      const dayBody = document.getElementById('usage-daily-body');
+      if (!(d.by_day || []).length) {
+        dayBody.innerHTML = '<tr><td colspan="4" style="color:#aaa; text-align:center; padding:14px">데이터 없음</td></tr>';
+      } else {
+        dayBody.innerHTML = d.by_day.map(r => {
+          const tok = (r.input_tokens || 0) + (r.output_tokens || 0);
+          const zero = r.calls === 0 ? ' zero' : '';
+          return `<tr>
+            <td class="${zero}">${r.date.slice(5)}</td>
+            <td class="num${zero}">${_fmtNum(r.calls)}</td>
+            <td class="num${zero}">${_fmtNum(tok)}</td>
+            <td class="num${zero}">${_fmtCost(r.cost_usd)}</td>
+          </tr>`;
+        }).join('');
+      }
+
+    })
+    .catch(() => {
+      document.getElementById('usage-daily-body').innerHTML =
+        '<tr><td colspan="4" style="color:#e53935; text-align:center; padding:14px">로드 실패</td></tr>';
+    });
 }
 
 function toggleAutoGenerate() {
