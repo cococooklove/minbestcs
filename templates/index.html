@@ -247,6 +247,48 @@
   .coupon-rule-input:focus { border-color: #03c75a; box-shadow: 0 0 0 3px rgba(3,199,90,.08); }
   .coupon-rule-input:disabled { background: #fafafa; color: #ccc; }
 
+  /* 토글 종속 그룹 (자동화 토글 계층화) */
+  .toggle-children {
+    margin-top: 10px;
+    padding: 4px 0 4px 14px;
+    border-left: 3px solid #e8e8e8;
+    background: #fafbfc;
+    border-radius: 0 6px 6px 0;
+    transition: opacity 0.2s;
+  }
+  .toggle-children .admin-row { padding: 9px 12px; }
+  .toggle-children > div:last-child { padding-bottom: 10px; }
+  .toggle-children-notice {
+    display: none;
+    font-size: 12px; color: #888;
+    padding: 8px 12px; background: #fff8e1;
+    border: 1px solid #ffe082; border-radius: 6px;
+    margin: 8px 0 4px;
+  }
+  .toggle-children.is-disabled { opacity: 0.45; pointer-events: none; }
+  .toggle-children.is-disabled + .toggle-children-notice { display: block; }
+  .toggle-master { background: #f7faf8; border-radius: 8px; padding: 12px 14px; }
+  .toggle-independent { margin-top: 14px; padding-top: 14px; border-top: 1px dashed #e8e8e8; }
+
+  /* 쿠폰 규칙 2단 그리드 */
+  .coupon-rule-v2 {
+    padding: 12px 0;
+    border-bottom: 1px solid #f5f5f5;
+  }
+  .coupon-rule-v2:last-child { border-bottom: none; }
+  .coupon-rule-v2-head {
+    display: flex; align-items: center; gap: 10px; margin-bottom: 8px;
+  }
+  .coupon-rule-v2-label { font-size: 13px; color: #333; font-weight: 600; }
+  .coupon-rule-v2-inputs {
+    display: grid;
+    grid-template-columns: 1fr 140px 170px;
+    gap: 8px;
+    padding-left: 50px;
+  }
+  .coupon-rule-v2-inputs.manual { grid-template-columns: 1fr 120px 140px; }
+  .coupon-rule-v2-inputs .coupon-rule-input { width: 100%; }
+
   .btn-naver-login {
     display: flex; align-items: center; gap: 6px;
     background: white; color: #03c75a;
@@ -1076,47 +1118,60 @@
   <!-- 답변 설정 -->
   <div class="admin-section">
     <div class="admin-section-title">💬 답변 · 신고 설정</div>
-    <div class="admin-row">
+
+    <!-- 마스터 토글: 자동 답변 초안 생성 -->
+    <div class="admin-row toggle-master">
       <div>
         <div class="admin-row-label">AI 분석 시 자동 답변 초안 생성</div>
-        <div class="admin-row-sub">AI 분류 실행 시 답변 초안도 함께 생성</div>
+        <div class="admin-row-sub">AI 분류 실행 시 답변 초안도 함께 생성. 꺼두면 아래 옵션은 모두 적용되지 않습니다.</div>
       </div>
       <div class="toggle-wrap">
         <div class="toggle" id="toggle-auto-generate" onclick="toggleAutoGenerate(); enableSave('btn-save-settings')"></div>
         <span id="auto-generate-label" style="font-size:13px;color:#888;">OFF</span>
       </div>
     </div>
-    <div class="admin-row" style="margin-top:12px">
-      <div>
-        <div class="admin-row-label">AI 답변 맞춤법 · 띄어쓰기 교정</div>
-        <div class="admin-row-sub">AI가 답변 작성 시 올바른 맞춤법과 띄어쓰기를 사용하도록 지시</div>
+
+    <!-- 종속 옵션: 자동 답변 초안 생성이 켜져 있을 때만 의미 있음 -->
+    <div class="toggle-children" id="auto-generate-children">
+      <div class="admin-row">
+        <div>
+          <div class="admin-row-label">AI 답변 맞춤법 · 띄어쓰기 교정</div>
+          <div class="admin-row-sub">AI가 답변 작성 시 올바른 맞춤법과 띄어쓰기를 사용하도록 지시</div>
+        </div>
+        <div class="toggle-wrap">
+          <div class="toggle on" id="toggle-spelling" onclick="toggleSpelling(); enableSave('btn-save-settings')"></div>
+          <span id="spelling-label" style="font-size:13px;color:#888;">ON</span>
+        </div>
       </div>
-      <div class="toggle-wrap">
-        <div class="toggle on" id="toggle-spelling" onclick="toggleSpelling(); enableSave('btn-save-settings')"></div>
-        <span id="spelling-label" style="font-size:13px;color:#888;">ON</span>
+      <div class="admin-row">
+        <div>
+          <div class="admin-row-label">민감 표현 감지 시 자동 재생성</div>
+          <div class="admin-row-sub">금지 표현이 포함된 답변 감지 시 AI API를 한 번 더 호출해 재생성</div>
+        </div>
+        <div class="toggle-wrap">
+          <div class="toggle on" id="toggle-retry-sensitive" onclick="toggleRetrySensitive(); enableSave('btn-save-settings')"></div>
+          <span id="retry-sensitive-label" style="font-size:13px;color:#888;">ON</span>
+        </div>
+      </div>
+      <div class="admin-row">
+        <div>
+          <div class="admin-row-label">신고 가능 리뷰 답변 초안 생성 건너뜀</div>
+          <div class="admin-row-sub">신고 대상으로 분류된 리뷰는 답변 초안을 생성하지 않음</div>
+        </div>
+        <div class="toggle-wrap">
+          <div class="toggle" id="toggle-skip-reportable" onclick="toggleSkipReportable(); enableSave('btn-save-settings')"></div>
+          <span id="skip-reportable-label" style="font-size:13px;color:#888;">OFF</span>
+        </div>
+      </div>
+      <div style="padding: 4px 12px 0">
+        <label class="admin-label">신고 가능 리뷰 기준 (쉼표 구분)</label>
+        <input class="admin-input" id="report-criteria" type="text" oninput="enableSave('btn-save-settings')" placeholder="욕설, 경쟁사 언급, 광고성, 반복 내용">
       </div>
     </div>
-    <div class="admin-row" style="margin-top:12px">
-      <div>
-        <div class="admin-row-label">민감 표현 감지 시 자동 재생성</div>
-        <div class="admin-row-sub">금지 표현이 포함된 답변 감지 시 AI API를 한 번 더 호출해 재생성</div>
-      </div>
-      <div class="toggle-wrap">
-        <div class="toggle on" id="toggle-retry-sensitive" onclick="toggleRetrySensitive(); enableSave('btn-save-settings')"></div>
-        <span id="retry-sensitive-label" style="font-size:13px;color:#888;">ON</span>
-      </div>
-    </div>
-    <div class="admin-row" style="margin-top:12px">
-      <div>
-        <div class="admin-row-label">신고 가능 리뷰 답변 초안 생성 건너뜀</div>
-        <div class="admin-row-sub">신고 대상으로 분류된 리뷰는 답변 초안을 생성하지 않음</div>
-      </div>
-      <div class="toggle-wrap">
-        <div class="toggle" id="toggle-skip-reportable" onclick="toggleSkipReportable(); enableSave('btn-save-settings')"></div>
-        <span id="skip-reportable-label" style="font-size:13px;color:#888;">OFF</span>
-      </div>
-    </div>
-    <div class="admin-row" style="margin-top:12px">
+    <div class="toggle-children-notice">자동 답변 초안 생성이 꺼져 있어 위 옵션은 적용되지 않습니다. 마스터 토글을 켜면 활성화됩니다.</div>
+
+    <!-- 독립 토글: TEST 모드 (게시 dry-run) -->
+    <div class="admin-row toggle-independent">
       <div>
         <div class="admin-row-label">TEST 모드 — 게시 미리보기에 '테스트 발송' 옵션 노출</div>
         <div class="admin-row-sub">실제 게시 없이 검증만 하는 dry-run 체크박스를 게시 컨펌 모달에 노출 (일반 사용자에게는 숨김)</div>
@@ -1126,10 +1181,7 @@
         <span id="test-mode-label" style="font-size:13px;color:#888;">OFF</span>
       </div>
     </div>
-    <div style="margin-top:16px">
-      <label class="admin-label">신고 가능 리뷰 기준 (쉼표 구분)</label>
-      <input class="admin-input" id="report-criteria" type="text" oninput="enableSave('btn-save-settings')" placeholder="욕설, 경쟁사 언급, 광고성, 반복 내용">
-    </div>
+
     <div class="admin-footer">
       <button class="btn-save" id="btn-save-settings" onclick="saveSettings(this)" disabled>저장됨</button>
     </div>
@@ -1162,22 +1214,29 @@
     </div>
     <div style="margin-top:16px">
       <label class="admin-label">고객 유형별 AI 힌트</label>
+      <div style="font-size:12px;color:#888;margin-bottom:10px;line-height:1.55">
+        공통 톤은 위의 <b>🎨 브랜드 톤 가이드</b>에서 관리합니다. 여기에는 각 유형에서만 <b>추가로 강조할 점</b>만 짧게 적으면 됩니다. 비워두면 공통 톤만 사용됩니다.
+      </div>
       <div class="hint-grid">
         <div class="hint-item">
           <label style="color:#1565c0">🔵 첫구매</label>
-          <textarea class="admin-textarea" id="hint-first" rows="3" oninput="enableSave('btn-save-cs')"></textarea>
+          <textarea class="admin-textarea" id="hint-first" rows="3" oninput="enableSave('btn-save-cs')"
+            placeholder="예: 처음 만난 인사, 다음 구매 유도"></textarea>
         </div>
         <div class="hint-item">
           <label style="color:#2e7d32">🟢 재구매</label>
-          <textarea class="admin-textarea" id="hint-repeat" rows="3" oninput="enableSave('btn-save-cs')"></textarea>
+          <textarea class="admin-textarea" id="hint-repeat" rows="3" oninput="enableSave('btn-save-cs')"
+            placeholder="예: 다시 찾아준 점에 대한 감사 표현"></textarea>
         </div>
         <div class="hint-item">
           <label style="color:#9e7a20">⭐ 단골</label>
-          <textarea class="admin-textarea" id="hint-loyal" rows="3" oninput="enableSave('btn-save-cs')"></textarea>
+          <textarea class="admin-textarea" id="hint-loyal" rows="3" oninput="enableSave('btn-save-cs')"
+            placeholder="예: 친근한 호칭, 특별한 혜택 안내 가능"></textarea>
         </div>
         <div class="hint-item">
           <label style="color:#c62828">🎁 선물 구매자</label>
-          <textarea class="admin-textarea" id="hint-gift" rows="3" oninput="enableSave('btn-save-cs')"></textarea>
+          <textarea class="admin-textarea" id="hint-gift" rows="3" oninput="enableSave('btn-save-cs')"
+            placeholder="예: 받는 분에 대한 배려 멘트"></textarea>
         </div>
       </div>
     </div>
@@ -2657,6 +2716,7 @@ function loadAdminData() {
     window.adminConfig = adminConfig;
     document.getElementById('toggle-test-mode').classList.toggle('on', testVal);
     document.getElementById('test-mode-label').textContent = testVal ? 'ON' : 'OFF';
+    applyAutoGenerateDependency();
     if (cfg.coupon_rules) renderCouponRules(cfg.coupon_rules);
     if (cfg.reply_coupon_template) {
       const el = document.getElementById('coupon-reply-template');
@@ -2680,6 +2740,14 @@ function toggleAutoGenerate() {
   const toggle = document.getElementById('toggle-auto-generate');
   toggle.classList.toggle('on', adminConfig.auto_generate_reply);
   document.getElementById('auto-generate-label').textContent = adminConfig.auto_generate_reply ? 'ON' : 'OFF';
+  applyAutoGenerateDependency();
+}
+
+function applyAutoGenerateDependency() {
+  const children = document.getElementById('auto-generate-children');
+  if (!children) return;
+  const enabled = !!adminConfig.auto_generate_reply;
+  children.classList.toggle('is-disabled', !enabled);
 }
 
 function toggleSpelling() {
@@ -2711,39 +2779,46 @@ function renderCouponRules(rules) {
   const list = document.getElementById('coupon-rules-list');
   const autoRules = rules.filter(r => r.condition !== 'manual_amount');
   const amountRules = rules.filter(r => r.condition === 'manual_amount');
+  const esc = (v) => String(v == null ? '' : v).replace(/"/g, '&quot;');
   list.innerHTML =
-    autoRules.map((r, i) => {
+    autoRules.map(r => {
       const gi = rules.indexOf(r);
+      const dis = r.enabled ? '' : 'disabled';
       return `
-    <div class="coupon-rule">
-      <div class="toggle ${r.enabled ? 'on' : ''}" onclick="toggleCoupon(${gi})" title="활성화/비활성화"></div>
-      <div class="coupon-rule-label">${r.label}</div>
-      <input class="coupon-rule-input" id="coupon-name-${gi}" type="text"
-        value="${r.coupon}" placeholder="쿠폰명" oninput="onCouponChange()" ${r.enabled ? '' : 'disabled'}>
-      <input class="coupon-rule-input" id="coupon-amount-${gi}" type="text"
-        value="${r.coupon_amount || ''}" placeholder="할인 금액 (예: 1만원 할인)" oninput="onCouponChange()"
-        ${r.enabled ? '' : 'disabled'} style="width:140px">
-      <input class="coupon-rule-input" id="coupon-min-${gi}" type="text"
-        value="${r.min_purchase_amount || ''}" placeholder="최소 구매 금액 (예: 10만원 이상)" oninput="onCouponChange()"
-        ${r.enabled ? '' : 'disabled'} style="width:170px">
+    <div class="coupon-rule-v2">
+      <div class="coupon-rule-v2-head">
+        <div class="toggle ${r.enabled ? 'on' : ''}" onclick="toggleCoupon(${gi})" title="활성화/비활성화"></div>
+        <div class="coupon-rule-v2-label">${r.label}</div>
+      </div>
+      <div class="coupon-rule-v2-inputs">
+        <input class="coupon-rule-input" id="coupon-name-${gi}" type="text"
+          value="${esc(r.coupon)}" placeholder="쿠폰명" oninput="onCouponChange()" ${dis}>
+        <input class="coupon-rule-input" id="coupon-amount-${gi}" type="text"
+          value="${esc(r.coupon_amount)}" placeholder="할인 금액 (예: 1만원)" oninput="onCouponChange()" ${dis}>
+        <input class="coupon-rule-input" id="coupon-min-${gi}" type="text"
+          value="${esc(r.min_purchase_amount)}" placeholder="최소 구매 금액 (예: 10만원 이상)" oninput="onCouponChange()" ${dis}>
+      </div>
     </div>`;
     }).join('') +
     (amountRules.length ? `
     <div style="margin:14px 0 6px;font-size:12px;color:#888;font-weight:600;letter-spacing:.3px">구매금액 기반 수동 발급</div>` : '') +
     amountRules.map(r => {
       const gi = rules.indexOf(r);
+      const dis = r.enabled ? '' : 'disabled';
       return `
-    <div class="coupon-rule">
-      <div class="toggle ${r.enabled ? 'on' : ''}" onclick="toggleCoupon(${gi})" title="활성화/비활성화"></div>
-      <div class="coupon-rule-label">${r.label}</div>
-      <input class="coupon-rule-input" id="coupon-name-${gi}" type="text"
-        value="${r.coupon}" placeholder="쿠폰명" oninput="onCouponChange()" ${r.enabled ? '' : 'disabled'}>
-      <input class="coupon-rule-input" id="coupon-amount-${gi}" type="text"
-        value="${r.coupon_amount || ''}" placeholder="할인 금액 (예: 1만원)" oninput="onCouponChange()"
-        ${r.enabled ? '' : 'disabled'} style="width:120px">
-      <input class="coupon-rule-input" id="coupon-minamount-${gi}" type="number"
-        value="${r.min_amount || ''}" placeholder="최소금액 (원)" oninput="onCouponChange()"
-        ${r.enabled ? '' : 'disabled'} style="width:140px">
+    <div class="coupon-rule-v2">
+      <div class="coupon-rule-v2-head">
+        <div class="toggle ${r.enabled ? 'on' : ''}" onclick="toggleCoupon(${gi})" title="활성화/비활성화"></div>
+        <div class="coupon-rule-v2-label">${r.label}</div>
+      </div>
+      <div class="coupon-rule-v2-inputs manual">
+        <input class="coupon-rule-input" id="coupon-name-${gi}" type="text"
+          value="${esc(r.coupon)}" placeholder="쿠폰명" oninput="onCouponChange()" ${dis}>
+        <input class="coupon-rule-input" id="coupon-amount-${gi}" type="text"
+          value="${esc(r.coupon_amount)}" placeholder="할인 금액 (예: 1만원)" oninput="onCouponChange()" ${dis}>
+        <input class="coupon-rule-input" id="coupon-minamount-${gi}" type="number"
+          value="${esc(r.min_amount)}" placeholder="최소금액 (원)" oninput="onCouponChange()" ${dis}>
+      </div>
     </div>`;
     }).join('');
 }
@@ -3221,6 +3296,78 @@ function cancelQRLogin() {
   if (btn) { btn.disabled = false; btn.textContent = '로그인 및 리뷰 수집'; }
 }
 
+// 캡차 모달 — 헤드리스 로그인 중 보안문자 감지 시 표시
+let _captchaTimerId = null;
+let _captchaDeadline = 0;
+
+socket.on('captcha_required', data => {
+  // 캡차가 뜨면 QR 모달은 끝난 단계 — 먼저 숨김
+  const qr = document.getElementById('qr-login-overlay');
+  if (qr) qr.style.display = 'none';
+  const overlay = document.getElementById('captcha-overlay');
+  if (!overlay) return;
+  const img = document.getElementById('captcha-img');
+  const hintEl = document.getElementById('captcha-hint');
+  const attemptEl = document.getElementById('captcha-attempt');
+  const input = document.getElementById('captcha-input');
+  if (img && data.image) img.src = data.image;
+  if (hintEl) {
+    if (data.hint) { hintEl.textContent = data.hint; hintEl.style.display = 'block'; }
+    else hintEl.style.display = 'none';
+  }
+  if (attemptEl) {
+    attemptEl.textContent = (data.attempt && data.attempt > 1) ? `재시도 ${data.attempt}회` : '';
+  }
+  if (input) { input.value = ''; setTimeout(() => input.focus(), 50); }
+  overlay.style.display = 'flex';
+  // 타이머
+  const timeout = Math.max(30, parseInt(data.timeout || 180, 10));
+  _captchaDeadline = Date.now() + timeout * 1000;
+  if (_captchaTimerId) clearInterval(_captchaTimerId);
+  _captchaTimerId = setInterval(() => {
+    const remain = Math.max(0, Math.ceil((_captchaDeadline - Date.now()) / 1000));
+    const t = document.getElementById('captcha-time');
+    if (t) t.textContent = remain + '초';
+    if (remain <= 0) {
+      clearInterval(_captchaTimerId); _captchaTimerId = null;
+      _closeCaptchaModal();
+    }
+  }, 500);
+});
+
+socket.on('captcha_done', () => {
+  _closeCaptchaModal();
+});
+
+function _closeCaptchaModal() {
+  const overlay = document.getElementById('captcha-overlay');
+  if (overlay) overlay.style.display = 'none';
+  if (_captchaTimerId) { clearInterval(_captchaTimerId); _captchaTimerId = null; }
+}
+
+function submitCaptcha() {
+  const input = document.getElementById('captcha-input');
+  const btn = document.getElementById('captcha-submit');
+  const answer = (input && input.value || '').trim();
+  if (!answer) { if (input) input.focus(); return; }
+  if (btn) { btn.disabled = true; btn.textContent = '제출 중...'; }
+  fetch('/api/captcha/answer', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({answer})
+  }).catch(() => {}).finally(() => {
+    // 모달은 captcha_done 이벤트로 닫힘. 폴백:
+    setTimeout(() => {
+      if (btn) { btn.disabled = false; btn.textContent = '제출'; }
+    }, 1500);
+  });
+}
+
+function cancelCaptcha() {
+  fetch('/api/captcha/cancel', {method: 'POST'}).catch(() => {});
+  _closeCaptchaModal();
+}
+
 </script>
 
 <div id="photo-lightbox" onclick="this.classList.remove('open')">
@@ -3268,6 +3415,42 @@ function cancelQRLogin() {
     <div style="font-size:11px;color:#bbb;">로그인 완료 시 자동으로 닫힙니다</div>
   </div>
 </div>
+
+<!-- 캡차 모달 — 헤드리스 로그인 중 보안문자 감지 시 사용자가 직접 답안 입력 -->
+<div id="captcha-overlay" style="display:none;position:fixed;inset:0;background:rgba(15,20,25,0.72);backdrop-filter:blur(6px);z-index:9999;align-items:center;justify-content:center;animation:qrFadeIn .25s ease-out;font-family:-apple-system,'Pretendard','Apple SD Gothic Neo','Noto Sans KR',sans-serif;">
+  <div style="background:#fff;padding:30px 32px 24px;border-radius:20px;box-shadow:0 24px 72px rgba(0,0,0,0.45);animation:qrPop .3s cubic-bezier(.2,.9,.3,1.2);width:380px;position:relative;text-align:center;">
+    <button type="button" onclick="cancelCaptcha()" aria-label="닫기"
+            style="position:absolute;top:14px;right:14px;width:32px;height:32px;border-radius:50%;border:0;background:#f5f5f5;color:#666;font-size:18px;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .15s;"
+            onmouseover="this.style.background='#e8e8e8';this.style.color='#000';"
+            onmouseout="this.style.background='#f5f5f5';this.style.color='#666';">×</button>
+
+    <div style="font-size:22px;font-weight:800;color:#222;margin-bottom:4px;">보안문자 입력</div>
+    <div style="font-size:13px;color:#888;margin-bottom:18px;">네이버에서 자동입력방지 확인을 요청했어요</div>
+
+    <div style="background:#fafafa;border-radius:12px;padding:18px;margin-bottom:14px;">
+      <img id="captcha-img" src="" alt="보안문자"
+           style="max-width:100%;display:block;margin:0 auto;background:#fff;border-radius:6px;border:1px solid #eee;">
+    </div>
+
+    <div id="captcha-hint" style="display:none;font-size:12px;color:#666;background:#fff8e1;border-radius:8px;padding:8px 10px;margin-bottom:12px;text-align:left;line-height:1.4;white-space:pre-line;"></div>
+
+    <input id="captcha-input" type="text" autocomplete="off" autocapitalize="off" spellcheck="false"
+           onkeydown="if(event.key==='Enter'){event.preventDefault();submitCaptcha();}"
+           placeholder="이미지의 문자를 입력"
+           style="width:100%;box-sizing:border-box;padding:12px 14px;font-size:18px;letter-spacing:3px;border:1.5px solid #ddd;border-radius:10px;outline:none;text-align:center;font-weight:600;margin-bottom:12px;"
+           onfocus="this.style.borderColor='#03c75a'" onblur="this.style.borderColor='#ddd'">
+
+    <button id="captcha-submit" type="button" onclick="submitCaptcha()"
+            style="width:100%;padding:12px;background:#03c75a;color:#fff;border:0;border-radius:10px;font-size:15px;font-weight:700;cursor:pointer;transition:opacity .15s;"
+            onmouseover="this.style.opacity='0.9'" onmouseout="this.style.opacity='1'">제출</button>
+
+    <div style="margin-top:12px;font-size:12px;color:#999;display:flex;justify-content:space-between;">
+      <span id="captcha-attempt"></span>
+      <span>남은 시간 <span id="captcha-time">--</span></span>
+    </div>
+  </div>
+</div>
+
 <style>
 @keyframes qrFadeIn { from { opacity: 0 } to { opacity: 1 } }
 @keyframes qrPop { from { transform: scale(.94); opacity: 0 } to { transform: scale(1); opacity: 1 } }

@@ -37,6 +37,58 @@ INTERVENTION_URL_HINTS = (
 )
 
 
+_STEALTH_INIT = r"""
+// navigator.webdriver 제거 (Playwright/Selenium 탐지의 1순위)
+Object.defineProperty(navigator, 'webdriver', { get: () => undefined });
+
+// window.chrome 객체가 없으면 헤드리스로 의심받음
+if (!window.chrome) {
+    window.chrome = { runtime: {}, loadTimes: function(){}, csi: function(){}, app: {} };
+}
+
+// plugins 비어있으면 자동화로 의심받음
+Object.defineProperty(navigator, 'plugins', {
+    get: () => [
+        { name: 'PDF Viewer', filename: 'internal-pdf-viewer' },
+        { name: 'Chrome PDF Viewer', filename: 'internal-pdf-viewer' },
+        { name: 'Chromium PDF Viewer', filename: 'internal-pdf-viewer' }
+    ]
+});
+
+// 한국 사용자처럼 보이도록 언어 셋팅
+Object.defineProperty(navigator, 'languages', { get: () => ['ko-KR', 'ko', 'en-US', 'en'] });
+
+// Notification permission이 'denied'면 헤드리스로 의심
+if (navigator.permissions && navigator.permissions.query) {
+    const orig = navigator.permissions.query.bind(navigator.permissions);
+    navigator.permissions.query = (parameters) => (
+        parameters && parameters.name === 'notifications'
+            ? Promise.resolve({ state: Notification.permission })
+            : orig(parameters)
+    );
+}
+
+// WebGL vendor/renderer 위장 — SwiftShader/Mesa 노출 시 헤드리스 판정
+try {
+    const getParam = WebGLRenderingContext.prototype.getParameter;
+    WebGLRenderingContext.prototype.getParameter = function(p) {
+        if (p === 37445) return 'Intel Inc.';
+        if (p === 37446) return 'Intel Iris OpenGL Engine';
+        return getParam.call(this, p);
+    };
+} catch (e) {}
+"""
+
+
+def _apply_stealth(context) -> None:
+    """context의 모든 페이지에 stealth init script 주입."""
+    try:
+        context.add_init_script(_STEALTH_INIT)
+        print("[auto_login.stealth] init_script 주입 완료")
+    except Exception as e:
+        print(f"[auto_login.stealth] 주입 실패: {e}")
+
+
 def _clean_profile_locks():
     os.makedirs(PROFILE_DIR, exist_ok=True)
     for lock in ("SingletonLock", "SingletonCookie", "SingletonSocket"):
@@ -350,6 +402,151 @@ def _autofill_login(page, naver_id: str = "", naver_pw: str = "", on_qr=None) ->
     time.sleep(2)
 
 
+_CAPTCHA_IMG_SELECTORS = (
+    "#captchaimg",
+    "img#captchaimg",
+    ".captcha_img img",
+    "[id*='captcha' i] img",
+    "img[src*='captcha' i]",
+)
+_CAPTCHA_INPUT_SELECTORS = (
+    "#captcha",
+    "input[name='captcha']",
+    "input[id*='captcha' i]",
+    "input[placeholder*='보안문자']",
+    "input[placeholder*='자동입력방지']",
+)
+_CAPTCHA_SUBMIT_SELECTORS = (
+    "button[type='submit']",
+    ".btn_login",
+    "#log\\.login",
+    "button:has-text('로그인')",
+    "button:has-text('확인')",
+)
+
+
+def _extract_captcha_data(page) -> dict:
+    """캡차 이미지 + 안내문구 추출.
+
+    Returns: {"image": bytes|None, "hint": str|None}
+    """
+    data = {"image": None, "hint": None}
+    for sel in _CAPTCHA_IMG_SELECTORS:
+        try:
+            loc = page.locator(sel).first
+            if loc.count() == 0:
+                continue
+            bb = loc.bounding_box()
+            if not bb or bb["width"] < 30:
+                continue
+            data["image"] = loc.screenshot()
+            print(f"[auto_login.captcha] 이미지 캡처: {sel}")
+            break
+        except Exception:
+            continue
+
+    # 안내문 — 캡차 영역 근처 텍스트
+    try:
+        hint = page.evaluate(
+            r"""() => {
+                const img = document.querySelector('#captchaimg, img#captchaimg, .captcha_img img');
+                if (!img) return null;
+                const container = img.closest('div, section, form, fieldset') || img.parentElement;
+                if (!container) return null;
+                const t = (container.innerText || '').trim();
+                // 너무 길면 자르기
+                return t.length > 200 ? t.slice(0, 200) : t;
+            }"""
+        )
+        if hint:
+            data["hint"] = hint
+    except Exception:
+        pass
+    return data
+
+
+def _submit_captcha(page, answer: str) -> bool:
+    """캡차 입력란에 답안 채우고 제출."""
+    answer = (answer or "").strip()
+    if not answer:
+        return False
+    filled = False
+    for sel in _CAPTCHA_INPUT_SELECTORS:
+        try:
+            loc = page.locator(sel).first
+            if loc.count() == 0:
+                continue
+            loc.fill(answer)
+            print(f"[auto_login.captcha] 답안 입력: {sel}")
+            filled = True
+            break
+        except Exception:
+            continue
+    if not filled:
+        print("[auto_login.captcha] 입력란을 찾지 못함")
+        return False
+
+    # 제출 — 명시 버튼 시도 후 폴백으로 Enter
+    for btn in _CAPTCHA_SUBMIT_SELECTORS:
+        try:
+            page.locator(btn).first.click(timeout=2500)
+            print(f"[auto_login.captcha] 제출 버튼 클릭: {btn}")
+            return True
+        except Exception:
+            continue
+    try:
+        page.keyboard.press("Enter")
+        print("[auto_login.captcha] Enter 키로 제출")
+        return True
+    except Exception as e:
+        print(f"[auto_login.captcha] 제출 실패: {e}")
+        return False
+
+
+def _handle_captcha_loop(page, on_captcha, max_attempts: int = 3, answer_timeout: int = 180) -> bool:
+    """캡차 화면 감지 → on_captcha로 답안 요청 → 제출 → 재판정.
+
+    on_captcha(data_dict) → str(answer) 또는 None(취소). 동기 호출(블로킹).
+    Returns: True(셀러센터 도달) / False(취소·실패)
+    """
+    for attempt in range(1, max_attempts + 1):
+        if _is_on_seller_center(page):
+            return True
+        if not _needs_human(page):
+            time.sleep(1.0)
+            continue
+        data = _extract_captcha_data(page)
+        if not data.get("image"):
+            print("[auto_login.captcha] 이미지 추출 실패 — 일반 intervention로 폴백")
+            return False
+        print(f"[auto_login.captcha] 답안 요청 (시도 {attempt}/{max_attempts})")
+        try:
+            answer = on_captcha({**data, "attempt": attempt, "timeout": answer_timeout})
+        except Exception as e:
+            print(f"[auto_login.captcha] on_captcha 예외: {e}")
+            return False
+        if not answer:
+            print("[auto_login.captcha] 사용자 취소 또는 타임아웃")
+            return False
+        if not _submit_captcha(page, answer):
+            continue
+        # 제출 후 결과 대기 — 셀러센터/재캡차/실패 중 하나로 갈 때까지
+        deadline = time.time() + 20
+        while time.time() < deadline:
+            if _is_on_seller_center(page):
+                return True
+            cur = (page.url or "").lower()
+            # URL 변화로 페이지 이동 감지
+            if "captcha" not in cur and not _needs_human(page):
+                # 캡차 통과했지만 셀러센터 아닐 수도 (다른 intervention)
+                time.sleep(1.0)
+                if _is_on_seller_center(page):
+                    return True
+                break
+            time.sleep(0.7)
+    return _is_on_seller_center(page)
+
+
 def _wait_after_login(page, max_seconds: int = 120) -> str:
     """로그인 제출 후 결과 판정. 반환: 'seller' | 'intervention' | 'timeout'."""
     deadline = time.time() + max_seconds
@@ -374,10 +571,13 @@ def _wait_for_human(page, max_seconds: int = 300) -> bool:
 
 
 def ensure_logged_in(page, naver_id: str = "", naver_pw: str = "",
-                      headless: bool = False, timeout_per_step: int = 120, on_qr=None) -> str:
+                      headless: bool = False, timeout_per_step: int = 120,
+                      on_qr=None, on_captcha=None) -> str:
     """이미 열려있는 페이지의 로그인 상태를 보장.
 
-    on_qr: bytes 콜백. popup이 떴을 때 주기적으로 화면을 캡처해 호출. 외부 UI에 QR 표시 용.
+    on_qr: popup QR 데이터 콜백 — 외부 UI에 QR 표시용.
+    on_captcha: 캡차 감지 시 호출되는 동기 콜백(data_dict) → answer 문자열 또는 None.
+                제공 시 headless에서도 캡차를 사용자에게 표시해 통과 가능.
     Returns: 'seller' | 'intervention' | 'failed' | 'timeout'
     """
     naver_id = (naver_id or os.environ.get("NAVER_ID", "")).strip()
@@ -419,6 +619,9 @@ def ensure_logged_in(page, naver_id: str = "", naver_pw: str = "",
         save_session(page.context)
         return "seller"
     if result == "intervention":
+        if on_captcha is not None and _handle_captcha_loop(page, on_captcha):
+            save_session(page.context)
+            return "seller"
         if headless:
             return "intervention"
         ok = _wait_for_human(page, max_seconds=timeout_per_step * 2)
@@ -437,7 +640,7 @@ def _safe_title(page) -> str:
 
 
 def main(keep_open: bool = False, naver_id: str = None, naver_pw: str = None,
-         headless: bool = False, timeout_per_step: int = 120, on_qr=None):
+         headless: bool = False, timeout_per_step: int = 120, on_qr=None, on_captcha=None):
     """
     Returns: (success: bool, pw, context, page)
       - keep_open=False 면 context/pw/page는 None 으로 반환되고 context는 close.
@@ -456,6 +659,7 @@ def main(keep_open: bool = False, naver_id: str = None, naver_pw: str = None,
         viewport={"width": 1440, "height": 900},
         accept_downloads=True,
     )
+    _apply_stealth(context)
     page = context.pages[0] if context.pages else context.new_page()
 
     # headful일 때 메인창은 화면 밖 + 1픽셀 — popup(OAuth)만 사용자에게 보이도록
@@ -514,6 +718,13 @@ def main(keep_open: bool = False, naver_id: str = None, naver_pw: str = None,
             print("[auto_login] 자동 로그인 성공")
             return _finish(True)
         if result == "intervention":
+            if on_captcha is not None:
+                print("[auto_login] intervention 감지 — captcha 모달 흐름 진입")
+                if _handle_captcha_loop(page, on_captcha):
+                    save_session(context)
+                    print("[auto_login] captcha 통과 — 셀러센터 도달")
+                    return _finish(True)
+                print("[auto_login] captcha 흐름 실패 — 폴백")
             if headless:
                 print("[auto_login] 캡차/2FA 감지 — headless 모드에서 처리 불가")
                 return _finish(False)

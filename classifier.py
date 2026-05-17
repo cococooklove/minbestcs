@@ -143,8 +143,12 @@ _SAFE_ALTERNATIVES_BLOCK = (
 MAX_SENSITIVE_RETRIES = 3
 
 
-def generate_reply(review: dict, brand_tone: str, client, settings: dict = None) -> dict:
+def generate_reply(review: dict, brand_tone: str, client, settings: dict = None,
+                   examples: list = None) -> dict:
     """OpenAI API 기반 답변 생성.
+
+    examples: RAG로 검색된 유사 과거 사례 [{content, rating, product, reply, score}].
+              system 다음에 user/assistant 메시지로 주입되어 few-shot 학습 효과를 냄.
 
     반환: {"text": str, "sensitive_remaining": list[str], "attempts": int}
       - sensitive_remaining 비어있으면 안전, 채워져 있으면 자동 등록 금지 신호.
@@ -197,17 +201,31 @@ def generate_reply(review: dict, brand_tone: str, client, settings: dict = None)
 
 위 리뷰에 적절한 답변을 작성해주세요."""
 
+    fewshot_msgs = []
+    for ex in (examples or []):
+        ex_reply = (ex.get("reply") or "").strip()
+        if not ex_reply:
+            continue
+        ex_user = (
+            f"리뷰 내용: {ex.get('content', '')}\n"
+            f"별점: {ex.get('rating', '')}점\n"
+            f"상품: {ex.get('product', '')}\n\n"
+            "위 리뷰에 적절한 답변을 작성해주세요."
+        )
+        fewshot_msgs.append({"role": "user", "content": ex_user})
+        fewshot_msgs.append({"role": "assistant", "content": ex_reply})
+
     def _call(sys_prompt: str) -> str:
+        messages = [{"role": "system", "content": sys_prompt}]
+        messages.extend(fewshot_msgs)
+        messages.append({"role": "user", "content": user})
         for attempt in range(2):
             try:
                 resp = client.chat.completions.create(
                     model=model,
                     max_tokens=512,
                     temperature=0.4,
-                    messages=[
-                        {"role": "system", "content": sys_prompt},
-                        {"role": "user", "content": user},
-                    ],
+                    messages=messages,
                 )
                 return resp.choices[0].message.content.strip()
             except Exception as e:
@@ -315,7 +333,15 @@ def process_batch():
         new_sensitive_flags = None  # None=손대지 않음, []=초기화, list=세팅
         if auto_generate and not existing_reply and not reviews[idx].get("replied") and not (skip_reportable and is_reportable):
             try:
-                gen = generate_reply(r, brand_tone, client, settings=settings)
+                examples = []
+                try:
+                    import rag
+                    top_k = int(settings.get("rag_top_k", 3))
+                    if top_k > 0:
+                        examples = rag.retrieve_similar(r, client, top_k=top_k)
+                except Exception:
+                    examples = []
+                gen = generate_reply(r, brand_tone, client, settings=settings, examples=examples)
                 existing_reply = gen.get("text", "")
                 remaining = gen.get("sensitive_remaining", [])
                 if existing_reply:

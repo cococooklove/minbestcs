@@ -5,7 +5,7 @@
 """
 from flask import Flask, render_template, jsonify, request
 from flask_socketio import SocketIO
-import json, os, threading, webbrowser, sys, subprocess, math
+import json, os, threading, webbrowser, sys, subprocess, math, queue, base64
 from datetime import datetime
 from pathlib import Path
 from dotenv import load_dotenv
@@ -49,6 +49,47 @@ _login_page = None
 _scraping = False
 _session_cookies = None
 _progress_step = ""
+
+# 캡차 답안 채널 — 로그인 스레드와 HTTP 엔드포인트 사이의 동기 큐
+_captcha_q: "queue.Queue[str|None]" = queue.Queue()
+
+
+def _b64_image(b: bytes | None) -> str | None:
+    if not b:
+        return None
+    return "data:image/png;base64," + base64.b64encode(b).decode("ascii")
+
+
+def _make_on_captcha():
+    """auto_login에 전달할 동기 콜백. 호출되면 모달 띄우고 답안 큐를 블로킹."""
+    # 이전 잔존 답안 비우기 (가짜 통과 방지)
+    while not _captcha_q.empty():
+        try: _captcha_q.get_nowait()
+        except queue.Empty: break
+
+    def _on_captcha(data):
+        timeout = int(data.get("timeout") or 180)
+        try:
+            socketio.emit("captcha_required", {
+                "image": _b64_image(data.get("image")),
+                "hint": data.get("hint"),
+                "attempt": data.get("attempt", 1),
+                "timeout": timeout,
+            })
+        except Exception as e:
+            print(f"[on_captcha] emit 실패: {e}")
+            return None
+        try:
+            answer = _captcha_q.get(timeout=timeout)
+        except queue.Empty:
+            print("[on_captcha] 답안 타임아웃")
+            try: socketio.emit("captcha_done", {"reason": "timeout"})
+            except Exception: pass
+            return None
+        try: socketio.emit("captcha_done", {"reason": "submitted"})
+        except Exception: pass
+        return answer
+    return _on_captcha
 
 # 클라이언트별 세션 정보 (멀티 클라이언트 대응 — 우선 메모리 보관, 만료시간 표시용)
 # { client_id: {"expires_at": float, "cookies": list, "updated_at": float} }
@@ -495,7 +536,8 @@ def api_login_start():
             import auto_login as login_mod
             login_mod.PROFILE_DIR = PROFILE_DIR
             success, pw, context, page = login_mod.main(
-                keep_open=True, naver_id=naver_id, naver_pw=naver_pw
+                keep_open=True, naver_id=naver_id, naver_pw=naver_pw,
+                on_captcha=_make_on_captcha(),
             )
             if success:
                 _login_pw, _login_context, _login_page = pw, context, page
@@ -605,7 +647,32 @@ def api_login_cancel():
         pass
     socketio.emit("login_qr_done", {})
     socketio.emit("collect_status", {"step": "done", "success": False, "error": "사용자 취소"})
+    # 캡차 대기 중인 콜백도 깨우기 (None → 취소로 처리)
+    try: _captcha_q.put_nowait(None)
+    except Exception: pass
     return jsonify({"status": "cancelled"})
+
+
+@app.route("/api/captcha/answer", methods=["POST"])
+def api_captcha_answer():
+    """캡차 모달에서 사용자가 입력한 답안을 로그인 콜백으로 전달."""
+    body = request.get_json(silent=True) or {}
+    answer = (body.get("answer") or "").strip()
+    if not answer:
+        return jsonify({"error": "answer required"}), 400
+    try:
+        _captcha_q.put_nowait(answer)
+    except queue.Full:
+        return jsonify({"error": "queue full"}), 503
+    return jsonify({"status": "ok"})
+
+
+@app.route("/api/captcha/cancel", methods=["POST"])
+def api_captcha_cancel():
+    """캡차 모달 닫기 — 콜백을 None으로 깨워 흐름 종료."""
+    try: _captcha_q.put_nowait(None)
+    except Exception: pass
+    return jsonify({"status": "ok"})
 
 
 def _run_server_collect():
@@ -684,7 +751,7 @@ def api_collect():
                 # 만료면 popup 캡처가 _on_qr로 우리 UI에 전달되어 modal 자동 열림
                 success, pw, context, page = login_mod.main(
                     keep_open=True, naver_id=naver_id, naver_pw=naver_pw,
-                    headless=True, on_qr=_on_qr,
+                    headless=True, on_qr=_on_qr, on_captcha=_make_on_captcha(),
                 )
                 socketio.emit("login_qr_done", {})
                 if not success:
@@ -720,6 +787,13 @@ def api_collect():
         except Exception as e:
             socketio.emit("collect_status", {"step": "done", "success": False, "error": str(e)})
         finally:
+            # 수집 성공/실패 무관, 스크래핑 중 갱신된 쿠키를 영속화 (다음 콜드 스타트 캡차 방지)
+            try:
+                if _login_context is not None:
+                    import auto_login as _al
+                    _al.save_session(_login_context)
+            except Exception as _e:
+                print(f"[collect] save_session 실패: {_e}")
             _scraping = False
     threading.Thread(target=run_collect, daemon=True).start()
     return jsonify({"status": "started"})
@@ -814,10 +888,18 @@ def api_generate_reply(idx):
     try:
         from openai import OpenAI
         from classifier import generate_reply, load_brand_tone
+        import rag
         client = OpenAI(api_key=api_key)
         brand_tone = load_brand_tone()
         settings_data = load_settings()
-        gen = generate_reply(reviews[idx], brand_tone, client, settings=settings_data)
+        top_k = int(settings_data.get("rag_top_k", 3))
+        examples = []
+        if top_k > 0:
+            try:
+                examples = rag.retrieve_similar(reviews[idx], client, top_k=top_k)
+            except Exception:
+                examples = []
+        gen = generate_reply(reviews[idx], brand_tone, client, settings=settings_data, examples=examples)
         reply = gen.get("text", "") if isinstance(gen, dict) else (gen or "")
         sensitive_remaining = gen.get("sensitive_remaining", []) if isinstance(gen, dict) else []
         if not reply:
@@ -880,7 +962,7 @@ def api_approve_reply(idx):
     reviews[idx].pop("sensitive_flags", None)
     save_reviews(reviews)
     invalidate_reviews_cache()
-    threading.Thread(target=maybe_auto_finetune, daemon=True).start()
+    threading.Thread(target=_rag_upsert_async, args=(dict(reviews[idx]),), daemon=True).start()
     return jsonify({"status": "approved", "forced": bool(found and force)})
 
 
@@ -1081,7 +1163,7 @@ def api_approve_all(idx):
     save_reviews(reviews)
     invalidate_reviews_cache()
     if approve_reply:
-        threading.Thread(target=maybe_auto_finetune, daemon=True).start()
+        threading.Thread(target=_rag_upsert_async, args=(dict(reviews[idx]),), daemon=True).start()
     return jsonify({"status": "ok"})
 
 
@@ -1188,8 +1270,13 @@ def admin_config_post():
         s["sensitive_expressions"] = data["sensitive_expressions"]
     if "loyal_threshold" in data:
         s["loyal_threshold"] = int(data["loyal_threshold"])
-    if "finetune_auto_threshold" in data:
-        s["finetune_auto_threshold"] = int(data.get("finetune_auto_threshold") or 0)
+    if "rag_auto_index" in data:
+        s["rag_auto_index"] = bool(data["rag_auto_index"])
+    if "rag_top_k" in data:
+        try:
+            s["rag_top_k"] = max(0, min(10, int(data["rag_top_k"])))
+        except (TypeError, ValueError):
+            pass
     if "customer_type_hints" in data:
         s["customer_type_hints"] = data["customer_type_hints"]
     if "spelling_correction" in data:
