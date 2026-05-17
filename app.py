@@ -456,13 +456,18 @@ def save_settings(data):
 
 @app.route("/api/login/start", methods=["POST"])
 def api_login_start():
+    body = request.get_json(silent=True) or {}
+    naver_id = (body.get("naver_id") or "").strip()
+    naver_pw = body.get("naver_pw") or ""
     def run_login():
         global _login_pw, _login_context, _login_page
         try:
             ensure_chromium()
-            import login as login_mod
+            import auto_login as login_mod
             login_mod.PROFILE_DIR = PROFILE_DIR
-            success, pw, context, page = login_mod.main(keep_open=True)
+            success, pw, context, page = login_mod.main(
+                keep_open=True, naver_id=naver_id, naver_pw=naver_pw
+            )
             if success:
                 _login_pw, _login_context, _login_page = pw, context, page
             socketio.emit("login_status", {"logged_in": bool(success)})
@@ -523,17 +528,22 @@ def api_collect():
             return jsonify({"error": "확장 프로그램에서 수집을 시작해주세요."}), 400
         threading.Thread(target=_run_server_collect, daemon=True).start()
         return jsonify({"status": "started"})
+    body = request.get_json(silent=True) or {}
+    naver_id = (body.get("naver_id") or "").strip()
+    naver_pw = body.get("naver_pw") or ""
     def run_collect():
         global _login_pw, _login_context, _login_page, _scraping
         try:
             if _login_page is None:
                 socketio.emit("collect_status", {"step": "login_start"})
                 ensure_chromium()
-                import login as login_mod
+                import auto_login as login_mod
                 login_mod.PROFILE_DIR = PROFILE_DIR
-                success, pw, context, page = login_mod.main(keep_open=True)
+                success, pw, context, page = login_mod.main(
+                    keep_open=True, naver_id=naver_id, naver_pw=naver_pw
+                )
                 if not success:
-                    socketio.emit("collect_status", {"step": "login_failed", "error": "로그인 시간 초과"})
+                    socketio.emit("collect_status", {"step": "login_failed", "error": "로그인 실패"})
                     return
                 _login_pw, _login_context, _login_page = pw, context, page
                 socketio.emit("collect_status", {"step": "login_done"})
@@ -1135,7 +1145,13 @@ def api_post_reply(idx):
         return jsonify({"error": "게시할 답글이 없습니다."}), 400
     if r.get("replied"):
         return jsonify({"error": "이미 답글이 달린 리뷰입니다."}), 400
-    subprocess.Popen([sys.executable, "reply_poster.py", str(idx)])
+    body = request.get_json(silent=True) or {}
+    env = os.environ.copy()
+    if body.get("naver_id"):
+        env["NAVER_ID"] = body["naver_id"].strip()
+    if body.get("naver_pw"):
+        env["NAVER_PW"] = body["naver_pw"]
+    subprocess.Popen([sys.executable, "reply_poster.py", str(idx)], env=env)
     return jsonify({"status": "started"})
 
 

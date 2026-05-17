@@ -765,6 +765,34 @@
 <!-- 관리자 패널 -->
 <div class="admin-panel" id="admin-panel">
 
+  <!-- 네이버 계정 (자동 로그인용) -->
+  <div class="admin-section">
+    <div class="admin-section-title">🔐 네이버 계정 (자동 로그인)</div>
+    <div style="font-size:12px;color:#888;margin-bottom:16px">
+      입력한 ID/PW는 이 브라우저(localStorage)에만 저장됩니다. 자동화 실행 시 서버로 전송되어 자동 로그인에 사용됩니다. 캡차/2단계 인증이 뜨면 브라우저 창이 열리고 직접 처리해야 합니다.
+    </div>
+    <div style="display:flex;flex-direction:column;gap:10px">
+      <div style="display:flex;align-items:center;gap:12px;font-size:13px">
+        <span style="color:#555;width:80px;flex-shrink:0">네이버 ID</span>
+        <input type="text" id="naver-id" autocomplete="username" placeholder="아이디"
+          style="flex:1;max-width:280px;padding:6px 10px;border:1px solid #e0e0e0;border-radius:5px;font-size:13px"
+          oninput="enableSave('btn-naver-save')">
+      </div>
+      <div style="display:flex;align-items:center;gap:12px;font-size:13px">
+        <span style="color:#555;width:80px;flex-shrink:0">비밀번호</span>
+        <input type="password" id="naver-pw" autocomplete="current-password" placeholder="비밀번호"
+          style="flex:1;max-width:280px;padding:6px 10px;border:1px solid #e0e0e0;border-radius:5px;font-size:13px"
+          oninput="enableSave('btn-naver-save')">
+      </div>
+    </div>
+    <div class="admin-footer" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+      <button class="btn-save" id="btn-naver-save" onclick="saveNaverCreds(this)" disabled>저장됨</button>
+      <button class="btn-save" id="btn-naver-clear" onclick="clearNaverCreds()"
+        style="background:#888;color:#fff;opacity:1;cursor:pointer">지우기</button>
+      <span id="naver-save-hint" style="font-size:12px;color:#888"></span>
+    </div>
+  </div>
+
   <!-- 파인튜닝 관리 -->
   <div class="admin-section">
     <div class="admin-section-title">🤖 파인튜닝 관리</div>
@@ -1459,7 +1487,11 @@ function runCollect() {
   const btn = document.getElementById('btn-collect');
   btn.disabled = true;
   btn.textContent = '준비 중...';
-  fetch('/api/collect', {method: 'POST'})
+  fetch('/api/collect', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify(getNaverCreds()),
+  })
     .then(r => r.json())
     .then(data => {
       if (data.error) {
@@ -1674,7 +1706,11 @@ function postReply(idx, btn) {
   if (!confirm('스마트스토어에 실제로 댓글을 게시할까요?')) return;
   btn.disabled = true;
   btn.textContent = '게시 중...';
-  fetch(`/api/reply/post/${idx}`, {method: 'POST'})
+  fetch(`/api/reply/post/${idx}`, {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify(getNaverCreds()),
+  })
     .then(r => r.json())
     .then(data => {
       if (data.error) { alert(data.error); btn.disabled = false; btn.textContent = '스토어에 댓글 등록'; return; }
@@ -2040,6 +2076,48 @@ function flashSaved(btn) {
   btn.disabled = true;
 }
 
+// 네이버 ID/PW localStorage 관리
+const NAVER_ID_KEY = 'naver_id';
+const NAVER_PW_KEY = 'naver_pw';
+
+function getNaverCreds() {
+  return {
+    naver_id: localStorage.getItem(NAVER_ID_KEY) || '',
+    naver_pw: localStorage.getItem(NAVER_PW_KEY) || '',
+  };
+}
+
+function loadNaverCreds() {
+  const idEl = document.getElementById('naver-id');
+  const pwEl = document.getElementById('naver-pw');
+  const hint = document.getElementById('naver-save-hint');
+  if (!idEl || !pwEl) return;
+  const c = getNaverCreds();
+  idEl.value = c.naver_id;
+  pwEl.value = c.naver_pw;
+  if (hint) hint.textContent = c.naver_id ? '저장된 계정으로 자동 로그인합니다' : '미저장 — 자동 로그인 시 수동 로그인 창이 열립니다';
+}
+
+function saveNaverCreds(btn) {
+  const id = (document.getElementById('naver-id').value || '').trim();
+  const pw = document.getElementById('naver-pw').value || '';
+  localStorage.setItem(NAVER_ID_KEY, id);
+  localStorage.setItem(NAVER_PW_KEY, pw);
+  flashSaved(btn);
+  const hint = document.getElementById('naver-save-hint');
+  if (hint) hint.textContent = id ? '저장됨 (이 브라우저에만 보관)' : '저장됨 — ID가 비어 있어 수동 로그인 모드입니다';
+}
+
+function clearNaverCreds() {
+  if (!confirm('저장된 네이버 ID/PW를 삭제할까요?')) return;
+  localStorage.removeItem(NAVER_ID_KEY);
+  localStorage.removeItem(NAVER_PW_KEY);
+  document.getElementById('naver-id').value = '';
+  document.getElementById('naver-pw').value = '';
+  const hint = document.getElementById('naver-save-hint');
+  if (hint) hint.textContent = '삭제됨';
+}
+
 // 쿠폰 토글/입력 변경 시 버튼 활성화
 function onCouponChange() { enableSave('btn-save-coupon'); }
 
@@ -2258,6 +2336,7 @@ function renderDailyChart() {
 }
 
 window.adminSettings = {};
+loadNaverCreds();
 fetch('/api/admin/config').then(r => r.json()).then(cfg => {
   window.adminSettings = cfg;
   fetchReviews();

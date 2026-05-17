@@ -68,10 +68,21 @@ def post_reply(idx: int) -> dict:
         page.wait_for_load_state("networkidle", timeout=15000)
         time.sleep(3)
 
-        # 로그인 확인
+        # 로그인 확인 — 필요 시 자동 로그인 시도
         if any(x in page.url.lower() for x in ("login", "nidlogin", "oauth", "signin")):
-            result["error"] = "로그인이 필요합니다. 먼저 네이버 로그인을 완료하세요."
-            return result
+            write_post_progress("자동 로그인 시도 중")
+            import auto_login
+            status = auto_login.ensure_logged_in(
+                page,
+                naver_id=os.environ.get("NAVER_ID", ""),
+                naver_pw=os.environ.get("NAVER_PW", ""),
+            )
+            if status != "seller":
+                result["error"] = f"로그인 실패({status}). 관리자 패널에서 네이버 ID/PW를 확인하세요."
+                return result
+            page.goto("https://sell.smartstore.naver.com/#/review/search", timeout=20000)
+            page.wait_for_load_state("networkidle", timeout=15000)
+            time.sleep(2)
 
         write_post_progress(f"주문번호 {order_no} 검색 중")
 
