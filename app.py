@@ -394,6 +394,10 @@ def api_reviews():
         "draft_count":       sum(1 for r in all_r if r.get("reply_status") == "draft"),
         "needs_review_count":sum(1 for r in all_r if r.get("reply_status") == "needs_review"),
         "need_reply_count":  sum(1 for r in all_r if not r.get("replied") and not r.get("ai_reply")),
+        "approved_pending_count": sum(
+            1 for r in all_r
+            if r.get("reply_status") == "approved" and not r.get("replied") and (r.get("review_id") or "").strip()
+        ),
     }
 
     # reviewer → 인덱스 목록 맵 (O(n) 선처리)
@@ -1194,6 +1198,8 @@ def admin_config_post():
         s["auto_retry_sensitive"] = bool(data["auto_retry_sensitive"])
     if "skip_reportable_reply" in data:
         s["skip_reportable_reply"] = bool(data["skip_reportable_reply"])
+    if "test_mode" in data:
+        s["test_mode"] = bool(data["test_mode"])
     save_settings(s)
     return jsonify({"status": "ok"})
 
@@ -1374,9 +1380,22 @@ def finetune_activate():
     return jsonify({"status": "ok", "active_model": model_id})
 
 
+# ── 답글 게시 동시성 관리 ──
+_post_progress = {}            # idx -> {step, running, success, error, started_at}
+_post_lock = threading.Lock()
+_reviews_io_lock = threading.Lock()
+
+
+def _set_post_progress(idx, **kw):
+    with _post_lock:
+        cur = _post_progress.get(idx, {})
+        cur.update(kw)
+        _post_progress[idx] = cur
+
+
 @app.route("/api/reply/post/<int:idx>", methods=["POST"])
 def api_post_reply(idx):
-    """셀러센터에 답글 게시 (HTTP 직접 호출 via reply_poster.py subprocess)"""
+    """셀러센터에 답글 게시 (인메모리 threading + per-idx 진행 추적)"""
     reviews = load_reviews()
     if idx >= len(reviews):
         return jsonify({"error": "not found"}), 404
@@ -1386,24 +1405,194 @@ def api_post_reply(idx):
     if r.get("replied"):
         return jsonify({"error": "이미 답글이 달린 리뷰입니다."}), 400
     if not (r.get("review_id") or "").strip():
-        return jsonify({"error": "review_id 없음 — 리뷰를 재수집해주세요 (엑셀 '리뷰글번호')"}), 422
+        return jsonify({"error": "review_id 없음 — 리뷰를 재수집해주세요"}), 422
+
+    # 세션 사전 가드 (cookies 만료/없음 → 412)
+    try:
+        import reply_api
+        if not reply_api.is_available():
+            return jsonify({"error": "세션 없음 — 다시 로그인해 주세요"}), 412
+    except Exception:
+        pass
+
+    # 동일 idx 중복 실행 차단
+    with _post_lock:
+        cur = _post_progress.get(idx)
+        if cur and cur.get("running"):
+            return jsonify({"error": "이미 게시 진행 중입니다."}), 409
+
     body = request.get_json(silent=True) or {}
-    env = os.environ.copy()
+    dry_run = bool(body.get("dry_run"))
     if body.get("naver_id"):
-        env["NAVER_ID"] = body["naver_id"].strip()
+        os.environ["NAVER_ID"] = body["naver_id"].strip()
     if body.get("naver_pw"):
-        env["NAVER_PW"] = body["naver_pw"]
-    subprocess.Popen([sys.executable, "reply_poster.py", str(idx)], env=env)
+        os.environ["NAVER_PW"] = body["naver_pw"]
+
+    import time
+    _set_post_progress(idx, step="시작", running=True, success=None,
+                       error=None, started_at=time.time())
+
+    def _run():
+        try:
+            import reply_poster
+            res = reply_poster.post_reply(
+                idx, dry_run=dry_run,
+                progress_cb=lambda step: _set_post_progress(idx, step=step),
+                io_lock=_reviews_io_lock,
+            )
+            _set_post_progress(idx,
+                step="완료" if res["ok"] else "오류",
+                running=False, success=res["ok"], error=res.get("error"))
+            if res["ok"] and not dry_run:
+                invalidate_reviews_cache()
+        except Exception as e:
+            _set_post_progress(idx, step="오류", running=False,
+                               success=False, error=str(e))
+
+    threading.Thread(target=_run, daemon=True).start()
     return jsonify({"status": "started"})
 
 
 @app.route("/api/reply/post-progress")
 def api_post_progress():
-    path = "data/post_progress.json"
-    if not os.path.exists(path):
-        return jsonify({"running": False, "step": "", "success": None, "error": None})
-    with open(path, encoding="utf-8") as f:
-        return jsonify(json.load(f))
+    """idx 쿼리로 단건 조회. 없으면 전체 dict 반환(호환)."""
+    idx_arg = request.args.get("idx", type=int)
+    if idx_arg is not None:
+        with _post_lock:
+            cur = _post_progress.get(idx_arg)
+        return jsonify(cur or {"running": False, "step": "", "success": None, "error": None})
+    with _post_lock:
+        return jsonify(dict(_post_progress))
+
+
+# ── 일괄 게시 ──
+_bulk_progress = {
+    "running": False, "total": 0, "done": 0,
+    "success": 0, "fail": 0, "current_idx": None,
+    "failures": [],   # [{idx, reviewer, error}]
+    "started_at": None,
+}
+_bulk_lock = threading.Lock()
+_BULK_MAX = 50
+_BULK_GAP_SEC = 0.8
+
+
+def _set_bulk(**kw):
+    with _bulk_lock:
+        _bulk_progress.update(kw)
+
+
+@app.route("/api/reply/post/bulk", methods=["POST"])
+def api_post_bulk():
+    """다수 idx를 순차 게시. rate-limit 보호 + per-idx 결과 누적."""
+    with _bulk_lock:
+        if _bulk_progress.get("running"):
+            return jsonify({"error": "이미 일괄 게시가 진행 중입니다."}), 409
+
+    data = request.get_json(silent=True) or {}
+    indices_in = data.get("indices") or []
+    dry_run = bool(data.get("dry_run"))
+    skip_needs_review = bool(data.get("skip_needs_review", True))
+
+    try:
+        import reply_api
+        if not reply_api.is_available():
+            return jsonify({"error": "세션 없음 — 다시 로그인해 주세요"}), 412
+    except Exception:
+        pass
+
+    reviews = load_reviews()
+    # 유효 idx만 선별
+    valid = []
+    for i in indices_in:
+        try:
+            i = int(i)
+        except (TypeError, ValueError):
+            continue
+        if not (0 <= i < len(reviews)):
+            continue
+        r = reviews[i]
+        if r.get("replied"):
+            continue
+        if r.get("reply_status") != "approved":
+            continue
+        if not (r.get("ai_reply") or "").strip():
+            continue
+        if not (r.get("review_id") or "").strip():
+            continue
+        if skip_needs_review and r.get("sensitive_flags"):
+            continue
+        valid.append(i)
+        if len(valid) >= _BULK_MAX:
+            break
+
+    if not valid:
+        return jsonify({"error": "게시 가능한 항목이 없습니다."}), 400
+
+    import time
+    with _bulk_lock:
+        _bulk_progress.update({
+            "running": True, "total": len(valid), "done": 0,
+            "success": 0, "fail": 0, "current_idx": None,
+            "failures": [], "started_at": time.time(),
+        })
+
+    if data.get("naver_id"):
+        os.environ["NAVER_ID"] = data["naver_id"].strip()
+    if data.get("naver_pw"):
+        os.environ["NAVER_PW"] = data["naver_pw"]
+
+    def _runner(idx_list):
+        import reply_poster, time as _t
+        for i in idx_list:
+            with _bulk_lock:
+                _bulk_progress["current_idx"] = i
+            # 게시별 진행 추적도 같이 갱신
+            _set_post_progress(i, step="시작", running=True, success=None, error=None)
+            try:
+                res = reply_poster.post_reply(
+                    i, dry_run=dry_run,
+                    progress_cb=lambda step, _i=i: _set_post_progress(_i, step=step),
+                    io_lock=_reviews_io_lock,
+                )
+                _set_post_progress(i,
+                    step="완료" if res["ok"] else "오류",
+                    running=False, success=res["ok"], error=res.get("error"))
+                with _bulk_lock:
+                    _bulk_progress["done"] += 1
+                    if res["ok"]:
+                        _bulk_progress["success"] += 1
+                    else:
+                        _bulk_progress["fail"] += 1
+                        reviewer = ""
+                        try:
+                            reviewer = load_reviews()[i].get("reviewer", "")
+                        except Exception:
+                            pass
+                        _bulk_progress["failures"].append({
+                            "idx": i, "reviewer": reviewer, "error": res.get("error") or "실패",
+                        })
+            except Exception as e:
+                _set_post_progress(i, step="오류", running=False, success=False, error=str(e))
+                with _bulk_lock:
+                    _bulk_progress["done"] += 1
+                    _bulk_progress["fail"] += 1
+                    _bulk_progress["failures"].append({"idx": i, "reviewer": "", "error": str(e)})
+            _t.sleep(_BULK_GAP_SEC)
+        with _bulk_lock:
+            _bulk_progress["running"] = False
+            _bulk_progress["current_idx"] = None
+        if not dry_run:
+            invalidate_reviews_cache()
+
+    threading.Thread(target=_runner, args=(list(valid),), daemon=True).start()
+    return jsonify({"status": "started", "total": len(valid)})
+
+
+@app.route("/api/reply/post/bulk/progress")
+def api_post_bulk_progress():
+    with _bulk_lock:
+        return jsonify(dict(_bulk_progress))
 
 
 @app.route("/api/scrape", methods=["POST"])

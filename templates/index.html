@@ -333,9 +333,9 @@
     padding: 14px 24px; display: flex; gap: 0; flex-wrap: wrap; align-items: stretch;
   }
   .stat {
-    text-align: left; min-width: 76px;
+    text-align: center; min-width: 76px;
     padding: 2px 16px; border-right: 1px solid #f1f3f4;
-    display: flex; flex-direction: column; justify-content: center;
+    display: flex; flex-direction: column; justify-content: center; align-items: center;
   }
   .stat:first-child { padding-left: 0; }
   .stat.no-divider, .stat.last-stat { border-right: none; }
@@ -392,15 +392,17 @@
   #chart-body { display: none; padding: 0 24px 16px; }
 
   .btn-classify-main {
-    height: 32px; padding: 0 14px;
+    height: 44px; padding: 0 22px;
     background: #03c75a; color: #fff; border: none;
-    border-radius: 4px; cursor: pointer;
-    font-size: 13px; font-weight: 700; white-space: nowrap;
-    display: inline-flex; align-items: center; gap: 4px;
-    transition: background 0.15s;
+    border-radius: 8px; cursor: pointer;
+    font-size: 15px; font-weight: 800; white-space: nowrap; letter-spacing: 0.2px;
+    display: inline-flex; align-items: center; gap: 6px;
+    box-shadow: 0 2px 6px rgba(3, 199, 90, 0.28);
+    transition: background 0.15s, box-shadow 0.15s, transform 0.05s;
   }
-  .btn-classify-main:hover { background: #02b350; }
-  .btn-classify-main:disabled { background: #cbe9d6; cursor: not-allowed; }
+  .btn-classify-main:hover { background: #02b350; box-shadow: 0 4px 10px rgba(3, 199, 90, 0.35); }
+  .btn-classify-main:active { transform: translateY(1px); }
+  .btn-classify-main:disabled { background: #cbe9d6; box-shadow: none; cursor: not-allowed; }
 
   .btn-unanalyzed {
     height: 32px; padding: 0 12px;
@@ -532,6 +534,60 @@
   .badge-report { background: #fce4ec; color: #c62828; }
   .badge-draft { background: #e3f2fd; color: #1565c0; }
   .badge-approved { background: #e8f5e9; color: #2e7d32; }
+  .badge-posted { background: #e8f9f0; color: #2e7d32; border: 1px solid #c8e6c9; }
+  .badge-warn   { background: #fff8e1; color: #8a6d3b; border: 1px solid #ffe082; }
+  .badge-muted  { background: #f5f5f5; color: #888; font-weight: 500; }
+
+  /* 게시 진행 칩 (per-idx) */
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .post-chip {
+    display: inline-flex; align-items: center; gap: 6px;
+    font-size: 11px; padding: 3px 9px; border-radius: 99px;
+    background: #fff8e1; color: #8a6d3b; border: 1px solid #ffe082;
+    margin-left: 6px; vertical-align: middle;
+  }
+  .post-chip.success { background: #e8f9f0; color: #2e7d32; border-color: #c8e6c9; }
+  .post-chip.error   { background: #fdecea; color: #b3261e; border-color: #f5c2c0; }
+  .post-chip .spinner {
+    width: 10px; height: 10px; border-radius: 50%;
+    border: 2px solid currentColor; border-top-color: transparent;
+    animation: spin 0.7s linear infinite; box-sizing: border-box;
+  }
+  .post-chip .chip-cta {
+    background: transparent; border: none; color: inherit; cursor: pointer;
+    font-size: 11px; font-weight: 700; padding: 0 2px; text-decoration: underline;
+  }
+
+  /* 인라인 게시 컨펌 패널 */
+  @keyframes pcpSlide { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: translateY(0); } }
+  .post-confirm-panel {
+    margin-top: 10px; padding: 14px; border-radius: 8px;
+    background: #fffbf3; border: 1px solid #ffd9a8;
+    animation: pcpSlide 0.18s ease;
+  }
+  .post-confirm-panel .pcp-title {
+    font-size: 13px; font-weight: 700; color: #b65b00; margin-bottom: 8px;
+    display: flex; align-items: center; gap: 6px;
+  }
+  .post-confirm-panel .pcp-meta {
+    font-size: 12px; color: #666; margin-bottom: 6px;
+  }
+  .post-confirm-panel .pcp-preview {
+    background: #fff; border: 1px solid #ffe7c8; border-radius: 6px;
+    padding: 8px 10px; font-size: 12px; color: #333; line-height: 1.6;
+    white-space: pre-wrap; max-height: 140px; overflow-y: auto;
+  }
+  .post-confirm-panel .pcp-row {
+    display: flex; align-items: center; gap: 10px; font-size: 11px;
+    color: #888; margin-top: 8px; flex-wrap: wrap;
+  }
+  .post-confirm-panel .pcp-dirty {
+    font-size: 12px; color: #b65b00; margin-top: 8px;
+    padding: 6px 8px; background: #fff3e0; border-radius: 4px;
+  }
+  .post-confirm-panel .pcp-actions {
+    display: flex; gap: 6px; margin-top: 10px; justify-content: flex-end;
+  }
 
   .product-tag {
     display: inline-block; background: #f0faf5; color: #00a846;
@@ -608,11 +664,20 @@
   .card-body { display: flex; gap: 0; }
   .card-left { width: 40%; min-width: 0; padding-right: 14px; border-right: 1px solid #f0f0f0; overflow: hidden; }
   .card-divider {
-    width: 6px; flex-shrink: 0; cursor: col-resize;
-    background: transparent; position: relative; margin: 0 -3px; z-index: 1;
+    width: 10px; flex-shrink: 0; cursor: col-resize;
+    background: transparent; position: relative; margin: 0 -5px; z-index: 1;
+    display: flex; align-items: center; justify-content: center;
     transition: background 0.15s;
   }
-  .card-divider:hover, .card-divider.dragging { background: #03c75a33; border-radius: 3px; }
+  .card-divider::before {
+    content: ''; width: 3px; height: 28px;
+    background: #d8dde3; border-radius: 2px;
+    transition: background 0.15s, height 0.15s, width 0.15s;
+  }
+  .card-divider:hover { background: #03c75a14; }
+  .card-divider:hover::before { background: #03c75a; width: 4px; height: 36px; }
+  .card-divider.dragging { background: #03c75a22; }
+  .card-divider.dragging::before { background: #03c75a; width: 4px; height: 36px; }
   .card-right {
     flex: 1; min-width: 0; padding-left: 14px;
     display: flex; flex-direction: column;
@@ -750,6 +815,7 @@
   <div class="stat warn" id="stat-report-card"><div class="val" id="stat-report">-</div><div class="lbl">신고 가능</div></div>
   <div class="stat info"><div class="val" id="stat-draft">-</div><div class="lbl">AI 초안 대기</div></div>
   <div class="stat warn" id="stat-need-reply-card"><div class="val" id="stat-need-reply">-</div><div class="lbl">답변 생성 필요</div></div>
+  <div class="stat refund-stat" id="stat-approved-pending-card" onclick="openBulkPostModal()" title="승인된 답변을 일괄로 게시"><div class="val" id="stat-approved-pending">-</div><div class="lbl">게시 대기</div></div>
   <div class="stat refund-stat" id="stat-refund-card" onclick="quickFilterRefund()" title="클릭하여 환불 완료 리뷰만 보기"><div class="val" id="stat-refund">-</div><div class="lbl">환불 완료</div></div>
   <div class="sentiment-card">
     <div class="sc-title">감성 분포</div>
@@ -891,6 +957,37 @@
   <button onclick="closeClassifyModal()" style="display:block;width:100%;margin-top:16px;padding:10px;background:#f5f5f5;color:#666;border:none;border-radius:8px;font-size:13px;cursor:pointer;">취소</button>
 </div>
 
+<!-- 일괄 게시 모달 -->
+<div id="bulk-post-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:9998;" onclick="closeBulkPostModal()"></div>
+<div id="bulk-post-modal" style="display:none;position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:#fff;border-radius:14px;box-shadow:0 8px 32px rgba(0,0,0,.18);z-index:9999;width:480px;max-height:80vh;padding:24px;font-family:-apple-system,'Malgun Gothic',sans-serif;display:flex;flex-direction:column;">
+  <div style="font-size:15px;font-weight:700;color:#222;margin-bottom:4px;">스토어에 일괄 게시</div>
+  <div id="bulk-post-summary" style="font-size:12px;color:#666;margin-bottom:14px;">대상을 불러오는 중…</div>
+  <div id="bulk-post-list" style="flex:1;overflow-y:auto;border:1px solid #eee;border-radius:8px;padding:8px;font-size:12px;color:#333;min-height:120px;max-height:300px;"></div>
+  <div style="margin-top:12px;display:flex;flex-direction:column;gap:6px;">
+    <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:#555;cursor:pointer;">
+      <input type="checkbox" id="bulk-skip-needs-review" checked onchange="_loadBulkCandidates()">
+      <span>민감어 검토 항목 자동 제외</span>
+    </label>
+    <label id="bulk-dryrun-wrap" style="display:none;align-items:center;gap:6px;font-size:12px;color:#555;cursor:pointer;">
+      <input type="checkbox" id="bulk-dryrun">
+      <span>테스트 발송 (실제 게시 안 함)</span>
+    </label>
+  </div>
+  <div style="display:flex;gap:8px;margin-top:14px;">
+    <button onclick="closeBulkPostModal()" style="flex:1;padding:10px;background:#f5f5f5;color:#666;border:none;border-radius:8px;font-size:13px;cursor:pointer;">취소</button>
+    <button id="bulk-post-start-btn" onclick="startBulkPost()" style="flex:2;padding:10px;background:#e65100;color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;">게시 시작</button>
+  </div>
+</div>
+
+<!-- 일괄 게시 결과 모달 -->
+<div id="bulk-result-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:9998;" onclick="closeBulkResultModal()"></div>
+<div id="bulk-result-modal" style="display:none;position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:#fff;border-radius:14px;box-shadow:0 8px 32px rgba(0,0,0,.18);z-index:9999;width:460px;max-height:80vh;padding:24px;font-family:-apple-system,'Malgun Gothic',sans-serif;display:flex;flex-direction:column;">
+  <div style="font-size:15px;font-weight:700;color:#222;margin-bottom:6px;">일괄 게시 결과</div>
+  <div id="bulk-result-summary" style="font-size:13px;color:#444;margin-bottom:10px;"></div>
+  <div id="bulk-result-failures" style="flex:1;overflow-y:auto;font-size:12px;"></div>
+  <button onclick="closeBulkResultModal()" style="display:block;width:100%;margin-top:14px;padding:10px;background:#03c75a;color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;">닫기</button>
+</div>
+
 <div id="classify-progress-backdrop" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:9998;"></div>
 <div class="progress-overlay" id="classify-progress">
   <div class="progress-title">
@@ -1017,6 +1114,16 @@
       <div class="toggle-wrap">
         <div class="toggle" id="toggle-skip-reportable" onclick="toggleSkipReportable(); enableSave('btn-save-settings')"></div>
         <span id="skip-reportable-label" style="font-size:13px;color:#888;">OFF</span>
+      </div>
+    </div>
+    <div class="admin-row" style="margin-top:12px">
+      <div>
+        <div class="admin-row-label">TEST 모드 — 게시 미리보기에 '테스트 발송' 옵션 노출</div>
+        <div class="admin-row-sub">실제 게시 없이 검증만 하는 dry-run 체크박스를 게시 컨펌 모달에 노출 (일반 사용자에게는 숨김)</div>
+      </div>
+      <div class="toggle-wrap">
+        <div class="toggle" id="toggle-test-mode" onclick="toggleTestMode(); enableSave('btn-save-settings')"></div>
+        <span id="test-mode-label" style="font-size:13px;color:#888;">OFF</span>
       </div>
     </div>
     <div style="margin-top:16px">
@@ -1257,11 +1364,13 @@ function customerTypeBadge(type) {
 function replyStatusBadge(status) {
   if (status === 'draft') return '<span class="badge badge-draft">AI초안</span>';
   if (status === 'approved') return '<span class="badge badge-approved">승인됨</span>';
+  if (status === 'posted') return '<span class="badge badge-posted">✓ 게시완료</span>';
+  if (status === 'needs_review') return '<span class="badge badge-warn">민감어 검토</span>';
   return '';
 }
 
 // 컬럼 드래그 리사이즈
-window._cardLeftPct = 30;
+window._cardLeftPct = 40;
 function startResize(e) {
   e.preventDefault();
   const divider = e.target;
@@ -1299,6 +1408,7 @@ function checkCoupon(r) {
 }
 
 function renderReviews(reviews) {
+  window._lastReviews = reviews;
   const container = document.getElementById('reviews-container');
   if (!reviews.length) {
     container.innerHTML = `<div class="empty-state"><div class="icon">📭</div><p>조건에 맞는 리뷰가 없습니다</p></div>`;
@@ -1411,7 +1521,7 @@ function renderReviews(reviews) {
       : '';
 
     let aiSection = '';
-    if (r.replied) {
+    if (r.replied || r.reply_status === 'posted') {
       aiSection = `
         <div class="card-right-section">
           <div class="card-right-label">답변 상태</div>
@@ -1448,9 +1558,10 @@ function renderReviews(reviews) {
               <button class="btn-sm btn-gray" id="enable-edit-btn-${idx}" onclick="enableEditReply(${idx})">수정</button>
               <button class="btn-sm btn-blue" id="edit-btn-${idx}" onclick="startEditReply(${idx})" style="display:none">저장</button>
               <button class="btn-sm btn-ghost" id="del-btn-${idx}" onclick="rejectReply(${idx})" style="display:none">삭제</button>
-              <button class="btn-sm btn-orange" disabled style="opacity:.4;cursor:not-allowed">스토어에 댓글 등록 (개발중)</button>
+              ${postActionHTML(idx, r)}
             </div>
             ${replyHistoryHTML}
+            <div class="post-confirm-host" id="post-confirm-host-${idx}"></div>
           </div>
         </div>`;
     } else {
@@ -1516,6 +1627,9 @@ function renderStats(stats) {
   setVal('stat-draft', stats.draft_count || 0);
   setVal('stat-need-reply', stats.need_reply_count || 0, true);
   setVal('stat-refund', stats.refund_count || 0);
+  setVal('stat-approved-pending', stats.approved_pending_count || 0);
+  document.getElementById('stat-approved-pending-card').style.display =
+    (stats.approved_pending_count || 0) > 0 ? '' : 'none';
   document.getElementById('stat-refund-card').classList.toggle('active', document.getElementById('filter-refund').value === 'completed');
   document.getElementById('filter-count').innerHTML = `<strong>${stats.filtered.toLocaleString()}</strong>건`;
 
@@ -1901,31 +2015,398 @@ function startEditReply(idx) {
   approveReply(idx);
 }
 
-function postReply(idx, btn) {
-  if (!confirm('스마트스토어에 실제로 댓글을 게시할까요?')) return;
-  btn.disabled = true;
-  btn.textContent = '게시 중...';
-  fetch(`/api/reply/post/${idx}`, {
+// ── 스토어 댓글 등록 UI ──────────────────────────────────────────────
+function _escapeHtml(s) {
+  return String(s ?? '').replace(/[&<>"']/g, c =>
+    ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+function postActionHTML(idx, r) {
+  const g = postButtonGuard(r);
+  if (g.disabled) {
+    return `
+      <button class="btn-sm btn-orange" disabled style="opacity:.45;cursor:not-allowed" title="${_escapeHtml(g.reason)}">스토어에 댓글 등록</button>
+      <span class="badge badge-muted">${_escapeHtml(g.reason)}</span>
+      ${g.cta || ''}`;
+  }
+  return `<button class="btn-sm btn-orange" id="post-btn-${idx}" onclick="openPostConfirm(${idx})">스토어에 댓글 등록</button>`;
+}
+
+function postButtonGuard(r) {
+  if (!window._sessionLoggedIn) {
+    return { disabled: true, reason: '세션 만료',
+             cta: `<button class="btn-sm btn-ghost" onclick="runCollect()">재로그인</button>` };
+  }
+  if (!(r.review_id || '').toString().trim()) {
+    return { disabled: true, reason: '리뷰 식별번호 없음',
+             cta: `<button class="btn-sm btn-ghost" onclick="runCollect()">리뷰 재수집</button>` };
+  }
+  if (!(r.ai_reply || '').trim()) {
+    return { disabled: true, reason: '답변 본문 없음' };
+  }
+  return { disabled: false };
+}
+
+function _findReviewByIdx(idx) {
+  return (window._lastReviews || []).find(x => x._idx === idx);
+}
+
+function openPostConfirm(idx) {
+  closeAllPostPanels();
+  const host = document.getElementById(`post-confirm-host-${idx}`);
+  if (!host) return;
+  const r = _findReviewByIdx(idx) || {};
+  const ta = document.getElementById(`reply-text-${idx}`);
+  const currentText = (ta?.value || '').trim();
+  const storedText = (r.ai_reply || '').trim();
+  const isDirty = !ta?.readOnly && currentText !== storedText;
+  const text = currentText || storedText;
+  const showDryRun = !!(window.adminConfig && window.adminConfig.test_mode);
+
+  const panel = document.createElement('div');
+  panel.className = 'post-confirm-panel';
+  panel.id = `post-confirm-${idx}`;
+  panel.innerHTML = `
+    <div class="pcp-title">⚠ 스마트스토어에 실제로 게시합니다</div>
+    <div class="pcp-meta"><strong>${_escapeHtml(r.reviewer || '익명')}</strong> · ${starsHTML(r.rating || 0)}</div>
+    <div class="pcp-preview">${_escapeHtml(text) || '<em style="color:#aaa">(본문 비어있음)</em>'}</div>
+    <div class="pcp-row">
+      <span>${text.length}자</span>
+      <span>·</span>
+      <span>리뷰번호 ${_escapeHtml(r.review_id || '')}</span>
+      ${showDryRun ? `
+        <span style="flex:1"></span>
+        <label style="display:flex;align-items:center;gap:4px;cursor:pointer">
+          <input type="checkbox" id="post-dryrun-${idx}">
+          <span>테스트 발송 (실제 게시 안 함)</span>
+        </label>
+      ` : ''}
+    </div>
+    ${isDirty ? `<div class="pcp-dirty">수정 내용이 저장되지 않았습니다. 저장 후 게시합니다.</div>` : ''}
+    <div class="pcp-actions">
+      <button class="btn-sm btn-ghost" onclick="closePostPanel(${idx})">취소</button>
+      <button class="btn-sm btn-orange" onclick="confirmPostReply(${idx}, ${isDirty ? 'true' : 'false'})">${isDirty ? '저장하고 게시' : '지금 게시'}</button>
+    </div>
+  `;
+  host.appendChild(panel);
+
+  const escHandler = (e) => { if (e.key === 'Escape') closePostPanel(idx); };
+  panel._escHandler = escHandler;
+  document.addEventListener('keydown', escHandler);
+
+  const outsideHandler = (e) => {
+    if (!panel.contains(e.target) && !e.target.closest(`#post-btn-${idx}`)) {
+      closePostPanel(idx);
+    }
+  };
+  panel._outsideHandler = outsideHandler;
+  setTimeout(() => document.addEventListener('mousedown', outsideHandler), 0);
+}
+
+function closePostPanel(idx) {
+  const p = document.getElementById(`post-confirm-${idx}`);
+  if (!p) return;
+  if (p._escHandler) document.removeEventListener('keydown', p._escHandler);
+  if (p._outsideHandler) document.removeEventListener('mousedown', p._outsideHandler);
+  p.remove();
+}
+
+function closeAllPostPanels() {
+  document.querySelectorAll('.post-confirm-panel').forEach(p => {
+    if (p._escHandler) document.removeEventListener('keydown', p._escHandler);
+    if (p._outsideHandler) document.removeEventListener('mousedown', p._outsideHandler);
+    p.remove();
+  });
+}
+
+function confirmPostReply(idx, saveFirst) {
+  const dryRun = document.getElementById(`post-dryrun-${idx}`)?.checked || false;
+  const ta = document.getElementById(`reply-text-${idx}`);
+  const text = (ta?.value || '').trim();
+
+  closePostPanel(idx);
+  showPostChip(idx, 'running', '답글 등록 요청 중…');
+
+  const sendPost = () => {
+    fetch(`/api/reply/post/${idx}`, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ ...getNaverCreds(), dry_run: dryRun }),
+    })
+      .then(r => r.json().then(d => ({ status: r.status, data: d })))
+      .then(({ status, data }) => {
+        if (data.error) {
+          showPostChip(idx, 'error', data.error, status);
+          return;
+        }
+        _pollPostProgress(idx, dryRun);
+      })
+      .catch(() => showPostChip(idx, 'error', '네트워크 오류'));
+  };
+
+  if (saveFirst) {
+    fetch(`/api/reply/approve/${idx}`, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ reply: text }),
+    }).then(r => r.json()).then(d => {
+      if (d.error) { showPostChip(idx, 'error', d.error); return; }
+      sendPost();
+    }).catch(() => showPostChip(idx, 'error', '저장 실패'));
+  } else {
+    sendPost();
+  }
+}
+
+function _pollPostProgress(idx, dryRun) {
+  const poll = setInterval(() => {
+    if (!document.getElementById(`card-${idx}`)) { clearInterval(poll); return; }
+    fetch(`/api/reply/post-progress?idx=${idx}`).then(r => r.json()).then(p => {
+      if (p.running) {
+        showPostChip(idx, 'running', p.step || '게시 중…');
+        return;
+      }
+      clearInterval(poll);
+      if (p.success) {
+        const successText = dryRun ? '테스트 완료 (실제 게시 안 됨)' : '게시 완료';
+        showPostChip(idx, 'success', successText);
+        const scrollY = window.scrollY;
+        fetchReviews(() => {
+          window.scrollTo(0, scrollY);
+          flashReplyTextarea(idx);
+          setTimeout(() => hidePostChip(idx), 2000);
+        });
+      } else {
+        showPostChip(idx, 'error', p.error || '알 수 없는 오류');
+      }
+    }).catch(() => {});
+  }, 1200);
+}
+
+function _getPostChipHost(idx) {
+  const card = document.getElementById(`card-${idx}`);
+  return card?.querySelector('.reviewer-name') || null;
+}
+
+function showPostChip(idx, kind, text, statusCode) {
+  const host = _getPostChipHost(idx);
+  if (!host) return;
+  let chip = document.getElementById(`post-chip-${idx}`);
+  if (!chip) {
+    chip = document.createElement('span');
+    chip.id = `post-chip-${idx}`;
+    host.appendChild(chip);
+  }
+  chip.className = `post-chip ${kind}`;
+  let inner = '';
+  if (kind === 'running') {
+    inner = `<span class="spinner"></span>${_escapeHtml(text)}`;
+  } else if (kind === 'success') {
+    inner = `✓ ${_escapeHtml(text)}`;
+  } else {
+    const friendly = _friendlyPostError(text, statusCode);
+    inner = `⚠ ${_escapeHtml(friendly)}`;
+    inner += _postErrorCtaHTML(idx, statusCode, text);
+  }
+  chip.innerHTML = inner;
+}
+
+function _postErrorCtaHTML(idx, statusCode, msg) {
+  // 401/412/세션 만료 → 재로그인 (재시도 노출 X)
+  if (statusCode === 401 || statusCode === 412 || /세션|로그인/.test(msg || '')) {
+    return ` <button class="chip-cta" onclick="runCollect()">재로그인</button>`;
+  }
+  // 422/review_id 누락 → 재수집 (재시도 노출 X)
+  if (statusCode === 422 || /review_id|식별|재수집/.test(msg || '')) {
+    return ` <button class="chip-cta" onclick="runCollect()">재수집</button>`;
+  }
+  // 이미 답글/이미 진행 중 → CTA 없음
+  if (statusCode === 409 || /이미 답글|이미 게시/.test(msg || '')) {
+    return '';
+  }
+  // 그 외 → 재시도
+  return ` <button class="chip-cta" onclick="hidePostChip(${idx});openPostConfirm(${idx});">재시도</button>`;
+}
+
+function _friendlyPostError(msg, statusCode) {
+  if (statusCode === 401 || statusCode === 412) return '세션 만료';
+  if (statusCode === 409) return '이미 게시 진행 중';
+  if (statusCode === 422) return '리뷰 식별번호 누락';
+  if (statusCode && statusCode >= 500) return '서버 오류';
+  if (!msg) return '알 수 없는 오류';
+  if (/세션|로그인/.test(msg)) return '세션 만료';
+  if (/review_id|식별/.test(msg)) return '리뷰 식별번호 누락';
+  if (/이미 답글/.test(msg)) return '이미 답글 등록됨';
+  if (/이미 게시/.test(msg)) return '이미 게시 진행 중';
+  return msg.length > 40 ? msg.slice(0, 40) + '…' : msg;
+}
+
+function hidePostChip(idx) {
+  const c = document.getElementById(`post-chip-${idx}`);
+  if (c) c.remove();
+}
+
+// ── 일괄 게시 ──
+let _bulkPostPoll = null;
+function openBulkPostModal() {
+  const overlay = document.getElementById('bulk-post-overlay');
+  const modal = document.getElementById('bulk-post-modal');
+  overlay.style.display = 'block';
+  modal.style.display = 'flex';
+  document.getElementById('bulk-dryrun-wrap').style.display =
+    (window.adminConfig && window.adminConfig.test_mode) ? 'flex' : 'none';
+  document.getElementById('bulk-dryrun').checked = false;
+  document.getElementById('bulk-skip-needs-review').checked = true;
+  const startBtn = document.getElementById('bulk-post-start-btn');
+  startBtn.disabled = false;
+  startBtn.textContent = '게시 시작';
+  startBtn.style.opacity = '1';
+  _loadBulkCandidates();
+}
+
+function closeBulkPostModal() {
+  if (_bulkPostPoll) { clearInterval(_bulkPostPoll); _bulkPostPoll = null; }
+  document.getElementById('bulk-post-overlay').style.display = 'none';
+  document.getElementById('bulk-post-modal').style.display = 'none';
+}
+
+function _loadBulkCandidates() {
+  const list = document.getElementById('bulk-post-list');
+  const summary = document.getElementById('bulk-post-summary');
+  list.innerHTML = '<div style="color:#aaa;padding:14px;text-align:center;">불러오는 중…</div>';
+  fetch('/api/reviews?page=1&page_size=10000').then(r => r.json()).then(data => {
+    const all = data.reviews || [];
+    const skipNR = document.getElementById('bulk-skip-needs-review').checked;
+    const candidates = all.filter(r =>
+      r.reply_status === 'approved' &&
+      !r.replied &&
+      (r.review_id || '').toString().trim() &&
+      (r.ai_reply || '').trim() &&
+      (!skipNR || !(r.sensitive_flags && r.sensitive_flags.length))
+    );
+    window._bulkCandidates = candidates;
+    summary.innerHTML = `<strong>${candidates.length}건</strong> 게시 예정` +
+      (candidates.length > 50 ? ` <span style="color:#b3261e">(한 번에 최대 50건)</span>` : '');
+    if (!candidates.length) {
+      list.innerHTML = '<div style="color:#888;padding:14px;text-align:center;">게시 가능한 항목이 없습니다.</div>';
+      const btn = document.getElementById('bulk-post-start-btn');
+      btn.disabled = true; btn.style.opacity = '.5';
+      return;
+    }
+    list.innerHTML = candidates.slice(0, 50).map(r => `
+      <div style="padding:6px 8px;border-bottom:1px solid #f3f3f3;display:flex;align-items:center;gap:8px;">
+        <span style="font-weight:600;min-width:60px;">${_escapeHtml(r.reviewer || '익명')}</span>
+        <span style="color:#f57c00;">${'★'.repeat(r.rating || 0)}</span>
+        <span style="color:#666;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${_escapeHtml((r.ai_reply || '').slice(0, 60))}</span>
+        <span style="color:#aaa;font-size:11px;">${(r.ai_reply || '').length}자</span>
+      </div>
+    `).join('');
+  }).catch(() => {
+    list.innerHTML = '<div style="color:#b3261e;padding:14px;text-align:center;">불러오기 실패</div>';
+  });
+}
+
+function startBulkPost() {
+  const candidates = window._bulkCandidates || [];
+  if (!candidates.length) return;
+  const indices = candidates.slice(0, 50).map(r => r._idx);
+  const dryRun = document.getElementById('bulk-dryrun')?.checked || false;
+  const skipNR = document.getElementById('bulk-skip-needs-review').checked;
+  const startBtn = document.getElementById('bulk-post-start-btn');
+  startBtn.disabled = true; startBtn.style.opacity = '.5';
+  startBtn.textContent = '시작 중…';
+
+  fetch('/api/reply/post/bulk', {
     method: 'POST',
     headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify(getNaverCreds()),
-  })
-    .then(r => r.json())
-    .then(data => {
-      if (data.error) { alert(data.error); btn.disabled = false; btn.textContent = '스토어에 댓글 등록'; return; }
-      // 진행상황 폴링
-      const poll = setInterval(() => {
-        fetch('/api/reply/post-progress').then(r => r.json()).then(p => {
-          btn.textContent = p.step || '게시 중...';
-          if (!p.running) {
-            clearInterval(poll);
-            if (p.success) fetchReviews();
-            else { alert('게시 실패: ' + (p.error || '알 수 없는 오류')); btn.disabled = false; btn.textContent = '스토어에 댓글 등록'; }
-          }
-        });
-      }, 1500);
+    body: JSON.stringify({
+      indices, dry_run: dryRun, skip_needs_review: skipNR,
+      ...getNaverCreds(),
+    }),
+  }).then(r => r.json().then(d => ({ status: r.status, data: d })))
+    .then(({status, data}) => {
+      if (data.error) {
+        document.getElementById('bulk-post-summary').innerHTML =
+          `<span style="color:#b3261e">⚠ ${_escapeHtml(_friendlyPostError(data.error, status))}</span>`;
+        startBtn.disabled = false; startBtn.style.opacity = '1';
+        startBtn.textContent = '게시 시작';
+        return;
+      }
+      _pollBulkProgress(dryRun);
     })
-    .catch(() => { btn.disabled = false; btn.textContent = '스토어에 댓글 등록'; });
+    .catch(() => {
+      startBtn.disabled = false; startBtn.style.opacity = '1';
+      startBtn.textContent = '게시 시작';
+    });
+}
+
+function _pollBulkProgress(dryRun) {
+  if (_bulkPostPoll) clearInterval(_bulkPostPoll);
+  const list = document.getElementById('bulk-post-list');
+  const summary = document.getElementById('bulk-post-summary');
+  _bulkPostPoll = setInterval(() => {
+    fetch('/api/reply/post/bulk/progress').then(r => r.json()).then(p => {
+      const done = p.done || 0, total = p.total || 0;
+      const pct = total ? Math.round(done / total * 100) : 0;
+      const cur = p.current_idx !== null && p.current_idx !== undefined ? `#${p.current_idx}` : '';
+      summary.innerHTML = `<strong>${done} / ${total}</strong> 진행 · 성공 ${p.success || 0} · 실패 ${p.fail || 0}`;
+      list.innerHTML = `
+        <div style="padding:14px;text-align:center;">
+          <div style="height:8px;background:#f1f3f4;border-radius:4px;overflow:hidden;margin-bottom:10px;">
+            <div style="height:100%;width:${pct}%;background:#03c75a;transition:width .2s;"></div>
+          </div>
+          <div style="color:#555;font-size:13px;">${cur} 게시 중…</div>
+        </div>
+      `;
+      if (!p.running) {
+        clearInterval(_bulkPostPoll); _bulkPostPoll = null;
+        closeBulkPostModal();
+        _showBulkResult(p, dryRun);
+        fetchReviews();
+      }
+    }).catch(() => {});
+  }, 1200);
+}
+
+function _showBulkResult(p, dryRun) {
+  const overlay = document.getElementById('bulk-result-overlay');
+  const modal = document.getElementById('bulk-result-modal');
+  const sum = document.getElementById('bulk-result-summary');
+  const failBox = document.getElementById('bulk-result-failures');
+  const total = p.total || 0, succ = p.success || 0, fail = p.fail || 0;
+  const label = dryRun ? '테스트 발송' : '게시';
+  sum.innerHTML = `${label} 완료 — <strong style="color:#2e7d32">성공 ${succ}</strong> · ` +
+    (fail > 0 ? `<strong style="color:#b3261e">실패 ${fail}</strong>` : `실패 ${fail}`) +
+    ` · 전체 ${total}`;
+  if (fail > 0 && p.failures?.length) {
+    failBox.innerHTML = `<div style="font-weight:600;color:#b3261e;margin:8px 0 6px;">실패 항목</div>` +
+      p.failures.map(f => `
+        <div style="padding:8px;border:1px solid #f5c2c0;background:#fdecea;border-radius:6px;margin-bottom:6px;display:flex;align-items:center;gap:8px;">
+          <div style="flex:1;">
+            <div style="font-weight:600;">${_escapeHtml(f.reviewer || '익명')}</div>
+            <div style="color:#666;font-size:11px;">${_escapeHtml(_friendlyPostError(f.error))}</div>
+          </div>
+          <button class="btn-sm btn-ghost" onclick="jumpToCard(${f.idx});closeBulkResultModal();">카드로 이동</button>
+        </div>
+      `).join('');
+  } else {
+    failBox.innerHTML = '';
+  }
+  overlay.style.display = 'block';
+  modal.style.display = 'flex';
+}
+
+function closeBulkResultModal() {
+  document.getElementById('bulk-result-overlay').style.display = 'none';
+  document.getElementById('bulk-result-modal').style.display = 'none';
+}
+
+function jumpToCard(idx) {
+  const el = document.getElementById(`card-${idx}`);
+  if (el) {
+    el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    flashReplyTextarea(idx);
+  }
 }
 
 function rejectReply(idx) {
@@ -2171,6 +2652,11 @@ function loadAdminData() {
     adminConfig.skip_reportable_reply = skipVal;
     document.getElementById('toggle-skip-reportable').classList.toggle('on', skipVal);
     document.getElementById('skip-reportable-label').textContent = skipVal ? 'ON' : 'OFF';
+    const testVal = cfg.test_mode === true;
+    adminConfig.test_mode = testVal;
+    window.adminConfig = adminConfig;
+    document.getElementById('toggle-test-mode').classList.toggle('on', testVal);
+    document.getElementById('test-mode-label').textContent = testVal ? 'ON' : 'OFF';
     if (cfg.coupon_rules) renderCouponRules(cfg.coupon_rules);
     if (cfg.reply_coupon_template) {
       const el = document.getElementById('coupon-reply-template');
@@ -2212,6 +2698,13 @@ function toggleSkipReportable() {
   adminConfig.skip_reportable_reply = !adminConfig.skip_reportable_reply;
   document.getElementById('toggle-skip-reportable').classList.toggle('on', adminConfig.skip_reportable_reply);
   document.getElementById('skip-reportable-label').textContent = adminConfig.skip_reportable_reply ? 'ON' : 'OFF';
+}
+
+function toggleTestMode() {
+  adminConfig.test_mode = !adminConfig.test_mode;
+  window.adminConfig = adminConfig;
+  document.getElementById('toggle-test-mode').classList.toggle('on', adminConfig.test_mode);
+  document.getElementById('test-mode-label').textContent = adminConfig.test_mode ? 'ON' : 'OFF';
 }
 
 function renderCouponRules(rules) {
@@ -2421,7 +2914,7 @@ function saveSettings(btn) {
   fetch('/api/admin/config', {
     method: 'POST',
     headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify({auto_generate_reply: adminConfig.auto_generate_reply, spelling_correction: adminConfig.spelling_correction, auto_retry_sensitive: adminConfig.auto_retry_sensitive, skip_reportable_reply: adminConfig.skip_reportable_reply, report_criteria: criteria}),
+    body: JSON.stringify({auto_generate_reply: adminConfig.auto_generate_reply, spelling_correction: adminConfig.spelling_correction, auto_retry_sensitive: adminConfig.auto_retry_sensitive, skip_reportable_reply: adminConfig.skip_reportable_reply, test_mode: !!adminConfig.test_mode, report_criteria: criteria}),
   }).then(() => flashSaved(btn));
 }
 
@@ -2553,6 +3046,8 @@ function refreshSession() {
     .then(r => r.json()).then(d => {
       _sessionLoggedIn = !!d.logged_in;
       _sessionExpiresAt = d.expires_at || null;
+      window._sessionLoggedIn = _sessionLoggedIn;
+      window._sessionExpiresAt = _sessionExpiresAt;
       renderSessionRemain();
     }).catch(() => {});
 }
