@@ -1,17 +1,51 @@
-name: Deploy to Railway
+name: Deploy to NCloud
 
 on:
   push:
     branches: [master]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-ncloud
+  cancel-in-progress: false
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Install Railway CLI
-        run: npm install -g @railway/cli
-      - name: Deploy
-        run: railway up --detach --service d4979439-7d83-43ed-9f47-5a03e16cdd84
-        env:
-          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+
+      - name: Sync code to NCloud (excluding secrets/data/build artifacts)
+        uses: easingthemes/ssh-deploy@main
+        with:
+          SSH_PRIVATE_KEY: ${{ secrets.NCLOUD_SSH_KEY }}
+          REMOTE_HOST: ${{ secrets.NCLOUD_HOST }}
+          REMOTE_USER: ${{ secrets.NCLOUD_USER }}
+          TARGET: /opt/minbestcs
+          SOURCE: "./"
+          EXCLUDE: ".git/, .github/, __pycache__/, *.pyc, .DS_Store, .env, .secrets/, data/browser_profile/, data/screenshots/, data/downloads/, data/session_state.json, data/reviews.json, recordings/, build/, dist/, release/, baselines/, node_modules/"
+          ARGS: "-rlgoDzvc --delete"
+
+      - name: Rebuild and restart container
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.NCLOUD_HOST }}
+          username: ${{ secrets.NCLOUD_USER }}
+          key: ${{ secrets.NCLOUD_SSH_KEY }}
+          script: |
+            set -e
+            cd /opt/minbestcs
+            docker build -t minbestcs:latest .
+            docker rm -f minbestcs 2>/dev/null || true
+            docker run -d --name minbestcs --restart unless-stopped \
+              -p 8080:8080 \
+              --env-file /opt/minbestcs/.env \
+              -v /opt/minbestcs/data:/app/data \
+              minbestcs:latest
+            sleep 3
+            docker ps --filter name=minbestcs --format 'STATUS={{.Status}} PORTS={{.Ports}}'
+
+      - name: Verify health
+        run: |
+          sleep 5
+          curl -fsS --max-time 15 "http://${{ secrets.NCLOUD_HOST }}:8080/" -o /dev/null -w "status=%{http_code} time=%{time_total}s\n"
