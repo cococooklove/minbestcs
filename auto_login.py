@@ -604,14 +604,15 @@ def ensure_logged_in(page, naver_id: str = "", naver_pw: str = "",
         print("[auto_login.ensure] 세션 만료 + headless + on_qr 없음 → 즉시 실패")
         return "failed"
 
-    if not naver_id or not naver_pw:
+    # QR 방식: on_qr 콜백이 있으면 ID/PW 없이도 진행 (사용자가 모바일 스캔)
+    if on_qr is None and (not naver_id or not naver_pw):
         if headless:
             return "failed"
-        print("[auto_login.ensure] ID/PW 없음 → 사람 대기")
+        print("[auto_login.ensure] ID/PW 없음 + QR 콜백 없음 → 사람 대기")
         ok = _wait_for_human(page, max_seconds=timeout_per_step * 2)
         return "seller" if ok else "timeout"
 
-    print(f"[auto_login.ensure] 자동입력 시도 (id={naver_id}, on_qr={'yes' if on_qr else 'no'})")
+    print(f"[auto_login.ensure] QR 로그인 시도 (on_qr={'yes' if on_qr else 'no'})")
     _autofill_login(page, naver_id, naver_pw, on_qr=on_qr)
     print(f"[auto_login.ensure] 자동입력 직후 URL={page.url}")
 
@@ -714,16 +715,16 @@ def main(keep_open: bool = False, naver_id: str = None, naver_pw: str = None,
             print("[auto_login] 세션 만료 + headless + on_qr 없음 → 즉시 실패")
             return _finish(False, "세션이 만료되어 추가 인증이 필요해요")
 
-        # 3) ID/PW 없으면 사람 로그인 대기
-        if not naver_id or not naver_pw:
+        # 3) QR 콜백이 없는 경우에만 ID/PW 필요 (QR 방식은 모바일 스캔으로 인증)
+        if on_qr is None and (not naver_id or not naver_pw):
             if headless:
-                return _finish(False, "아이디와 비밀번호를 입력해 주세요")
-            print("[auto_login] ID/PW 미입력 — 브라우저에서 수동 로그인 대기")
+                return _finish(False, "QR 인증 콜백이 없습니다")
+            print("[auto_login] ID/PW 미입력 + QR 콜백 없음 — 브라우저에서 수동 로그인 대기")
             ok = _wait_for_human(page, max_seconds=timeout_per_step * 2)
             return _finish(ok, None if ok else "수동 로그인이 시간 안에 완료되지 않았어요")
 
-        # 4) 자동 입력 (popup은 on_qr 콜백으로 외부 UI에 표시)
-        print(f"[auto_login] 자동 로그인 시도: {naver_id}, on_qr={'yes' if on_qr else 'no'}")
+        # 4) QR 로그인 흐름 시작 (popup은 on_qr 콜백으로 외부 UI에 표시)
+        print(f"[auto_login] QR 로그인 시도, on_qr={'yes' if on_qr else 'no'}")
         _autofill_login(page, naver_id, naver_pw, on_qr=on_qr)
 
         # 4) 결과 판정
