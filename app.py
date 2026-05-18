@@ -149,10 +149,46 @@ def ensure_chromium():
         pass
 
     if not expected_exe or not os.path.exists(expected_exe):
-        socketio.emit("agent_progress", {"step": "Chromium 설치 중 (최초 1회, 이후 유지됩니다)..."})
+        import re, time
+        socketio.emit("agent_progress", {"step": "처음 한 번만 준비할게요"})
         from playwright._impl._driver import compute_driver_executable
         driver_executable, driver_cli = compute_driver_executable()
-        subprocess.run([str(driver_executable), str(driver_cli), "install", "chromium"], check=True)
+
+        # 다운로드 진행률을 실시간으로 파싱하여 토스 스타일로 안내
+        proc = subprocess.Popen(
+            [str(driver_executable), str(driver_cli), "install", "chromium"],
+            stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+            text=True, bufsize=1,
+        )
+        pct_re = re.compile(r"(\d{1,3})%")
+        last_pct, last_emit = -1, 0.0
+        # \r 로 갱신되는 진행 라인까지 잡아내기 위해 read1 + 라인 누적
+        buf = ""
+        while True:
+            chunk = proc.stdout.read(128) if proc.stdout else ""
+            if not chunk:
+                if proc.poll() is not None:
+                    break
+                continue
+            buf += chunk
+            # \r 또는 \n 단위로 분리해 마지막 토큰의 % 만 사용
+            parts = buf.replace("\r", "\n").split("\n")
+            buf = parts.pop()  # 미완성 잔여
+            for part in parts:
+                m = pct_re.search(part)
+                if not m:
+                    continue
+                pct = max(0, min(99, int(m.group(1))))
+                now = time.monotonic()
+                if pct != last_pct and (now - last_emit) > 0.2:
+                    last_pct, last_emit = pct, now
+                    socketio.emit("agent_progress", {
+                        "step": f"준비 중... {pct}%",
+                        "progress": pct,
+                    })
+        if proc.returncode != 0:
+            raise RuntimeError("초기 준비에 실패했어요. 잠시 후 다시 시도해 주세요.")
+        socketio.emit("agent_progress", {"step": "준비 완료!", "progress": 100})
 
     _chromium_verified = True
 
@@ -749,7 +785,8 @@ def api_collect():
                 )
                 socketio.emit("login_qr_done", {})
                 if not success:
-                    socketio.emit("collect_status", {"step": "login_failed", "error": "로그인 실패"})
+                    _err = getattr(login_mod, "last_error", None) or "자동 로그인에 실패했어요"
+                    socketio.emit("collect_status", {"step": "login_failed", "error": _err})
                     return
                 _login_pw, _login_context, _login_page = pw, context, page
                 if client_id and os.path.exists(SESSION_STATE_PATH):

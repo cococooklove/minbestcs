@@ -377,6 +377,15 @@
     font-size: 14px; color: #444; text-align: center;
     line-height: 1.7; word-break: keep-all; min-height: 22px;
   }
+  /* 진행률 바 (토스 스타일) */
+  .naver-popup .popup-progress { margin-top: 12px; }
+  .naver-popup .popup-progress-track {
+    background: #f0f0f0; border-radius: 99px; height: 6px; overflow: hidden;
+  }
+  .naver-popup .popup-progress-bar {
+    height: 100%; background: #03c75a; border-radius: 99px;
+    transition: width .35s ease;
+  }
   /* 확인 버튼 */
   .naver-popup .popup-close {
     display: block; width: 100%; margin-top: 20px;
@@ -947,6 +956,9 @@
   </div>
   <div id="popup-incremental-note" style="display:none;font-size:11px;color:#03c75a;text-align:center;margin-bottom:6px;font-weight:600;"></div>
   <div class="popup-msg" id="popup-msg"></div>
+  <div class="popup-progress" id="popup-progress" style="display:none;">
+    <div class="popup-progress-track"><div class="popup-progress-bar" id="popup-progress-bar" style="width:0%"></div></div>
+  </div>
   <button class="popup-close" id="popup-close-btn" onclick="closePopup()" style="display:none;">확인</button>
 </div>
 
@@ -2515,7 +2527,7 @@ function _openPopup(isError) {
 
 // 수집 진행 중: 단계 업데이트, 확인 버튼 숨김
 let _progressTimeout = null;
-function showProgress(msg) {
+function showProgress(msg, pct) {
   if (_collectDone) return; // 수집 완료 후 늦게 도착한 progress 무시
   if (_popupTimer) { clearTimeout(_popupTimer); _popupTimer = null; }
   if (_progressTimeout) { clearTimeout(_progressTimeout); _progressTimeout = null; }
@@ -2538,6 +2550,18 @@ function showProgress(msg) {
     }, 15000);
   }
   document.getElementById('popup-msg').textContent = msg;
+  // 진행률(%) 표시 — 서버가 progress 필드를 보낼 때만 노출
+  const progEl = document.getElementById('popup-progress');
+  const barEl = document.getElementById('popup-progress-bar');
+  if (progEl && barEl) {
+    if (typeof pct === 'number' && pct >= 0) {
+      progEl.style.display = 'block';
+      barEl.style.width = Math.max(0, Math.min(100, pct)) + '%';
+    } else {
+      progEl.style.display = 'none';
+      barEl.style.width = '0%';
+    }
+  }
   const s = _getMsgStep(msg);
   if (s >= 0) _setStep(s);
 }
@@ -3176,7 +3200,7 @@ socket.on('scrape_status', data => {
 });
 
 socket.on('agent_progress', data => {
-  showProgress(data.step || '수집 중...');
+  showProgress(data.step || '수집 중...', data.progress);
 });
 
 // 페이지 로드 시 수집 고착 상태 자동 리셋

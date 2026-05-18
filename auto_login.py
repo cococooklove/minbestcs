@@ -20,6 +20,9 @@ print = functools.partial(print, flush=True)
 PROFILE_DIR = os.environ.get("SCRAPER_PROFILE_DIR") or os.path.abspath("data/browser_profile")
 SESSION_STATE_PATH = os.environ.get("SESSION_STATE_PATH") or os.path.abspath("data/session_state.json")
 
+# 최근 main() 호출에서의 실패 사유 (실패 시 외부에서 읽어서 사용자에게 표시)
+last_error: "str | None" = None
+
 SELLER_HOME = "https://sell.smartstore.naver.com/"
 # 세션 유효성은 '보호된' 페이지로 확인해야 한다. 홈(/)은 미인증에도 일부 진입 가능하지만
 # 리뷰 페이지는 commerce ID 재인증을 요구하므로 정확한 검증점이 된다.
@@ -646,19 +649,27 @@ def main(keep_open: bool = False, naver_id: str = None, naver_pw: str = None,
       - keep_open=False 면 context/pw/page는 None 으로 반환되고 context는 close.
       - keep_open=True 면 호출자가 직접 close 책임.
     """
+    global last_error
+    last_error = None
+
     naver_id = (naver_id or os.environ.get("NAVER_ID", "")).strip()
     naver_pw = (naver_pw or os.environ.get("NAVER_PW", "")).strip()
 
     _clean_profile_locks()
 
-    pw = sync_playwright().start()
-    context = pw.chromium.launch_persistent_context(
-        user_data_dir=PROFILE_DIR,
-        headless=headless,
-        slow_mo=0 if headless else 50,
-        viewport={"width": 1440, "height": 900},
-        accept_downloads=True,
-    )
+    try:
+        pw = sync_playwright().start()
+        context = pw.chromium.launch_persistent_context(
+            user_data_dir=PROFILE_DIR,
+            headless=headless,
+            slow_mo=0 if headless else 50,
+            viewport={"width": 1440, "height": 900},
+            accept_downloads=True,
+        )
+    except Exception as e:
+        print(f"[auto_login] 브라우저 시작 실패: {e}")
+        last_error = f"브라우저를 시작할 수 없어요 ({type(e).__name__})"
+        return False, None, None, None
     _apply_stealth(context)
     page = context.pages[0] if context.pages else context.new_page()
 
@@ -675,7 +686,10 @@ def main(keep_open: bool = False, naver_id: str = None, naver_pw: str = None,
         except Exception as e:
             print(f"[auto_login] 메인창 hide 실패: {e}")
 
-    def _finish(success: bool):
+    def _finish(success: bool, reason: "str | None" = None):
+        global last_error
+        if not success and reason:
+            last_error = reason
         if keep_open and success:
             return success, pw, context, page
         try:
@@ -698,15 +712,15 @@ def main(keep_open: bool = False, naver_id: str = None, naver_pw: str = None,
         # 2) headless + on_qr 콜백 없으면 popup 인증 불가
         if headless and on_qr is None:
             print("[auto_login] 세션 만료 + headless + on_qr 없음 → 즉시 실패")
-            return _finish(False)
+            return _finish(False, "세션이 만료되어 추가 인증이 필요해요")
 
         # 3) ID/PW 없으면 사람 로그인 대기
         if not naver_id or not naver_pw:
             if headless:
-                return _finish(False)
+                return _finish(False, "아이디와 비밀번호를 입력해 주세요")
             print("[auto_login] ID/PW 미입력 — 브라우저에서 수동 로그인 대기")
             ok = _wait_for_human(page, max_seconds=timeout_per_step * 2)
-            return _finish(ok)
+            return _finish(ok, None if ok else "수동 로그인이 시간 안에 완료되지 않았어요")
 
         # 4) 자동 입력 (popup은 on_qr 콜백으로 외부 UI에 표시)
         print(f"[auto_login] 자동 로그인 시도: {naver_id}, on_qr={'yes' if on_qr else 'no'}")
@@ -727,14 +741,14 @@ def main(keep_open: bool = False, naver_id: str = None, naver_pw: str = None,
                 print("[auto_login] captcha 흐름 실패 — 폴백")
             if headless:
                 print("[auto_login] 캡차/2FA 감지 — headless 모드에서 처리 불가")
-                return _finish(False)
+                return _finish(False, "추가 인증이 필요해요. 잠시 후 다시 시도해 주세요")
             ok = _wait_for_human(page, max_seconds=timeout_per_step * 2)
-            return _finish(ok)
+            return _finish(ok, None if ok else "추가 인증 시간이 초과됐어요")
         print("[auto_login] 로그인 시간 초과")
-        return _finish(False)
+        return _finish(False, "로그인 응답을 받지 못했어요. 아이디/비밀번호를 확인해 주세요")
     except Exception as e:
         print(f"[auto_login] 예외: {e}")
-        return _finish(False)
+        return _finish(False, f"로그인 중 오류가 발생했어요 ({type(e).__name__})")
 
 
 if __name__ == "__main__":
