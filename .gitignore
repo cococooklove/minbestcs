@@ -15,3 +15,5 @@ recordings/
 build/
 dist/
 release/
+.secrets/
+*.pem

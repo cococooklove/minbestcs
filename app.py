@@ -17,7 +17,12 @@ else:
 
 load_dotenv(os.path.join(_base_dir, ".env"))
 
-IS_SERVER = bool(os.environ.get("RAILWAY_ENVIRONMENT") or os.environ.get("RAILWAY_SERVICE_NAME"))
+IS_SERVER = bool(
+    os.environ.get("RAILWAY_ENVIRONMENT")
+    or os.environ.get("RAILWAY_SERVICE_NAME")
+    or os.environ.get("FLY_APP_NAME")
+    or os.environ.get("SERVICE_ENV")
+)
 
 app = Flask(__name__)
 if not IS_SERVER:

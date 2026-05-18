@@ -11,9 +11,10 @@
 실행: python3 scraper.py
 """
 from playwright.sync_api import sync_playwright
-import json, os, time
+import json, os, time, random
 from datetime import datetime, timedelta
 from pathlib import Path
+import requests
 import modal_guard
 
 PROFILE_DIR = os.environ.get("SCRAPER_PROFILE_DIR") or os.path.abspath("data/browser_profile")
@@ -22,8 +23,8 @@ DOWNLOAD_DIR = Path("data/downloads").resolve()  # 호환성: 외부에서 참�
 
 REVIEW_SEARCH_URL = "https://sell.smartstore.naver.com/#/review/search"
 REVIEW_API_PATH = "/api/v3/contents/reviews/search"
-PAGE_SIZE = 500
-MAX_PAGES = 200  # 안전 상한 (500 * 200 = 10만건)
+PAGE_SIZE = int(os.environ.get("SCRAPER_PAGE_SIZE", "500"))
+MAX_PAGES = int(os.environ.get("SCRAPER_MAX_PAGES", "200"))
 
 
 def _to_iso(dt: datetime, end_of_day: bool = False) -> str:
@@ -35,14 +36,37 @@ def _to_iso(dt: datetime, end_of_day: bool = False) -> str:
 
 REVIEW_API_URL = "https://sell.smartstore.naver.com/api/v3/contents/reviews/search"
 
+# Playwright headless Chromium의 fetch는 봇 탐지에 걸려 6~7페이지 후 차단됨.
+# Python requests는 일반 HTTP 클라이언트라 차단 안 됨 → 쿠키만 Playwright로 확보 후
+# 실제 API는 requests로 호출.
 
-def _fetch_review_page(page, from_iso: str, to_iso: str, page_no: int, size: int) -> dict:
-    """셀러센터 SPA 컨텍스트 안에서 fetch() — 쿠키/CSRF 자동 처리.
+REQUEST_HEADERS = {
+    "content-type": "application/json;charset=UTF-8",
+    "referer": "https://sell.smartstore.naver.com/",
+    "origin": "https://sell.smartstore.naver.com",
+    "user-agent": (
+        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 "
+        "(KHTML, like Gecko) Chrome/132.0.0.0 Safari/537.36"
+    ),
+    "accept": "application/json, text/plain, */*",
+    "accept-language": "ko-KR,ko;q=0.9",
+}
 
-    절대 URL을 사용해야 page가 셀러센터 도메인이 아닐 때도 동작. 단, fetch는
-    여전히 page의 origin에서 발사되므로 cross-origin이면 셀러센터 CORS 정책에
-    걸릴 수 있음 → 호출 직전에 셀러센터 페이지가 활성화돼 있어야 함.
-    """
+
+def _build_session_from_playwright(context) -> requests.Session:
+    """Playwright context의 쿠키를 requests.Session에 주입."""
+    s = requests.Session()
+    s.headers.update(REQUEST_HEADERS)
+    pw_cookies = context.cookies()
+    for c in pw_cookies:
+        s.cookies.set(c.get("name", ""), c.get("value", ""),
+                      domain=c.get("domain") or None, path=c.get("path") or "/")
+    return s
+
+
+def _fetch_review_page(session: requests.Session, from_iso: str, to_iso: str,
+                       page_no: int, size: int) -> dict:
+    """requests.Session으로 셀러센터 API 직접 호출."""
     payload = {
         "reviewSearchSortType": "REVIEW_CREATE_DATE_DESC",
         "searchKeywordType": "IDS",
@@ -60,25 +84,16 @@ def _fetch_review_page(page, from_iso: str, to_iso: str, page_no: int, size: int
         "size": size,
         "sort": [],
     }
-    js = r"""
-    async ({url, payload}) => {
-        try {
-            const r = await fetch(url, {
-                method: 'POST',
-                headers: {'content-type': 'application/json;charset=UTF-8'},
-                body: JSON.stringify(payload),
-                credentials: 'include'
-            });
-            const text = await r.text();
-            if (!r.ok) return { __error: true, status: r.status, body: text.slice(0, 400) };
-            try { return JSON.parse(text); }
-            catch (e) { return { __error: true, status: r.status, body: 'JSON parse: ' + text.slice(0, 400) }; }
-        } catch (e) {
-            return { __error: true, status: 0, body: String(e) + ' (origin=' + location.origin + ')' };
-        }
-    }
-    """
-    return page.evaluate(js, {"url": REVIEW_API_URL, "payload": payload})
+    try:
+        r = session.post(REVIEW_API_URL, json=payload, timeout=30)
+    except Exception as e:
+        return {"__error": True, "status": 0, "body": f"network: {e}"}
+    if r.status_code != 200:
+        return {"__error": True, "status": r.status_code, "body": r.text[:400]}
+    try:
+        return r.json()
+    except Exception as e:
+        return {"__error": True, "status": r.status_code, "body": f"JSON parse: {e}: {r.text[:200]}"}
 
 
 def _map_review(r: dict) -> dict:
@@ -161,6 +176,11 @@ def main(progress_cb=None, existing_page=None, cookies=None, headless=False):
                       "--disable-gpu", "--single-process"],
             )
             context = browser.new_context(viewport={"width": 1440, "height": 900})
+            # 헤드리스 자동화 탐지 우회 — navigator.webdriver 등 위장
+            try:
+                import auto_login as _al
+                _al._apply_stealth(context)
+            except Exception: pass
             modal_guard.install(context)
             modal_guard.attach_dialog_autoaccept(context)
             SAME_SITE_MAP = {"no_restriction": "None", "lax": "Lax",
@@ -187,6 +207,10 @@ def main(progress_cb=None, existing_page=None, cookies=None, headless=False):
                 headless=headless,
                 viewport={"width": 1440, "height": 900},
             )
+            try:
+                import auto_login as _al
+                _al._apply_stealth(context)
+            except Exception: pass
             modal_guard.install(context)
             modal_guard.attach_dialog_autoaccept(context)
             try:
@@ -212,11 +236,17 @@ def main(progress_cb=None, existing_page=None, cookies=None, headless=False):
                 raise Exception(f"자동 로그인 실패: {status}")
             progress("로그인 OK")
 
-        # === 리뷰 페이지 진입 (referer/SPA 컨텍스트 셋업) ===
+        # === 셀러센터 페이지 진입 (세션 갱신/검증) ===
         progress("리뷰 검색 페이지 로딩 중...")
         _ensure_review_page(page, progress)
 
-        # === API 직접 호출 (1년치) ===
+        # === Playwright 쿠키 → requests.Session ===
+        # Playwright headless의 fetch는 봇 탐지에 걸려 6~7페이지 후 차단됨.
+        # requests는 일반 HTTP 클라이언트라 통과.
+        session = _build_session_from_playwright(context)
+        progress(f"세션 쿠키 {len(session.cookies)}개 확보 — API 호출 시작")
+
+        # === API 페이지네이션 (1년치) ===
         # 셀러센터 API는 "최대 1년"을 엄격히 검사 (365일 = 거부, 364일 = 허용)
         to_dt = datetime.now()
         from_dt = to_dt - timedelta(days=364)
@@ -224,14 +254,24 @@ def main(progress_cb=None, existing_page=None, cookies=None, headless=False):
         to_iso = _to_iso(to_dt, end_of_day=True)
         progress(f"수집 기간: {from_dt.date()} ~ {to_dt.date()}")
 
+        BASE_DELAY = float(os.environ.get("SCRAPER_PAGE_DELAY", "0.3"))
         all_reviews = []
         for page_no in range(MAX_PAGES):
             progress(f"리뷰 page={page_no} 조회 중 (누적 {len(all_reviews)}건)...")
-            result = _fetch_review_page(page, from_iso, to_iso, page_no, PAGE_SIZE)
+            result = None
+            last_err = None
+            for attempt in range(3):
+                result = _fetch_review_page(session, from_iso, to_iso, page_no, PAGE_SIZE)
+                if not (isinstance(result, dict) and result.get("__error")):
+                    break
+                last_err = result
+                wait = 5 + attempt * 5
+                progress(f"  page={page_no} 시도 {attempt+1} 실패 (status={result.get('status')}) — {wait}s 대기")
+                time.sleep(wait)
             if isinstance(result, dict) and result.get("__error"):
                 raise Exception(
-                    f"리뷰 API 실패: status={result.get('status')} "
-                    f"body={(result.get('body') or '')[:200]}"
+                    f"리뷰 API 실패: status={(last_err or {}).get('status')} "
+                    f"body={((last_err or {}).get('body') or '')[:200]}"
                 )
             contents = (result or {}).get("contents") or []
             if not contents:
@@ -241,6 +281,7 @@ def main(progress_cb=None, existing_page=None, cookies=None, headless=False):
             if len(contents) < PAGE_SIZE:
                 progress(f"page={page_no} 마지막 페이지 (n={len(contents)})")
                 break
+            time.sleep(BASE_DELAY + random.uniform(0, 0.3))
         else:
             progress(f"[경고] MAX_PAGES({MAX_PAGES}) 도달 — 중단")
 
