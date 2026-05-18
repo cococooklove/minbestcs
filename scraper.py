@@ -204,38 +204,86 @@ def main(progress_cb=None, existing_page=None, cookies=None, headless=False):
                 raise Exception("로그인 확인 시간 초과. 다시 로그인해주세요.")
             time.sleep(2)
 
+        # 화면 상태 스냅샷 — 떠있는 dialog/modal 정보를 로그로 출력
+        def _snapshot_page_state(label=""):
+            try:
+                info = page.evaluate(r"""
+                () => {
+                    const out = { url: location.href, dialogs: [], reviewCount: null };
+                    const dialogs = document.querySelectorAll(
+                        "[role='dialog'], .modal.in, .seller-layer-modal.in, .uib-modal-window, [class*='Modal'][class*='open'], [class*='Popup'][class*='open']"
+                    );
+                    for (const dlg of dialogs) {
+                        const style = window.getComputedStyle(dlg);
+                        if (style.display === 'none' || style.visibility === 'hidden') continue;
+                        const rect = dlg.getBoundingClientRect();
+                        if (rect.width === 0 || rect.height === 0) continue;
+                        const text = (dlg.textContent || "").replace(/\s+/g, " ").trim().slice(0, 120);
+                        const buttons = Array.from(dlg.querySelectorAll("button"))
+                            .map(b => (b.textContent || "").trim())
+                            .filter(t => t).slice(0, 8);
+                        out.dialogs.push({ text, buttons });
+                    }
+                    const m = (document.body.innerText || "").match(/리뷰목록\s*\(\s*총\s*([\d,]+)\s*개?\s*\)/);
+                    if (m) out.reviewCount = m[1];
+                    return out;
+                }
+                """)
+                progress(f"[상태{(' '+label) if label else ''}] URL: {info.get('url','')}")
+                if info.get('reviewCount') is not None:
+                    progress(f"[상태{(' '+label) if label else ''}] 리뷰목록: 총 {info['reviewCount']}개")
+                dialogs = info.get('dialogs') or []
+                if not dialogs:
+                    progress(f"[상태{(' '+label) if label else ''}] 떠있는 모달: 없음")
+                else:
+                    for i, d in enumerate(dialogs):
+                        progress(f"[상태{(' '+label) if label else ''}] 모달 {i+1}: \"{d['text']}\" / 버튼=[{', '.join(d['buttons'])}]")
+                return info
+            except Exception as e:
+                progress(f"[상태{(' '+label) if label else ''}] 스냅샷 실패: {e}")
+                return None
+
         # 페이지 진입 시 떠 있는 안내/공지 모달 자동 닫기
         # (다운로드 확인 모달은 '확인' 버튼이라 같이 닫지 않도록 키워드로 구분)
+        # 반환값: 닫힌 모달들의 텍스트 리스트 (로깅용)
         def _dismiss_announcement_modals():
             try:
-                page.evaluate(r"""
+                closed = page.evaluate(r"""
                 () => {
+                    const closed = [];
                     const dialogs = document.querySelectorAll(
                         "[role='dialog'], .modal.in, .seller-layer-modal.in, .uib-modal-window"
                     );
                     for (const dlg of dialogs) {
                         if (dlg.querySelector("textarea")) continue;
-                        const text = (dlg.textContent || "");
+                        const text = (dlg.textContent || "").replace(/\s+/g, " ").trim();
                         // 다운로드 확인 모달은 건드리지 않음
                         if (text.includes("다운로드를 계속") || text.includes("리뷰 다운로드")) continue;
-                        // 닫기 아이콘/버튼 우선
                         const closes = dlg.querySelectorAll(
                             "button[aria-label='close'], button[aria-label='닫기'], button[class*='close']"
                         );
-                        if (closes.length) { closes[0].click(); continue; }
-                        // 텍스트 기반 ('나중에','다시 보지 않기','확인','닫기') — 단 다운로드 모달이 아닐 때만
+                        if (closes.length) { closes[0].click(); closed.push(text.slice(0, 80)); continue; }
                         for (const btn of dlg.querySelectorAll("button")) {
                             const t = (btn.textContent || "").trim();
                             if (["닫기","나중에","다음에","다시 보지 않기"].includes(t)) {
-                                btn.click(); break;
+                                btn.click();
+                                closed.push(text.slice(0, 80));
+                                break;
                             }
                         }
                     }
+                    return closed;
                 }
-                """)
-            except Exception:
-                pass
+                """) or []
+                if closed:
+                    for c in closed:
+                        progress(f"[모달 자동 닫기] \"{c}\"")
+                return closed
+            except Exception as e:
+                progress(f"[모달 자동 닫기] 실패: {e}")
+                return []
 
+        _snapshot_page_state("리뷰페이지 진입")
         _dismiss_announcement_modals()
         time.sleep(1)
 
@@ -256,8 +304,9 @@ def main(progress_cb=None, existing_page=None, cookies=None, headless=False):
         except Exception as e:
             progress(f"기간 설정 실패(기본값으로 진행): {e}")
 
-        # 검색 직후 다시 한 번 안내 모달 정리
+        # 검색 직후 다시 한 번 안내 모달 정리 + 상태 스냅샷
         _dismiss_announcement_modals()
+        _snapshot_page_state("검색 완료")
 
         # 엑셀다운 버튼 대기 — 텍스트 변형 + 버튼 셀렉터 fallback
         progress("엑셀다운 버튼 찾는 중...")
@@ -287,7 +336,8 @@ def main(progress_cb=None, existing_page=None, cookies=None, headless=False):
                 btn = page.get_by_text("엑셀다운").first
                 btn.wait_for(state="visible", timeout=15000)
             except Exception:
-                # 디버그 스크린샷 + 보이는 버튼 로그 후 실패
+                # 상태 스냅샷 + 스크린샷 + 보이는 버튼 로그 후 실패
+                _snapshot_page_state("엑셀버튼 미발견")
                 try:
                     _dbg_dir = Path(os.path.dirname(OUTPUT_FILE)) / "screenshots"
                     _dbg_dir.mkdir(parents=True, exist_ok=True)
