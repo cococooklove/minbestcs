@@ -4,4 +4,4 @@ python-dotenv>=1.0
 gunicorn>=21.0
 flask-socketio>=5.3
 openpyxl>=3.1
-playwright>=1.40
+playwright==1.49.1
