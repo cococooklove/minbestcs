@@ -37,6 +37,23 @@ def add_cors(response):
         response.headers["Pragma"] = "no-cache"
         response.headers["Expires"] = "0"
     return response
+
+
+@app.errorhandler(Exception)
+def _on_unhandled(e):
+    # 4xx 등 HTTP 예외는 그대로 전달 (5xx 및 일반 예외만 알림)
+    from werkzeug.exceptions import HTTPException
+    if isinstance(e, HTTPException) and (e.code or 500) < 500:
+        return e
+    try:
+        from notify import alert_exception
+        _ip = request.headers.get("X-Forwarded-For", request.remote_addr) or "-"
+        alert_exception("서버 예외", e, path=request.path, method=request.method, ip=_ip)
+    except Exception:
+        pass
+    if isinstance(e, HTTPException):
+        return e
+    return jsonify({"error": "서버 오류가 발생했어요"}), 500
 REVIEWS_FILE = os.path.join(_base_dir, "data", "reviews.json")
 
 _reviews_cache = None
@@ -187,6 +204,11 @@ def ensure_chromium():
                         "progress": pct,
                     })
         if proc.returncode != 0:
+            try:
+                from notify import alert
+                alert("초기 준비(Chromium) 실패", returncode=proc.returncode, tail=(buf or "")[-500:])
+            except Exception:
+                pass
             raise RuntimeError("초기 준비에 실패했어요. 잠시 후 다시 시도해 주세요.")
         socketio.emit("agent_progress", {"step": "준비 완료!", "progress": 100})
 
@@ -753,6 +775,7 @@ def api_collect():
     naver_id = (body.get("naver_id") or "").strip()
     naver_pw = body.get("naver_pw") or ""
     client_id = (body.get("client_id") or "").strip() or None
+    _remote_ip = request.headers.get("X-Forwarded-For", request.remote_addr) or "-"
     def run_collect():
         global _login_pw, _login_context, _login_page, _scraping
         try:
@@ -787,6 +810,12 @@ def api_collect():
                 if not success:
                     _err = getattr(login_mod, "last_error", None) or "자동 로그인에 실패했어요"
                     socketio.emit("collect_status", {"step": "login_failed", "error": _err})
+                    try:
+                        from notify import alert
+                        alert("로그인 실패", reason=_err, naver_id=naver_id or "(미입력)",
+                              client_id=client_id or "-", ip=_remote_ip)
+                    except Exception:
+                        pass
                     return
                 _login_pw, _login_context, _login_page = pw, context, page
                 if client_id and os.path.exists(SESSION_STATE_PATH):
@@ -817,6 +846,12 @@ def api_collect():
             socketio.emit("collect_status", {"step": "done", "success": True})
         except Exception as e:
             socketio.emit("collect_status", {"step": "done", "success": False, "error": str(e)})
+            try:
+                from notify import alert_exception
+                alert_exception("수집 실패", e, naver_id=naver_id or "(미입력)",
+                                client_id=client_id or "-", ip=_remote_ip)
+            except Exception:
+                pass
         finally:
             # 수집 성공/실패 무관, 스크래핑 중 갱신된 쿠키를 영속화 (다음 콜드 스타트 캡차 방지)
             try:
