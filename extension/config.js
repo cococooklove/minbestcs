@@ -1,1 +1,1 @@
-const SERVER_URL = 'https://mincombestcx.up.railway.app';
+const SERVER_URL = 'http://101.79.22.61:8080';
