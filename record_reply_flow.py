@@ -28,6 +28,7 @@ from playwright.sync_api import sync_playwright
 from dotenv import load_dotenv
 
 import auto_login
+import modal_guard
 
 load_dotenv()
 print = functools.partial(print, flush=True)
@@ -59,6 +60,8 @@ def main():
         viewport={"width": 1440, "height": 900},
         accept_downloads=True,
     )
+    modal_guard.install(context)
+    modal_guard.attach_dialog_autoaccept(context)
     auto_login.restore_session(context)
 
     # 네트워크 이벤트 수집

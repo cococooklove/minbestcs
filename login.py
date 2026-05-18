@@ -5,6 +5,7 @@
 from playwright.sync_api import sync_playwright
 from dotenv import load_dotenv
 import os, time
+import modal_guard
 
 load_dotenv()
 
@@ -44,6 +45,8 @@ def main(keep_open=False):
         viewport={"width": 1440, "height": 900},
         accept_downloads=True,
     )
+    modal_guard.install(context)
+    modal_guard.attach_dialog_autoaccept(context)
     page = context.pages[0] if context.pages else context.new_page()
 
     try:

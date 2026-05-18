@@ -7,6 +7,7 @@ import json, os, time
 from datetime import datetime
 from pathlib import Path
 import openpyxl
+import modal_guard
 
 PROFILE_DIR = os.environ.get("SCRAPER_PROFILE_DIR") or os.path.abspath("data/browser_profile")
 OUTPUT_FILE = "data/reviews.json"
@@ -103,7 +104,8 @@ def main(progress_cb=None, existing_page=None, cookies=None, headless=False):
         pw = None
         context = None
         page = existing_page
-        page.on("dialog", lambda d: d.accept())
+        modal_guard.attach_dialog_autoaccept(page)
+        modal_guard.apply_now(page)
     elif cookies:
         # 서버 headless 모드: 쿠키 주입
         pw = sync_playwright().start()
@@ -116,6 +118,8 @@ def main(progress_cb=None, existing_page=None, cookies=None, headless=False):
             viewport={"width": 1440, "height": 900},
             accept_downloads=True,
         )
+        modal_guard.install(context)
+        modal_guard.attach_dialog_autoaccept(context)
         # Chrome 확장 sameSite 값 → Playwright 형식 변환
         SAME_SITE_MAP = {"no_restriction": "None", "lax": "Lax", "strict": "Strict", "unspecified": "Lax"}
         normalized = []
@@ -125,7 +129,6 @@ def main(progress_cb=None, existing_page=None, cookies=None, headless=False):
             normalized.append(c)
         context.add_cookies(normalized)
         page = context.new_page()
-        page.on("dialog", lambda d: d.accept())
     else:
         os.makedirs(PROFILE_DIR, exist_ok=True)
         for lock in ["SingletonLock", "SingletonCookie", "SingletonSocket"]:
@@ -140,6 +143,8 @@ def main(progress_cb=None, existing_page=None, cookies=None, headless=False):
             viewport={"width": 1440, "height": 900},
             accept_downloads=True,
         )
+        modal_guard.install(context)
+        modal_guard.attach_dialog_autoaccept(context)
         # 저장된 세션 복원 (auto_login.save_session에서 저장됨)
         try:
             import auto_login as _al
@@ -147,7 +152,7 @@ def main(progress_cb=None, existing_page=None, cookies=None, headless=False):
         except Exception:
             pass
         page = context.pages[0] if context.pages else context.new_page()
-        page.on("dialog", lambda d: d.accept())
+        modal_guard.apply_now(page)
 
     def _is_on_login_page(pg):
         url = pg.url.lower()
@@ -243,49 +248,14 @@ def main(progress_cb=None, existing_page=None, cookies=None, headless=False):
                 progress(f"[상태{(' '+label) if label else ''}] 스냅샷 실패: {e}")
                 return None
 
-        # 페이지 진입 시 떠 있는 안내/공지 모달 자동 닫기
-        # (다운로드 확인 모달은 '확인' 버튼이라 같이 닫지 않도록 키워드로 구분)
-        # 반환값: 닫힌 모달들의 텍스트 리스트 (로깅용)
-        def _dismiss_announcement_modals():
-            try:
-                closed = page.evaluate(r"""
-                () => {
-                    const closed = [];
-                    const dialogs = document.querySelectorAll(
-                        "[role='dialog'], .modal.in, .seller-layer-modal.in, .uib-modal-window"
-                    );
-                    for (const dlg of dialogs) {
-                        if (dlg.querySelector("textarea")) continue;
-                        const text = (dlg.textContent || "").replace(/\s+/g, " ").trim();
-                        // 다운로드 확인 모달은 건드리지 않음
-                        if (text.includes("다운로드를 계속") || text.includes("리뷰 다운로드")) continue;
-                        const closes = dlg.querySelectorAll(
-                            "button[aria-label='close'], button[aria-label='닫기'], button[class*='close']"
-                        );
-                        if (closes.length) { closes[0].click(); closed.push(text.slice(0, 80)); continue; }
-                        for (const btn of dlg.querySelectorAll("button")) {
-                            const t = (btn.textContent || "").trim();
-                            if (["닫기","나중에","다음에","다시 보지 않기"].includes(t)) {
-                                btn.click();
-                                closed.push(text.slice(0, 80));
-                                break;
-                            }
-                        }
-                    }
-                    return closed;
-                }
-                """) or []
-                if closed:
-                    for c in closed:
-                        progress(f"[모달 자동 닫기] \"{c}\"")
-                return closed
-            except Exception as e:
-                progress(f"[모달 자동 닫기] 실패: {e}")
-                return []
+        # 모달 자동 닫기는 modal_guard가 백그라운드로 처리 — 여기서는 로그만 회수
+        def _flush_modal_log(label=""):
+            for entry in modal_guard.drain_log(page):
+                progress(f"[모달 자동 닫기{(' '+label) if label else ''}] {entry}")
 
         _snapshot_page_state("리뷰페이지 진입")
-        _dismiss_announcement_modals()
         time.sleep(1)
+        _flush_modal_log("리뷰페이지 진입")
 
         # 전체 선택 + 1년 기간 설정 후 검색
         progress("최근 1년치 리뷰를 다운로드 중입니다. 잠시 기다려주세요...")
@@ -304,8 +274,8 @@ def main(progress_cb=None, existing_page=None, cookies=None, headless=False):
         except Exception as e:
             progress(f"기간 설정 실패(기본값으로 진행): {e}")
 
-        # 검색 직후 다시 한 번 안내 모달 정리 + 상태 스냅샷
-        _dismiss_announcement_modals()
+        # 검색 직후 상태 스냅샷 + 모달 자동 닫기 로그 회수
+        _flush_modal_log("검색 완료")
         _snapshot_page_state("검색 완료")
 
         # 엑셀다운 버튼 대기 — 텍스트 변형 + 버튼 셀렉터 fallback
@@ -337,6 +307,7 @@ def main(progress_cb=None, existing_page=None, cookies=None, headless=False):
                 btn.wait_for(state="visible", timeout=15000)
             except Exception:
                 # 상태 스냅샷 + 스크린샷 + 보이는 버튼 로그 후 실패
+                _flush_modal_log("엑셀버튼 미발견")
                 _snapshot_page_state("엑셀버튼 미발견")
                 try:
                     _dbg_dir = Path(os.path.dirname(OUTPUT_FILE)) / "screenshots"
@@ -437,6 +408,8 @@ def main(progress_cb=None, existing_page=None, cookies=None, headless=False):
         progress("다운로드 시작 대기 중...")
         if not _download_event.wait(timeout=120):
             _save_screenshot("download_timeout")
+            _flush_modal_log("다운로드 타임아웃")
+            _snapshot_page_state("다운로드 타임아웃")
             try:
                 cur_url = page.url
             except Exception:

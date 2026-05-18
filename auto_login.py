@@ -11,6 +11,7 @@ login.py와 같은 시그니처를 유지하되 ID/PW 인자를 추가로 받는
 from playwright.sync_api import sync_playwright
 from dotenv import load_dotenv
 import os, sys, time, json, functools
+import modal_guard
 
 load_dotenv()
 
@@ -689,6 +690,8 @@ def main(keep_open: bool = False, naver_id: str = None, naver_pw: str = None,
         last_error = f"브라우저를 시작할 수 없어요 ({type(e).__name__})"
         return False, None, None, None
     _apply_stealth(context)
+    modal_guard.install(context)
+    modal_guard.attach_dialog_autoaccept(context)
     page = context.pages[0] if context.pages else context.new_page()
 
     # headful일 때 메인창은 화면 밖 + 1픽셀 — popup(OAuth)만 사용자에게 보이도록
