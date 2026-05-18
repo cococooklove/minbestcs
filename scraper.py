@@ -33,8 +33,16 @@ def _to_iso(dt: datetime, end_of_day: bool = False) -> str:
     return dt.strftime("%Y-%m-%dT00:00:00.000+09:00")
 
 
+REVIEW_API_URL = "https://sell.smartstore.naver.com/api/v3/contents/reviews/search"
+
+
 def _fetch_review_page(page, from_iso: str, to_iso: str, page_no: int, size: int) -> dict:
-    """셀러센터 SPA 컨텍스트 안에서 fetch() — 쿠키/CSRF 자동 처리."""
+    """셀러센터 SPA 컨텍스트 안에서 fetch() — 쿠키/CSRF 자동 처리.
+
+    절대 URL을 사용해야 page가 셀러센터 도메인이 아닐 때도 동작. 단, fetch는
+    여전히 page의 origin에서 발사되므로 cross-origin이면 셀러센터 CORS 정책에
+    걸릴 수 있음 → 호출 직전에 셀러센터 페이지가 활성화돼 있어야 함.
+    """
     payload = {
         "reviewSearchSortType": "REVIEW_CREATE_DATE_DESC",
         "searchKeywordType": "IDS",
@@ -53,9 +61,9 @@ def _fetch_review_page(page, from_iso: str, to_iso: str, page_no: int, size: int
         "sort": [],
     }
     js = r"""
-    async (payload) => {
+    async ({url, payload}) => {
         try {
-            const r = await fetch('/api/v3/contents/reviews/search', {
+            const r = await fetch(url, {
                 method: 'POST',
                 headers: {'content-type': 'application/json;charset=UTF-8'},
                 body: JSON.stringify(payload),
@@ -66,11 +74,11 @@ def _fetch_review_page(page, from_iso: str, to_iso: str, page_no: int, size: int
             try { return JSON.parse(text); }
             catch (e) { return { __error: true, status: r.status, body: 'JSON parse: ' + text.slice(0, 400) }; }
         } catch (e) {
-            return { __error: true, status: 0, body: String(e) };
+            return { __error: true, status: 0, body: String(e) + ' (origin=' + location.origin + ')' };
         }
     }
     """
-    return page.evaluate(js, payload)
+    return page.evaluate(js, {"url": REVIEW_API_URL, "payload": payload})
 
 
 def _map_review(r: dict) -> dict:
