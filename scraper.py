@@ -204,6 +204,41 @@ def main(progress_cb=None, existing_page=None, cookies=None, headless=False):
                 raise Exception("로그인 확인 시간 초과. 다시 로그인해주세요.")
             time.sleep(2)
 
+        # 페이지 진입 시 떠 있는 안내/공지 모달 자동 닫기
+        # (다운로드 확인 모달은 '확인' 버튼이라 같이 닫지 않도록 키워드로 구분)
+        def _dismiss_announcement_modals():
+            try:
+                page.evaluate(r"""
+                () => {
+                    const dialogs = document.querySelectorAll(
+                        "[role='dialog'], .modal.in, .seller-layer-modal.in, .uib-modal-window"
+                    );
+                    for (const dlg of dialogs) {
+                        if (dlg.querySelector("textarea")) continue;
+                        const text = (dlg.textContent || "");
+                        // 다운로드 확인 모달은 건드리지 않음
+                        if (text.includes("다운로드를 계속") || text.includes("리뷰 다운로드")) continue;
+                        // 닫기 아이콘/버튼 우선
+                        const closes = dlg.querySelectorAll(
+                            "button[aria-label='close'], button[aria-label='닫기'], button[class*='close']"
+                        );
+                        if (closes.length) { closes[0].click(); continue; }
+                        // 텍스트 기반 ('나중에','다시 보지 않기','확인','닫기') — 단 다운로드 모달이 아닐 때만
+                        for (const btn of dlg.querySelectorAll("button")) {
+                            const t = (btn.textContent || "").trim();
+                            if (["닫기","나중에","다음에","다시 보지 않기"].includes(t)) {
+                                btn.click(); break;
+                            }
+                        }
+                    }
+                }
+                """)
+            except Exception:
+                pass
+
+        _dismiss_announcement_modals()
+        time.sleep(1)
+
         # 전체 선택 + 1년 기간 설정 후 검색
         progress("최근 1년치 리뷰를 다운로드 중입니다. 잠시 기다려주세요...")
         try:
@@ -213,14 +248,59 @@ def main(progress_cb=None, existing_page=None, cookies=None, headless=False):
             time.sleep(1)
             page.click("button:has-text('검색')", timeout=8000)
             progress("검색 결과 로딩 중...")
-            time.sleep(6)
+            # 결과 리스트가 실제로 렌더될 때까지 대기 (엑셀다운 버튼은 결과 영역 안에 있음)
+            try:
+                page.locator("text=/리뷰목록\\s*\\(/").first.wait_for(state="visible", timeout=30000)
+            except Exception:
+                time.sleep(6)
         except Exception as e:
             progress(f"기간 설정 실패(기본값으로 진행): {e}")
 
-        # 엑셀다운 버튼 대기
+        # 검색 직후 다시 한 번 안내 모달 정리
+        _dismiss_announcement_modals()
+
+        # 엑셀다운 버튼 대기 — 텍스트 변형 + 버튼 셀렉터 fallback
         progress("엑셀다운 버튼 찾는 중...")
-        btn = page.get_by_text("엑셀다운").first
-        btn.wait_for(state="visible", timeout=60000)
+        EXCEL_BTN_SELECTORS = [
+            "button:has-text('엑셀다운로드')",
+            "button:has-text('엑셀 다운로드')",
+            "button:has-text('엑셀다운')",
+            "button:has-text('엑셀 다운')",
+            "a:has-text('엑셀다운')",
+            "[role='button']:has-text('엑셀다운')",
+        ]
+        btn = None
+        last_err = None
+        for sel in EXCEL_BTN_SELECTORS:
+            try:
+                cand = page.locator(sel).first
+                cand.wait_for(state="visible", timeout=10000)
+                btn = cand
+                progress(f"엑셀다운 버튼 감지: {sel}")
+                break
+            except Exception as e:
+                last_err = e
+                continue
+        if btn is None:
+            # 마지막 fallback: get_by_text
+            try:
+                btn = page.get_by_text("엑셀다운").first
+                btn.wait_for(state="visible", timeout=15000)
+            except Exception:
+                # 디버그 스크린샷 + 보이는 버튼 로그 후 실패
+                try:
+                    _dbg_dir = Path(os.path.dirname(OUTPUT_FILE)) / "screenshots"
+                    _dbg_dir.mkdir(parents=True, exist_ok=True)
+                    ts = datetime.now().strftime("%H%M%S")
+                    page.screenshot(path=str(_dbg_dir / f"excel_btn_not_found_{ts}.png"), full_page=True)
+                except Exception:
+                    pass
+                try:
+                    btns = page.locator("button:visible").all_text_contents()
+                    progress(f"[디버그] 보이는 버튼: {', '.join(b.strip() for b in btns[:30] if b.strip())}")
+                except Exception:
+                    pass
+                raise Exception(f"엑셀다운 버튼을 찾지 못했습니다 ({last_err})")
         progress("엑셀다운 버튼 클릭 중...")
 
         # 팝업 확인 + 다운로드를 분리해서 처리
