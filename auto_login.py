@@ -320,7 +320,7 @@ def _extract_qr_data(popup) -> dict:
 
 
 def _wait_for_popup_close(popup, max_seconds: int = 300, on_qr=None, on_qr_done=None,
-                          poll_interval: float = 1.0) -> bool:
+                          poll_interval: float = 0.3) -> bool:
     """popup이 닫히기를 대기. 사용자가 QR 스캔/캡차 처리 등 직접 작업할 시간.
 
     on_qr: 콜백(dict). 주기적으로 popup에서 QR 데이터 추출해 호출.
