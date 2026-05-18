@@ -121,8 +121,13 @@ def _log_event(event_type, message, detail=None):
         pass
 
 
+_chromium_verified = False
+
 def ensure_chromium():
-    import glob, platform, subprocess
+    global _chromium_verified
+    if _chromium_verified:
+        return
+    import platform, subprocess
     # 환경변수로 경로가 이미 지정된 경우 (Railway 볼륨, Playwright 베이스 이미지 등)
     _pw_path = os.environ.get("PLAYWRIGHT_BROWSERS_PATH")
     if not _pw_path:
@@ -133,11 +138,23 @@ def ensure_chromium():
         else:
             _pw_path = os.path.join(os.path.expanduser("~"), ".cache", "ms-playwright")
         os.environ["PLAYWRIGHT_BROWSERS_PATH"] = _pw_path
-    if not glob.glob(os.path.join(_pw_path, "chromium*")):
+
+    # 클라이언트 버전이 요구하는 정확한 binary 경로 확인 (glob 추정 대신 실제 검증)
+    expected_exe = None
+    try:
+        from playwright.sync_api import sync_playwright
+        with sync_playwright() as p:
+            expected_exe = p.chromium.executable_path
+    except Exception:
+        pass
+
+    if not expected_exe or not os.path.exists(expected_exe):
         socketio.emit("agent_progress", {"step": "Chromium 설치 중 (최초 1회, 이후 유지됩니다)..."})
         from playwright._impl._driver import compute_driver_executable
         driver_executable, driver_cli = compute_driver_executable()
         subprocess.run([str(driver_executable), str(driver_cli), "install", "chromium"], check=True)
+
+    _chromium_verified = True
 
 
 def load_reviews():
