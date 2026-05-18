@@ -944,13 +944,13 @@
 <div class="naver-popup-overlay" id="popup-overlay" onclick="overlayClick()"></div>
 <div class="naver-popup" id="naver-popup">
   <div class="popup-steps" id="popup-steps">
-    <div class="popup-step" id="pstep-0"><div class="step-circle">1</div><div class="step-label">페이지 이동</div></div>
+    <div class="popup-step" id="pstep-0"><div class="step-circle">1</div><div class="step-label">로그인</div></div>
     <div class="step-line"></div>
-    <div class="popup-step" id="pstep-1"><div class="step-circle">2</div><div class="step-label">기간 설정</div></div>
+    <div class="popup-step" id="pstep-1"><div class="step-circle">2</div><div class="step-label">진입</div></div>
     <div class="step-line"></div>
-    <div class="popup-step" id="pstep-2"><div class="step-circle">3</div><div class="step-label">다운로드</div></div>
+    <div class="popup-step" id="pstep-2"><div class="step-circle">3</div><div class="step-label">수집</div></div>
     <div class="step-line"></div>
-    <div class="popup-step" id="pstep-3"><div class="step-circle">4</div><div class="step-label">파싱</div></div>
+    <div class="popup-step" id="pstep-3"><div class="step-circle">4</div><div class="step-label">저장</div></div>
     <div class="step-line"></div>
     <div class="popup-step" id="pstep-4"><div class="step-circle">✓</div><div class="step-label">완료</div></div>
   </div>
@@ -2487,13 +2487,13 @@ let _popupLocked = false;
 let _popupCloseCallback = null;
 let _collectDone = false; // showResult(성공) 호출 후 showProgress 무시용
 
-// 진행 단계 매핑
+// 진행 단계 매핑 (API 직접 호출 흐름: 로그인 → 진입 → 수집 → 저장 → 완료)
 const _STEP_MAP = [
-  { step: 0, keys: ['페이지', '로딩', '로그인', '세션', '쿠키', '이동'] },
-  { step: 1, keys: ['1년치', '기간', '초기화', '검색 결과', '조회'] },
-  { step: 2, keys: ['엑셀다운', '다운로드'] },
-  { step: 3, keys: ['파싱'] },
   { step: 4, keys: ['완료'] },
+  { step: 3, keys: ['저장', '병합'] },
+  { step: 2, keys: ['수집 기간', 'page=', '리뷰 page', 'API 수집', '마지막 페이지', '조회'] },
+  { step: 1, keys: ['리뷰 검색 페이지', '페이지 로딩', '진입', '이동'] },
+  { step: 0, keys: ['로그인', '세션', '쿠키'] },
 ];
 
 function _getMsgStep(msg) {

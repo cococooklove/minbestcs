@@ -255,6 +255,7 @@ def main(progress_cb=None, existing_page=None, cookies=None, headless=False):
             except Exception: pass
 
     # === reviews.json 병합 (기존과 동일) ===
+    progress("저장 중...")
     try:
         existing = []
         if os.path.exists(OUTPUT_FILE):
