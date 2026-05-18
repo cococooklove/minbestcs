@@ -800,13 +800,21 @@ def api_collect():
                     except Exception as e:
                         print(f"[on_qr] emit 실패: {e}")
 
+                def _on_qr_done():
+                    # popup이 닫힌 즉시 모달 닫기 (셀러센터 이동 대기 전)
+                    try:
+                        socketio.emit("login_qr_done", {})
+                    except Exception as e:
+                        print(f"[on_qr_done] emit 실패: {e}")
+
                 # 항상 headless로 시도 — 세션 살아있으면 즉시 통과 (QR 안 뜸),
                 # 만료면 popup 캡처가 _on_qr로 우리 UI에 전달되어 modal 자동 열림
                 success, pw, context, page = login_mod.main(
                     keep_open=True, naver_id=naver_id, naver_pw=naver_pw,
-                    headless=True, on_qr=_on_qr, on_captcha=_make_on_captcha(),
+                    headless=True, on_qr=_on_qr, on_qr_done=_on_qr_done,
+                    on_captcha=_make_on_captcha(),
                 )
-                socketio.emit("login_qr_done", {})
+                socketio.emit("login_qr_done", {})  # 안전망
                 if not success:
                     _err = getattr(login_mod, "last_error", None) or "자동 로그인에 실패했어요"
                     socketio.emit("collect_status", {"step": "login_failed", "error": _err})

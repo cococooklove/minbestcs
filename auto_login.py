@@ -319,33 +319,47 @@ def _extract_qr_data(popup) -> dict:
     return data
 
 
-def _wait_for_popup_close(popup, max_seconds: int = 300, on_qr=None, poll_interval: float = 1.0) -> bool:
+def _wait_for_popup_close(popup, max_seconds: int = 300, on_qr=None, on_qr_done=None,
+                          poll_interval: float = 1.0) -> bool:
     """popup이 닫히기를 대기. 사용자가 QR 스캔/캡차 처리 등 직접 작업할 시간.
 
     on_qr: 콜백(dict). 주기적으로 popup에서 QR 데이터 추출해 호출.
+    on_qr_done: 콜백(). popup이 닫힌 즉시 호출 — 외부 UI 즉시 닫기용.
+    poll_interval: popup close 체크 주기 (s). QR 데이터 추출은 1초마다.
     """
+    def _emit_done():
+        if on_qr_done is not None:
+            try:
+                on_qr_done()
+            except Exception:
+                pass
     print(f"[auto_login.qr] popup 종료 대기 중 (최대 {max_seconds}s — QR 스캔/직접 로그인)...")
     deadline = time.time() + max_seconds
+    last_extract = 0.0
     while time.time() < deadline:
         try:
             if popup.is_closed():
                 print("[auto_login.qr] popup 종료 감지 — 로그인 진행됨")
+                _emit_done()
                 return True
         except Exception:
             print("[auto_login.qr] popup 접근 불가 (이미 닫힘)")
+            _emit_done()
             return True
-        if on_qr is not None:
+        now = time.time()
+        if on_qr is not None and (now - last_extract) >= 1.0:
             try:
                 data = _extract_qr_data(popup)
                 on_qr(data)
             except Exception as e:
                 print(f"[auto_login.qr] 추출 실패: {e}")
+            last_extract = now
         time.sleep(poll_interval)
     print("[auto_login.qr] popup 종료 대기 시간 초과")
     return False
 
 
-def _autofill_login(page, naver_id: str = "", naver_pw: str = "", on_qr=None) -> None:
+def _autofill_login(page, naver_id: str = "", naver_pw: str = "", on_qr=None, on_qr_done=None) -> None:
     """네이버 로그인 흐름 시작. QR 탭을 열고 사용자가 모바일로 스캔할 때까지 대기.
 
     - accounts.commerce.naver.com 페이지면 '네이버 아이디로 로그인' 탭 → OAuth popup → QR 탭 → 대기
@@ -353,13 +367,14 @@ def _autofill_login(page, naver_id: str = "", naver_pw: str = "", on_qr=None) ->
     - 그 외엔 nid로 직접 이동 → QR 탭 → 대기
 
     naver_id/naver_pw는 현재 사용하지 않지만(QR 방식), 향후 fallback용으로 시그니처 유지.
+    on_qr_done: popup 닫힘 즉시 호출 (외부 UI 즉시 닫기용).
     """
     cur = (page.url or "").lower()
     print(f"[auto_login.qr] 진입 URL={page.url}")
 
     if "nid.naver.com" in cur:
         _open_qr_tab(page)
-        _wait_for_popup_close(page, on_qr=on_qr)  # page 자체를 대기 (단일 페이지 흐름)
+        _wait_for_popup_close(page, on_qr=on_qr, on_qr_done=on_qr_done)
         return
 
     if "accounts.commerce.naver.com" in cur:
@@ -389,7 +404,7 @@ def _autofill_login(page, naver_id: str = "", naver_pw: str = "", on_qr=None) ->
             _open_qr_tab(popup)
             time.sleep(0.8)  # QR 탭 렌더링 대기
             _make_popup_minimal(popup)
-            _wait_for_popup_close(popup, on_qr=on_qr)
+            _wait_for_popup_close(popup, on_qr=on_qr, on_qr_done=on_qr_done)
             return
         except Exception as e:
             print(f"[auto_login.qr] popup 흐름 실패: {e} — nid 직접 이동 폴백")
@@ -575,10 +590,11 @@ def _wait_for_human(page, max_seconds: int = 300) -> bool:
 
 def ensure_logged_in(page, naver_id: str = "", naver_pw: str = "",
                       headless: bool = False, timeout_per_step: int = 120,
-                      on_qr=None, on_captcha=None) -> str:
+                      on_qr=None, on_qr_done=None, on_captcha=None) -> str:
     """이미 열려있는 페이지의 로그인 상태를 보장.
 
     on_qr: popup QR 데이터 콜백 — 외부 UI에 QR 표시용.
+    on_qr_done: popup 닫힘(=스캔 성공) 즉시 호출 — 외부 UI 즉시 닫기용.
     on_captcha: 캡차 감지 시 호출되는 동기 콜백(data_dict) → answer 문자열 또는 None.
                 제공 시 headless에서도 캡차를 사용자에게 표시해 통과 가능.
     Returns: 'seller' | 'intervention' | 'failed' | 'timeout'
@@ -613,7 +629,7 @@ def ensure_logged_in(page, naver_id: str = "", naver_pw: str = "",
         return "seller" if ok else "timeout"
 
     print(f"[auto_login.ensure] QR 로그인 시도 (on_qr={'yes' if on_qr else 'no'})")
-    _autofill_login(page, naver_id, naver_pw, on_qr=on_qr)
+    _autofill_login(page, naver_id, naver_pw, on_qr=on_qr, on_qr_done=on_qr_done)
     print(f"[auto_login.ensure] 자동입력 직후 URL={page.url}")
 
     result = _wait_after_login(page, max_seconds=timeout_per_step)
@@ -644,7 +660,8 @@ def _safe_title(page) -> str:
 
 
 def main(keep_open: bool = False, naver_id: str = None, naver_pw: str = None,
-         headless: bool = False, timeout_per_step: int = 120, on_qr=None, on_captcha=None):
+         headless: bool = False, timeout_per_step: int = 120,
+         on_qr=None, on_qr_done=None, on_captcha=None):
     """
     Returns: (success: bool, pw, context, page)
       - keep_open=False 면 context/pw/page는 None 으로 반환되고 context는 close.
@@ -725,7 +742,7 @@ def main(keep_open: bool = False, naver_id: str = None, naver_pw: str = None,
 
         # 4) QR 로그인 흐름 시작 (popup은 on_qr 콜백으로 외부 UI에 표시)
         print(f"[auto_login] QR 로그인 시도, on_qr={'yes' if on_qr else 'no'}")
-        _autofill_login(page, naver_id, naver_pw, on_qr=on_qr)
+        _autofill_login(page, naver_id, naver_pw, on_qr=on_qr, on_qr_done=on_qr_done)
 
         # 4) 결과 판정
         result = _wait_after_login(page, max_seconds=timeout_per_step)
